@@ -16,3 +16,8 @@
 
 ### Rollback
 Everything is in git; each milestone is a commit.
+
+### 2026-11-04 (GitHub + CI)
+- Connected `origin` (private repo), rebased M0 onto remote `main` (which held only `LICENSE`, Unlicense). Branch renamed `master` -> `main`.
+- Added `ci.yml`, `security.yml`, Dependabot, CODEOWNERS, PR template, `.gitattributes` on branch `ci/github-actions`. YAML validated locally; **not yet run on GitHub** until pushed and checked.
+- ADR 0002 records the CI/CD and scanning choices.
