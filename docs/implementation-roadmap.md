@@ -6,7 +6,7 @@ Rules: one milestone at a time; tests green before moving on; explicit approval 
 |---|---|---|---|
 | M0 | Foundation: skeleton, config, logging, tests, docs, git | lint/types/tests pass; `--health` runs | $0 |
 | M1 | Local chat + cited RAG (original model) | Answers cite retrieved sources from a small versioned corpus | $0 |
-| M2 | Evaluation harness + baseline | Repeatable scores recorded for original model | $0 |
+| M2 | Evaluation harness + baseline (**built; baseline recorded**) | Repeatable scores recorded for original model | $0 |
 | M3 | Weekly RAG automation | Staged update, eval gate, atomic promote, rollback, report | $0-low |
 | M4 | Colab QLoRA (gated by M2) | Candidate beats baseline without general regression; human approves | Colab free or ~$10/mo |
 | M5 | LangGraph agents + policy engine | Approval checkpoints and audit log work with no live targets | $0 |

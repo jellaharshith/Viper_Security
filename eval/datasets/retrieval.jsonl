@@ -1,0 +1,130 @@
+{"id": "ret-000", "query": "Apple Multiple Products Memory Initialization Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2020-27950"}
+{"id": "ret-001", "query": "Microsoft Windows LSA Spoofing Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2022-26925"}
+{"id": "ret-002", "query": "VMware vCenter Server Out-of-Bounds Write Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2023-34048"}
+{"id": "ret-003", "query": "Wing FTP Server Information Disclosure Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2025-47813"}
+{"id": "ret-004", "query": "Zyxel GS1900 Series Switches Stack-Based Buffer Overflow Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2026-7273"}
+{"id": "ret-005", "query": "Android OS Privilege Escalation Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2011-1823"}
+{"id": "ret-006", "query": "PlaySMS Server-Side Template Injection Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2020-8644"}
+{"id": "ret-007", "query": "KNX Association KNX Protocol Connection Authorization Option 1 Overly Restrictive Account Lockout Mechanism Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2023-4346"}
+{"id": "ret-008", "query": "Microsoft Office Remote Code Execution", "style": "title", "gold_id": "cisa-kev:CVE-2009-0238"}
+{"id": "ret-009", "query": "Cisco Catalyst SD-WAN Controller and Manager Authentication Bypass Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2026-20127"}
+{"id": "ret-010", "query": "WordPress Core Interpretation Conflict Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2026-63030"}
+{"id": "ret-011", "query": "Oracle Java SE and JRockit Unspecified Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2016-3427"}
+{"id": "ret-012", "query": "Palo Alto Networks PAN-OS File Read Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2025-0111"}
+{"id": "ret-013", "query": "Microsoft Word Information Disclosure Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2023-36761"}
+{"id": "ret-014", "query": "Oracle JRE Sandbox Bypass Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2013-0431"}
+{"id": "ret-015", "query": "Palo Alto Networks Expedition Missing Authentication Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2024-5910"}
+{"id": "ret-016", "query": "D-Link Multiple Routers Command Injection Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2019-16920"}
+{"id": "ret-017", "query": "Apple Multiple Buffer Overflow Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2026-20700"}
+{"id": "ret-018", "query": "Apple Multiple Products WebKit Out-of-Bounds Write Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2025-24201"}
+{"id": "ret-019", "query": "Arcadyan Buffalo Firmware Path Traversal Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2021-20090"}
+{"id": "ret-020", "query": "Cisco IOS Software and Cisco IOS XE Software Improper Input Validation Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2018-0174"}
+{"id": "ret-021", "query": "Google Chromium Portals Use-After-Free Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2021-37973"}
+{"id": "ret-022", "query": "Reolink RLC-410W IP Camera OS Command Injection Vulnerability ", "style": "title", "gold_id": "cisa-kev:CVE-2021-40407"}
+{"id": "ret-023", "query": "Cisco IP Phones Web Server Remote Code Execution and Denial-of-Service Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2020-3161"}
+{"id": "ret-024", "query": "Cisco Secure Access Control System Java Deserialization Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2018-0147"}
+{"id": "ret-025", "query": "Atlassian Confluence Server and Data Center Remote Code Execution Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2022-26134"}
+{"id": "ret-026", "query": "Microsoft Windows NULL Pointer Dereference Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2026-21525"}
+{"id": "ret-027", "query": "Dassault Systèmes DELMIA Apriso Deserialization of Untrusted Data Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2025-5086"}
+{"id": "ret-028", "query": "TeleMessage TM SGNL Hidden Functionality Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2025-47729"}
+{"id": "ret-029", "query": "WatchGuard Firebox Out-of-Bounds Write Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2025-9242"}
+{"id": "ret-030", "query": "SolarWinds Web Help Desk Security Control Bypass Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2025-40536"}
+{"id": "ret-031", "query": "Apple Multiple Products Kernel Privilege Escalation Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2023-41992"}
+{"id": "ret-032", "query": "EG Secure Solutions SiteGuard Server Edition OS Command Injection Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2026-106931"}
+{"id": "ret-033", "query": "Citrix Session Recording Deserialization of Untrusted Data Vulnerability", "style": "title", "gold_id": "cisa-kev:CVE-2024-8069"}
+{"id": "ret-034", "query": "Apple iOS, iPadOS, and macOS contain an unspecified vulnerability involving input validation which can allow a local attacker to view sensitive user information.", "style": "description", "gold_id": "cisa-kev:CVE-2020-9934"}
+{"id": "ret-035", "query": "WinRAR Absolute Path Traversal vulnerability leads to Remote Code Execution", "style": "description", "gold_id": "cisa-kev:CVE-2018-20250"}
+{"id": "ret-036", "query": "WSO2 API Control Plane, API Manager, Traffic Manager & Universal Gateway contain a path traversal vulnerability that could allow for unrestricted file upload and lead to remote code execution.", "style": "description", "gold_id": "cisa-kev:CVE-2026-5430"}
+{"id": "ret-037", "query": "WatchGuard Firebox and XTM appliances allow a remote attacker with unprivileged credentials to access the system with a privileged management session via exposed management access.", "style": "description", "gold_id": "cisa-kev:CVE-2022-23176"}
+{"id": "ret-038", "query": "JFrog Artifactory contains an improper limitation of a pathname to a restricted directory vulnerability. This can allow an authenticated user to write data outside the intended Docker cache path under specific remote-rep", "style": "description", "gold_id": "cisa-kev:CVE-2026-66384"}
+{"id": "ret-039", "query": "Citrix Workspace Application and Receiver for Windows contains remote code execution vulnerability resulting from local drive access preferences not being enforced into the clients' local drives.", "style": "description", "gold_id": "cisa-kev:CVE-2019-11634"}
+{"id": "ret-040", "query": "Microsoft Windows Server 2003 R2 contains a buffer overflow vulnerability in Internet Information Services (IIS) 6.0 which allows remote attackers to execute code via a long header beginning with \"If: <http://\" in a PROP", "style": "description", "gold_id": "cisa-kev:CVE-2017-7269"}
+{"id": "ret-041", "query": "Google Chromium contains an out of bounds memory access vulnerability in ANGLE that could allow a remote attacker to perform out of bounds memory access via a crafted HTML page. This vulnerability could affect multiple w", "style": "description", "gold_id": "cisa-kev:CVE-2025-14174"}
+{"id": "ret-042", "query": "A deserialization of untrusted data vulnerability in the web-based management interface of certain Cisco Small Business RV Series Routers could allow an attacker to execute code with root privileges.", "style": "description", "gold_id": "cisa-kev:CVE-2019-15271"}
+{"id": "ret-043", "query": "Citrix NetScaler ADC and NetScaler Gateway contain a memory overflow vulnerability that could allow for remote code execution and/or denial of service.", "style": "description", "gold_id": "cisa-kev:CVE-2025-7775"}
+{"id": "ret-044", "query": "Oracle Fusion Middleware Reports Developer contains an unspecified vulnerability that allows remote attackers to affect confidentiality and integrity of affected systems.", "style": "description", "gold_id": "cisa-kev:CVE-2012-3152"}
+{"id": "ret-045", "query": "Cisco Adaptive Security Appliance (ASA) and Firepower Threat Defense (FTD) contain a missing release of resource after effective lifetime vulnerability that could allow an unauthenticated, remote attacker to cause a deni", "style": "description", "gold_id": "cisa-kev:CVE-2024-20481"}
+{"id": "ret-046", "query": "Microsoft Defender contains an unspecified vulnerability that allows for remote code execution.", "style": "description", "gold_id": "cisa-kev:CVE-2021-1647"}
+{"id": "ret-047", "query": "Oracle PeopleSoft Enterprise PeopleTools contains a missing authentication for critical function vulnerability which could allow an unauthenticated attacker to obtain takeover of PeopleSoft Enterprise PeopleTools.", "style": "description", "gold_id": "cisa-kev:CVE-2026-35273"}
+{"id": "ret-048", "query": "Ivanti Endpoint Manager Mobile (EPMM) and MobileIron Core contain an authentication bypass vulnerability that allows unauthorized users to access restricted functionality or resources of the application.", "style": "description", "gold_id": "cisa-kev:CVE-2023-35082"}
+{"id": "ret-049", "query": "GNU C Library's dynamic loader ld.so contains a buffer overflow vulnerability when processing the GLIBC_TUNABLES environment variable, allowing a local attacker to execute code with elevated privileges.", "style": "description", "gold_id": "cisa-kev:CVE-2023-4911"}
+{"id": "ret-050", "query": "Microsoft Office Excel allows remote attackers to execute arbitrary code via a spreadsheet with a FEATHEADER record containing an invalid cbHdrData size element that affects a pointer offset.", "style": "description", "gold_id": "cisa-kev:CVE-2009-3129"}
+{"id": "ret-051", "query": "Acronis Cyber Infrastructure (ACI) allows an unauthenticated user to execute commands remotely due to the use of default passwords.", "style": "description", "gold_id": "cisa-kev:CVE-2023-45249"}
+{"id": "ret-052", "query": "Microsoft Windows Win32k contains an unspecified vulnerability that allows for privilege escalation.", "style": "description", "gold_id": "cisa-kev:CVE-2021-28310"}
+{"id": "ret-053", "query": "Microsoft Windows SmartScreen contains a security feature bypass vulnerability that could allow an attacker to bypass Windows Defender SmartScreen checks and their associated prompts.", "style": "description", "gold_id": "cisa-kev:CVE-2023-36025"}
+{"id": "ret-054", "query": "Google Chromium contains an information disclosure vulnerability within the core memory component that allows a remote attacker to obtain potentially sensitive information from process memory via a crafted HTML page. Thi", "style": "description", "gold_id": "cisa-kev:CVE-2021-37976"}
+{"id": "ret-055", "query": "Teclib GLPI contains a remote code execution vulnerability in the third-party library, htmlawed.", "style": "description", "gold_id": "cisa-kev:CVE-2022-35914"}
+{"id": "ret-056", "query": "A privilege escalation vulnerability exists in Microsoft Exchange Server. An attacker who successfully exploited this vulnerability could attempt to impersonate any other user of the Exchange server.", "style": "description", "gold_id": "cisa-kev:CVE-2018-8581"}
+{"id": "ret-057", "query": "Synacor Zimbra Collaboration Suite (ZCS) contains an improper restriction of XML external entity (XXE) vulnerability in the mailboxd component.", "style": "description", "gold_id": "cisa-kev:CVE-2019-9670"}
+{"id": "ret-058", "query": "Google Chromium V8 contains an out-of-bounds read and write vulnerability that could allow a remote attacker to potentially exploit heap corruption via a crafted HTML page. This vulnerability could affect multiple web br", "style": "description", "gold_id": "cisa-kev:CVE-2025-5419"}
+{"id": "ret-059", "query": "Google Chromium libvpx contains a heap buffer overflow vulnerability in vp8 encoding that allows a remote attacker to potentially exploit heap corruption via a crafted HTML page. This vulnerability could impact web brows", "style": "description", "gold_id": "cisa-kev:CVE-2023-5217"}
+{"id": "ret-060", "query": "Adobe Acrobat and Reader contain a heap-based buffer overflow vulnerability which could allow remote attackers to execute arbitrary code via a crafted PDF file that triggers memory corruption.", "style": "description", "gold_id": "cisa-kev:CVE-2009-3459"}
+{"id": "ret-061", "query": "ProjectSend contains an improper authentication vulnerability that allows a remote, unauthenticated attacker to enable unauthorized modification of the application's configuration via crafted HTTP requests to options.php", "style": "description", "gold_id": "cisa-kev:CVE-2024-11680"}
+{"id": "ret-062", "query": "MikroTik RouterOS contains a missing authentication for critical function vulnerability which allows kernel memory disclosure and denial of service in the btest service.", "style": "description", "gold_id": "cisa-kev:CVE-2026-67277"}
+{"id": "ret-063", "query": "VMware Aria Operations for Networks (formerly vRealize Network Insight) contains a command injection vulnerability that allows a malicious actor with network access to perform an attack resulting in remote code execution", "style": "description", "gold_id": "cisa-kev:CVE-2023-20887"}
+{"id": "ret-064", "query": "Oracle WebLogic contains an unspecified vulnerability that could allow an unauthenticated attacker with network access via T3, IIOP to compromise Oracle WebLogic Server. Successful attacks of this vulnerability can resul", "style": "description", "gold_id": "cisa-kev:CVE-2024-21182"}
+{"id": "ret-065", "query": "The login_mgr.cgi script in D-Link DNS-320 is vulnerable to remote code execution.", "style": "description", "gold_id": "cisa-kev:CVE-2019-16057"}
+{"id": "ret-066", "query": "Android Pixel contains an unspecified vulnerability in the firmware that allows for privilege escalation.", "style": "description", "gold_id": "cisa-kev:CVE-2024-32896"}
+{"id": "ret-067", "query": "vulnerability in Cisco HyperFlex HX where cisco hyperflex hx installer virtual machine contains an insufficient input validation vulnerability which could allow a", "style": "hint", "gold_id": "cisa-kev:CVE-2021-1498"}
+{"id": "ret-068", "query": "vulnerability in Roundcube Webmail where roundcube webmail contains a cross-site scripting vulnerability via the animate tag in an svg document.", "style": "hint", "gold_id": "cisa-kev:CVE-2025-68461"}
+{"id": "ret-069", "query": "vulnerability in Microsoft Windows where microsoft windows cryptographic next generation (cng) key isolation service contains an unspecified vulnerability that a", "style": "hint", "gold_id": "cisa-kev:CVE-2022-41125"}
+{"id": "ret-070", "query": "vulnerability in Wing FTP Server Wing FTP Server where wing ftp server contains an improper neutralization of null byte or nul character vulnerability that can allow injection", "style": "hint", "gold_id": "cisa-kev:CVE-2025-47812"}
+{"id": "ret-071", "query": "vulnerability in Adobe ColdFusion where adobe coldfusion contains an unspecified vulnerability, which could result in information disclosure from a compromised ", "style": "hint", "gold_id": "cisa-kev:CVE-2013-0631"}
+{"id": "ret-072", "query": "vulnerability in SAP NetWeaver where the universal worklist configuration in sap netweaver as java 7.4 allows remote attackers to obtain sensitive user infor", "style": "hint", "gold_id": "cisa-kev:CVE-2016-2388"}
+{"id": "ret-073", "query": "vulnerability in Citrix NetScaler ADC and NetScaler Gateway where citrix netscaler adc and netscaler gateway contain a buffer overflow vulnerability that allows for sensitive information", "style": "hint", "gold_id": "cisa-kev:CVE-2023-4966"}
+{"id": "ret-074", "query": "vulnerability in Microsoft Internet Explorer and Edge where an information disclosure vulnerability exists in the way that certain functions in internet explorer and edge handle ob", "style": "hint", "gold_id": "cisa-kev:CVE-2016-3351"}
+{"id": "ret-075", "query": "vulnerability in Checkbox Checkbox Survey where deserialization of untrusted data vulnerability in checkboxweb.dll of checkbox survey allows an unauthenticated remote a", "style": "hint", "gold_id": "cisa-kev:CVE-2021-27852"}
+{"id": "ret-076", "query": "vulnerability in Mitel MiVoice Connect where the mitel edge gateway component of mivoice connect allows an authenticated attacker with internal network access to exe", "style": "hint", "gold_id": "cisa-kev:CVE-2022-40765"}
+{"id": "ret-077", "query": "vulnerability in Apache Tomcat where when running apache tomcat on windows with http puts enabled, it is possible to upload a jsp file to the server via a sp", "style": "hint", "gold_id": "cisa-kev:CVE-2017-12615"}
+{"id": "ret-078", "query": "vulnerability in SonicWall SMA1000 Appliances where sonicwall sma1000 appliances contains an os command injection vulnerability that could enable a remote authenticated att", "style": "hint", "gold_id": "cisa-kev:CVE-2026-83549"}
+{"id": "ret-079", "query": "vulnerability in Kludex Starlette where kludex starlette contains a http request/response smuggling vulnerability that could allow attackers to inject paths int", "style": "hint", "gold_id": "cisa-kev:CVE-2026-48710"}
+{"id": "ret-080", "query": "vulnerability in Microsoft DWM Core Library where microsoft dwm core library contains a privilege escalation vulnerability that allows an attacker to gain system privileg", "style": "hint", "gold_id": "cisa-kev:CVE-2024-30051"}
+{"id": "ret-081", "query": "vulnerability in Adobe Acrobat and Reader where adobe acrobat and reader contains an unespecified vulnerability described as a design flaw which could allow a specially", "style": "hint", "gold_id": "cisa-kev:CVE-2008-0655"}
+{"id": "ret-082", "query": "vulnerability in Apache Airflow where a remote code/command injection vulnerability was discovered in one of the example dags shipped with airflow.", "style": "hint", "gold_id": "cisa-kev:CVE-2020-11978"}
+{"id": "ret-083", "query": "vulnerability in SysAid SysAid On-Prem where sysaid on-prem contains an improper restriction of xml external entity reference vulnerability in the server url process", "style": "hint", "gold_id": "cisa-kev:CVE-2025-2776"}
+{"id": "ret-084", "query": "vulnerability in Sunhillo SureLine where sunhillo sureline contains an os command injection vulnerability that allows an attacker to cause a denial-of-service or", "style": "hint", "gold_id": "cisa-kev:CVE-2021-36380"}
+{"id": "ret-085", "query": "vulnerability in Elastic Elasticsearch where elasticsearch enables dynamic scripting, which allows remote attackers to execute arbitrary mvel expressions and java co", "style": "hint", "gold_id": "cisa-kev:CVE-2014-3120"}
+{"id": "ret-086", "query": "vulnerability in Apache Struts where apache struts contains a vulnerability that allows for remote code execution under two circumstances. one, where the alw", "style": "hint", "gold_id": "cisa-kev:CVE-2018-11776"}
+{"id": "ret-087", "query": "vulnerability in Microsoft Office where microsoft office allows remote attackers to execute arbitrary code via a crafted office document.", "style": "hint", "gold_id": "cisa-kev:CVE-2015-1770"}
+{"id": "ret-088", "query": "vulnerability in Langflow Langflow where langflow contains a code injection vulnerability that could allow building public flows without requiring authentication", "style": "hint", "gold_id": "cisa-kev:CVE-2026-33017"}
+{"id": "ret-089", "query": "vulnerability in SolarWinds Serv-U where solarwinds serv-u contains an unspecified memory escape vulnerability which can allow for remote code execution.", "style": "hint", "gold_id": "cisa-kev:CVE-2021-35211"}
+{"id": "ret-090", "query": "vulnerability in Apple iOS, iPadOS, and watchOS where apple ios, ipados, and watchos webkit contain an unspecified vulnerability that allows for universal cross-site scriptin", "style": "hint", "gold_id": "cisa-kev:CVE-2021-1879"}
+{"id": "ret-091", "query": "vulnerability in Commvault Web Server where commvault web server contains an unspecified vulnerability that allows a remote, authenticated attacker to create and ex", "style": "hint", "gold_id": "cisa-kev:CVE-2025-3928"}
+{"id": "ret-092", "query": "vulnerability in Linux Kernel where linux kernel contains a use-after-free vulnerability in the nft_object, allowing local attackers to escalate privileges.", "style": "hint", "gold_id": "cisa-kev:CVE-2022-2586"}
+{"id": "ret-093", "query": "vulnerability in Apple Multiple Products where a use-after-free vulnerability in apple ios, macos, tvos, and watchos could allow a malicious application to execute cod", "style": "hint", "gold_id": "cisa-kev:CVE-2019-8605"}
+{"id": "ret-094", "query": "vulnerability in Apple Multiple Products where apple ios, ipados, macos, tvos, and watchos contain a time-of-check/time-of-use (toctou) memory corruption vulnerability", "style": "hint", "gold_id": "cisa-kev:CVE-2022-48618"}
+{"id": "ret-095", "query": "vulnerability in Trend Micro OfficeScan where trend micro officescan contains a directory traversal vulnerability by extracting files from a zip file to a specific fo", "style": "hint", "gold_id": "cisa-kev:CVE-2019-18187"}
+{"id": "ret-096", "query": "vulnerability in Dasan Gigabit Passive Optical Network (GPON) Routers where dasan gpon routers contain an authentication bypass vulnerability. when combined with cve-2018-10561, exploitation can a", "style": "hint", "gold_id": "cisa-kev:CVE-2018-10562"}
+{"id": "ret-097", "query": "vulnerability in Adobe Flash Player where adobe flash player allows remote attackers to cause a denial of service or possibly execute arbitrary code.", "style": "hint", "gold_id": "cisa-kev:CVE-2016-1019"}
+{"id": "ret-098", "query": "vulnerability in Amcrest Cameras and Network Video Recorder (NVR) where amcrest cameras and nvr contain a stack-based buffer overflow vulnerability through port 37777 that allows an unauthenti", "style": "hint", "gold_id": "cisa-kev:CVE-2020-5735"}
+{"id": "ret-099", "query": "vulnerability in Cisco Unified Communications Manager where cisco unified communications manager (unified cm), cisco unified communications manager session management edition (unif", "style": "hint", "gold_id": "cisa-kev:CVE-2026-20045"}
+{"id": "neg-000", "query": "What is a good recipe for banana bread?", "style": "negative", "gold_id": null}
+{"id": "neg-001", "query": "Who won the 2018 FIFA World Cup?", "style": "negative", "gold_id": null}
+{"id": "neg-002", "query": "Write a haiku about autumn leaves.", "style": "negative", "gold_id": null}
+{"id": "neg-003", "query": "How tall is Mount Everest?", "style": "negative", "gold_id": null}
+{"id": "neg-004", "query": "What is the best way to learn the guitar?", "style": "negative", "gold_id": null}
+{"id": "neg-005", "query": "Explain how photosynthesis works.", "style": "negative", "gold_id": null}
+{"id": "neg-006", "query": "What is the weather usually like in Lisbon in May?", "style": "negative", "gold_id": null}
+{"id": "neg-007", "query": "How do I train a puppy to sit?", "style": "negative", "gold_id": null}
+{"id": "neg-008", "query": "Recommend a good science fiction novel.", "style": "negative", "gold_id": null}
+{"id": "neg-009", "query": "What is the boiling point of water at altitude?", "style": "negative", "gold_id": null}
+{"id": "neg-010", "query": "How do I convert a Python list to a set?", "style": "negative", "gold_id": null}
+{"id": "neg-011", "query": "What is the difference between TCP and UDP?", "style": "negative", "gold_id": null}
+{"id": "neg-012", "query": "How do I configure a firewall rule on Linux?", "style": "negative", "gold_id": null}
+{"id": "neg-013", "query": "Explain what a buffer overflow is.", "style": "negative", "gold_id": null}
+{"id": "neg-014", "query": "What is multi-factor authentication?", "style": "negative", "gold_id": null}
+{"id": "neg-015", "query": "How does public key cryptography work?", "style": "negative", "gold_id": null}
+{"id": "neg-016", "query": "What are the OWASP Top 10 categories?", "style": "negative", "gold_id": null}
+{"id": "neg-017", "query": "How do I write a good security report?", "style": "negative", "gold_id": null}
+{"id": "neg-018", "query": "What is the MITRE ATT&CK technique for phishing?", "style": "negative", "gold_id": null}
+{"id": "neg-019", "query": "How should I rotate API keys safely?", "style": "negative", "gold_id": null}
+{"id": "neg-020", "query": "Explain the CIA triad.", "style": "negative", "gold_id": null}
+{"id": "neg-021", "query": "What is a zero-day vulnerability?", "style": "negative", "gold_id": null}
+{"id": "neg-022", "query": "How do I set up a home VPN?", "style": "negative", "gold_id": null}
+{"id": "neg-023", "query": "What is the capital of Australia?", "style": "negative", "gold_id": null}
+{"id": "neg-024", "query": "Summarize the plot of Romeo and Juliet.", "style": "negative", "gold_id": null}
+{"id": "neg-025", "query": "How many bytes are in a gigabyte?", "style": "negative", "gold_id": null}
+{"id": "neg-026", "query": "What is a SQL injection?", "style": "negative", "gold_id": null}
+{"id": "neg-027", "query": "Describe how a password manager works.", "style": "negative", "gold_id": null}
+{"id": "neg-028", "query": "What is the history of the Roman Empire?", "style": "negative", "gold_id": null}
+{"id": "neg-029", "query": "How do I bake sourdough bread?", "style": "negative", "gold_id": null}
