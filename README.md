@@ -29,3 +29,10 @@ ollama pull hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF:Q4_K_M   # 
 ```
 Answers cite numbered sources. If nothing relevant is found, the answer is labelled UNVERIFIED.
 A CVE that is not in KEV is reported as such without asking the model. CPU-only: expect ~1 minute per answer.
+
+## Knowledge-base updates
+```
+python -m viper.cli kb update --no-promote   # fetch, stage, gate (dry run)
+python -m viper.cli kb update                # ...and promote if every gate passes
+python -m viper.cli kb status | rollback
+```

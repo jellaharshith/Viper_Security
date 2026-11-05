@@ -18,6 +18,40 @@ class VectorStore:
         # path=None -> in-memory (used by tests)
         self._client = QdrantClient(path=str(path)) if path else QdrantClient(":memory:")
         self.collection = collection
+        self._owner = True
+
+    def view(self, collection: str) -> VectorStore:
+        """Another collection on the same client. Embedded Qdrant allows one client per folder."""
+        other = object.__new__(VectorStore)
+        other._client = self._client
+        other.collection = collection
+        other._owner = False
+        return other
+
+    def exists(self) -> bool:
+        return bool(self._client.collection_exists(self.collection))
+
+    def drop(self) -> None:
+        if self.exists():
+            self._client.delete_collection(self.collection)
+
+    def export(self) -> list[tuple[Document, list[float]]]:
+        """Every (document, vector) pair, so unchanged records need not be re-embedded."""
+        if not self.exists():
+            return []
+        out: list[tuple[Document, list[float]]] = []
+        offset = None
+        while True:
+            pts, offset = self._client.scroll(
+                self.collection, limit=256, offset=offset, with_payload=True, with_vectors=True
+            )
+            for p in pts:
+                vec = p.vector
+                if isinstance(vec, list):
+                    flat = [float(x) for x in vec if not isinstance(x, list)]
+                    out.append((self._to_doc(p.payload or {}), flat))
+            if offset is None:
+                return out
 
     def _ensure(self, dim: int) -> None:
         if not self._client.collection_exists(self.collection):
@@ -72,4 +106,5 @@ class VectorStore:
         return hits
 
     def close(self) -> None:
-        self._client.close()
+        if self._owner:
+            self._client.close()

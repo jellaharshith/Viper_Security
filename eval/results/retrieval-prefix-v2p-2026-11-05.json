@@ -1,0 +1,57 @@
+{
+ "meta": {
+  "tag": "retrieval-prefix-v2p",
+  "created": "2026-11-05T05:01:48+00:00",
+  "chat_model": "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF:Q4_K_M",
+  "embed_model": "nomic-embed-text",
+  "embed_query_prefix": "search_query: ",
+  "embed_doc_prefix": "search_document: ",
+  "kb_version": "v2p",
+  "kb_records": 1768,
+  "min_score": 0.55,
+  "top_k": 4,
+  "dataset_hash": "f63ecd4683d45d37",
+  "git_commit": "64d80d5"
+ },
+ "retrieval": {
+  "overall": {
+   "n": 100,
+   "recall@1": 0.89,
+   "recall@4": 0.99,
+   "recall@10": 1.0,
+   "mrr": 0.9366666666666668
+  },
+  "by_style": {
+   "description": {
+    "n": 33,
+    "recall@1": 0.9393939393939394,
+    "recall@4": 0.9696969696969697,
+    "recall@10": 1.0,
+    "mrr": 0.9595959595959597
+   },
+   "hint": {
+    "n": 33,
+    "recall@1": 0.8181818181818182,
+    "recall@4": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.898989898989899
+   },
+   "title": {
+    "n": 34,
+    "recall@1": 0.9117647058823529,
+    "recall@4": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.9509803921568628
+   }
+  },
+  "calibration": {
+   "threshold": 0.8047,
+   "balanced_accuracy": 1.0,
+   "tpr": 1.0,
+   "tnr": 1.0,
+   "pos_mean": 0.9047,
+   "neg_mean": 0.5826,
+   "neg_max": 0.7516
+  }
+ }
+}
