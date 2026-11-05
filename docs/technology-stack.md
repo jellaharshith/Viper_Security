@@ -9,9 +9,10 @@ Status: **Chosen** = used now; **Planned** = per milestone; **Verify** = must be
 | Logging | stdlib JSON formatter | Chosen | No extra dependency |
 | Quality | pytest, ruff, mypy | Chosen | Run via `tasks.ps1 check` |
 | Inference | Ollama + GGUF (CPU) | Planned M1 | Ollama already installed |
-| Base model | Cisco Foundation-Sec-8B family | **Verify** | Confirm chat variant and license first |
-| Embedded vector DB | Qdrant local mode | Planned M1 | No Docker |
-| Embeddings | small local model (e.g. bge-small class) | Verify M1 | CPU-friendly |
+| Chat model | Foundation-Sec-1.1-8B-Instruct, Q4_K_M GGUF (4.92 GB, official `fdtn-ai` build) | **Chosen (M1), verified 2026-11-04** | Llama 3.1 Community License + Cisco Apache-2.0 changes (per NOTICE.md). Baseline vs alternatives in M2 |
+| Embedded vector DB | Qdrant local mode (`qdrant-client`) | Chosen (M1) | No Docker |
+| Embeddings | `nomic-embed-text` via Ollama (274 MB, 768-dim) | Chosen (M1) | CPU-friendly; no extra ML dependency |
+| HTTP | httpx | Chosen (M1) | Ollama client + CISA fetch |
 | Agents | LangGraph | Planned M5 | |
 | API | FastAPI | Planned M5/M6 | Authenticated, TLS |
 | DB | PostgreSQL | Planned M5/M6 | Not needed before |
