@@ -20,3 +20,6 @@ Train only if a measurable, repeatable failure exists that prompting, tooling or
 
 ## Hardware note
 Local runs are CPU-bound, so evaluation sets stay small at first and run in batches.
+
+## Verified model facts (2026-11-04)
+Variants on Hugging Face under `fdtn-ai`: Foundation-Sec-8B (base, card: Apache-2.0, derived from Llama-3.1-8B), -Instruct, -Reasoning, and 1.1-Instruct; Cisco publishes Q4_K_M and Q8_0 GGUFs. Instruct/Reasoning ship Llama 3.1 Community License plus Cisco Apache-2.0 changes (NOTICE.md). M1 uses 1.1-Instruct Q4_K_M. Reasoning is an M2 comparison candidate (it emits long reasoning traces, which is slow on CPU).

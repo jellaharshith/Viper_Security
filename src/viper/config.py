@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = ""  # set once a model is chosen/pulled (M1)
     qdrant_path: Path = Path("data/qdrant")  # embedded mode, no server/Docker
+    embed_model: str = "nomic-embed-text"
+    kb_version: str = "v1"  # knowledge-base index version (collection name suffix)
+    retrieval_top_k: int = 4
+    min_score: float = 0.55  # below this, an answer is labelled unverified
 
     # --- Execution plane: cloud Kali VM (empty until provisioned) ---
     exec_api_url: str = ""
