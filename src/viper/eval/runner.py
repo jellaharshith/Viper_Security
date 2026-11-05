@@ -16,6 +16,7 @@ from viper.eval.retrieval import evaluate_retrieval
 from viper.llm import OllamaClient
 from viper.rag import VectorStore, answer
 from viper.rag.embedding import PrefixEmbedder
+from viper.rag.registry import resolve_collection
 
 RESULTS_DIR = Path("eval/results")
 
@@ -39,7 +40,10 @@ def run_eval(
 ) -> dict[str, Any]:
     llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
     qembed = PrefixEmbedder(llm, settings.embed_query_prefix)
-    store = VectorStore(settings.qdrant_path, f"kb_{settings.kb_version}")
+    store = VectorStore(
+        settings.qdrant_path,
+        resolve_collection(settings.kb_registry_path, f"kb_{settings.kb_version}"),
+    )
     try:
         report: dict[str, Any] = {
             "meta": {

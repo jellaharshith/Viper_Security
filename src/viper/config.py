@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     embed_query_prefix: str = "search_query: "  # nomic-embed-text task prefix
     embed_doc_prefix: str = "search_document: "
     kb_version: str = "v2p"  # index version = collection suffix (v2p: nomic task prefixes)
+    kb_registry_path: Path = Path("data/kb_registry.json")
+    kb_min_recall_at_4: float = 0.95  # promotion gate: absolute floor on the frozen retrieval set
+    kb_max_shrink: float = 0.10  # reject an update that drops more than this fraction of records
     retrieval_top_k: int = 4
     min_score: float = 0.65  # below this, no sources are attached (calibrated in M2)
 

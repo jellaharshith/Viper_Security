@@ -46,3 +46,11 @@ Everything is in git; each milestone is a commit.
 - Process notes: several bugs were escape-sequence slips in generated code (regex ``, f-string newlines, dataset-line wrapping); caught by tests/linters, not by inspection. Large heredocs and nested escapes are unreliable here; use file-write tools for code.
 - Not done: comparison against other models (needs approval for downloads); NVD/ATT&CK/OWASP ingestion; weekly automation (M3).
 - Not verified: GitHub CI on the M2 branch.
+
+## M3a - Gated KB update pipeline (2026-11-05, branch `m3/rag-automation`)
+Built and verified live: registry-based promotion/rollback, staging collection, validation + retrieval gates,
+incremental embedding (unchanged records reuse vectors). 66 tests pass. Real run: 1768 fetched / 1768 reused /
+0 embedded, recall@4 0.99 vs 0.99, promoted, rolled back, chat verified after rollback. See ADR 0004.
+
+Remaining in M3 (needs decisions): scheduling/persistent Qdrant, extra sources (MITRE ATT&CK, OWASP, NVD),
+dataset v2 so the gate covers them.
