@@ -6,6 +6,8 @@ import argparse
 import json
 import logging
 import sys
+from datetime import UTC, datetime
+from pathlib import Path
 
 from viper import __version__
 from viper.config import Settings, get_settings
@@ -14,13 +16,18 @@ from viper.logging_setup import configure_logging
 from viper.rag import Answer, IngestError, VectorStore, answer, ingest
 from viper.rag.cisa_kev import fetch_kev, parse_kev
 from viper.rag.embedding import PrefixEmbedder
+from viper.rag.registry import KBRegistry, resolve_collection
 
 log = logging.getLogger("viper.cli")
 
 
+def active_collection(settings: Settings) -> str:
+    return resolve_collection(settings.kb_registry_path, f"kb_{settings.kb_version}")
+
+
 def _build(settings: Settings) -> tuple[OllamaClient, VectorStore]:
     llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
-    store = VectorStore(settings.qdrant_path, f"kb_{settings.kb_version}")
+    store = VectorStore(settings.qdrant_path, active_collection(settings))
     return llm, store
 
 
@@ -79,14 +86,68 @@ def cmd_ask(settings: Settings, question: str | None) -> int:
         store.close()
 
 
-def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
-    from pathlib import Path
+def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
+    from viper.eval.cases import load_retrieval
+    from viper.eval.retrieval import evaluate_retrieval
+    from viper.rag.update import run_update
 
+    reg = KBRegistry.load(settings.kb_registry_path)
+    if args.kb_cmd == "status":
+        print(json.dumps({"active": reg.active or f"(default) kb_{settings.kb_version}",
+                          "previous": reg.previous, "history": reg.history[-5:]}, indent=1))
+        return 0
+    if args.kb_cmd == "rollback":
+        try:
+            print(f"Rolled back. Active collection is now {reg.rollback()}.")
+        except ValueError as exc:
+            print(f"Rollback failed: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    reg.bootstrap(active_collection(settings))
+    llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
+    qembed = PrefixEmbedder(llm, settings.embed_query_prefix)
+    base = VectorStore(settings.qdrant_path, reg.active or "")
+    active = base
+    staging = base.view(f"kb_{settings.kb_version}_{datetime.now(UTC):%Y%m%d%H%M%S}")
+    cases = load_retrieval()
+
+    def recall(store: VectorStore) -> float:
+        return float(evaluate_retrieval(cases, qembed, store)["overall"]["recall@4"])
+
+    try:
+        docs = parse_kev(fetch_kev())
+        report = run_update(
+            source="cisa-kev", docs=docs, doc_embedder=PrefixEmbedder(llm, settings.embed_doc_prefix),
+            active=active, staging=staging, recall_at_4=recall,
+            min_recall=settings.kb_min_recall_at_4, max_shrink=settings.kb_max_shrink,
+            promote=None if args.no_promote else reg.promote,
+        )
+        if report.promoted:
+            keep = {reg.active, reg.previous}
+            for h in reg.history:  # prune superseded collections this tool created
+                if h["event"] == "promote" and h["collection"] not in keep:
+                    base.view(h["collection"]).drop()
+    except (IngestError, LLMError) as exc:
+        print(f"Update failed (live index untouched): {exc}", file=sys.stderr)
+        return 1
+    finally:
+        base.close()
+    out = Path("data/kb_reports")
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"{report.started[:19].replace(':', '')}-{report.source}.json"
+    path.write_text(json.dumps(report.to_dict(), indent=1), encoding="utf-8", newline="\n")
+    print(json.dumps(report.to_dict(), indent=1))
+    print(f"Report saved: {path}")
+    return 0 if report.promoted or args.no_promote else 2
+
+
+def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
     from viper.eval import runner
     from viper.eval.build import build
 
     if args.eval_cmd == "build":
-        store = VectorStore(settings.qdrant_path, f"kb_{settings.kb_version}")
+        store = VectorStore(settings.qdrant_path, active_collection(settings))
         try:
             print(build(store))
         finally:
@@ -125,6 +186,12 @@ def main(argv: list[str] | None = None) -> int:
     p_cmp = esub.add_parser("compare", help="compare two saved reports")
     p_cmp.add_argument("a")
     p_cmp.add_argument("b")
+    p_kb = sub.add_parser("kb", help="knowledge-base lifecycle (safe weekly update)")
+    ksub = p_kb.add_subparsers(dest="kb_cmd", required=True)
+    p_upd = ksub.add_parser("update", help="fetch, stage, gate and promote a new KEV snapshot")
+    p_upd.add_argument("--no-promote", action="store_true", help="stage and gate only (dry run)")
+    ksub.add_parser("status", help="show the live collection and history")
+    ksub.add_parser("rollback", help="point back at the previous collection")
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -136,6 +203,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "ingest-kev":
         return cmd_ingest_kev(settings, args.limit)
+    if args.command == "kb":
+        return cmd_kb(settings, args)
     if args.command == "eval":
         return cmd_eval(settings, args)
     if args.command == "chat":
