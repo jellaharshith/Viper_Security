@@ -14,6 +14,11 @@ UNVERIFIED_PREFIX = (
     "memory and is UNVERIFIED.]\n\n"
 )
 
+UNCITED_PREFIX = (
+    "[Sources were retrieved but the answer cites none of them - treat the answer below as "
+    "UNVERIFIED (model memory).]\n\n"
+)
+
 _NOT_IN_KEV = (
     "{ids} is not in the CISA KEV knowledge base. That does not mean it is safe or not exploited; "
     "KEV only lists vulnerabilities CISA has confirmed as exploited. Check NVD or the vendor advisory."
@@ -62,10 +67,19 @@ def extract_cves(question: str) -> list[str]:
     return list(dict.fromkeys(m.upper() for m in _CVE_RE.findall(question)))
 
 
+def cited_numbers(text: str) -> set[int]:
+    """Source numbers the answer cites, e.g. [1] or [Source: 2]."""
+    return {int(m) for m in re.findall(r"\[(?:source:?\s*)?(\d+)\]", text, re.IGNORECASE)}
+
+
 def check_citations(text: str, n_sources: int) -> list[int]:
     """Return cited numbers that do not correspond to a provided source."""
-    cited = {int(m) for m in re.findall(r"\[(?:source:?\s*)?(\d+)\]", text, re.IGNORECASE)}
-    return sorted(c for c in cited if not 1 <= c <= n_sources)
+    return sorted(c for c in cited_numbers(text) if not 1 <= c <= n_sources)
+
+
+def is_unverified(text: str) -> bool:
+    """True when the answer carries one of the explicit UNVERIFIED labels."""
+    return text.startswith((UNVERIFIED_PREFIX, UNCITED_PREFIX))
 
 
 def answer(
@@ -101,5 +115,10 @@ def answer(
     prompt = f"Sources:\n{_format_sources(hits)}\n{note}\nQuestion: {question}"
     text = llm.chat([{"role": "system", "content": SYSTEM_GROUNDED},
                      {"role": "user", "content": prompt}])
-    return Answer(text=text, grounded=True, sources=hits,
-                  invalid_citations=check_citations(text, len(hits)))
+    invalid = check_citations(text, len(hits))
+    if not cves and not cited_numbers(text) - set(invalid):
+        # Semantic hits only prove topical similarity, not that the model used them. If the answer
+        # cites none, it is not grounded. (A named CVE is grounded by construction: the answer is
+        # built from that exact record, and structured replies such as JSON have no room for [n].)
+        return Answer(text=UNCITED_PREFIX + text, grounded=False, invalid_citations=invalid)
+    return Answer(text=text, grounded=True, sources=hits, invalid_citations=invalid)
