@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+# secrets and local data: NEVER commit
+.env
+*.key
+*.pem
+data/
+qdrant_data/
+models/
+*.gguf
