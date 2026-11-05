@@ -121,3 +121,33 @@ def test_unknown_cve_skips_llm_even_with_permissive_threshold(store: VectorStore
 
 def test_check_citations_catches_source_label_format() -> None:
     assert check_citations("claim [Source: 3] and [source 1]", 2) == [3]
+
+
+def test_answer_that_cites_nothing_is_not_grounded(store: VectorStore) -> None:
+    from viper.rag.pipeline import UNCITED_PREFIX, is_unverified
+
+    a = answer("Acme Widget remote code execution", FakeEmbedder(), store,
+               FakeLLM("It is a bug, from memory."), min_score=0.3)
+    assert not a.grounded and a.text.startswith(UNCITED_PREFIX) and is_unverified(a.text)
+    assert a.sources == []  # do not display sources the answer did not use
+
+
+def test_answer_citing_only_a_nonexistent_source_is_not_grounded(store: VectorStore) -> None:
+    a = answer("Acme Widget remote code execution", FakeEmbedder(), store,
+               FakeLLM("Per [9] it is bad."), min_score=0.3)
+    assert not a.grounded and a.invalid_citations == [9]
+
+
+def test_is_unverified_recognises_both_labels() -> None:
+    from viper.rag.pipeline import UNCITED_PREFIX, is_unverified
+
+    assert is_unverified(UNVERIFIED_PREFIX + "x") and is_unverified(UNCITED_PREFIX + "x")
+    assert not is_unverified("plain answer [1]")
+
+
+def test_named_cve_answer_stays_grounded_without_inline_citations() -> None:
+    s = VectorStore(None, "kb_json")
+    emb = FakeEmbedder()
+    ingest([Document("cisa-kev:CVE-2021-44228", "Apache Log4j2 RCE", "CISA KEV", "u", "T")], emb, s)
+    a = answer("Reply with ONLY JSON for CVE-2021-44228", emb, s, FakeLLM('{"cve": "CVE-2021-44228"}'))
+    assert a.grounded and a.sources[0].document.id == "cisa-kev:CVE-2021-44228"

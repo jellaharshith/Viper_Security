@@ -27,9 +27,11 @@ class Settings(BaseSettings):
     ollama_model: str = ""  # set once a model is chosen/pulled (M1)
     qdrant_path: Path = Path("data/qdrant")  # embedded mode, no server/Docker
     embed_model: str = "nomic-embed-text"
-    kb_version: str = "v1"  # knowledge-base index version (collection name suffix)
+    embed_query_prefix: str = "search_query: "  # nomic-embed-text task prefix
+    embed_doc_prefix: str = "search_document: "
+    kb_version: str = "v2p"  # index version = collection suffix (v2p: nomic task prefixes)
     retrieval_top_k: int = 4
-    min_score: float = 0.55  # below this, an answer is labelled unverified
+    min_score: float = 0.65  # below this, no sources are attached (calibrated in M2)
 
     # --- Execution plane: cloud Kali VM (empty until provisioned) ---
     exec_api_url: str = ""

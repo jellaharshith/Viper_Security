@@ -1,6 +1,6 @@
 # Development Progress
 
-## Status: M1 built and live-tested on branch m1/local-chat-rag (PR pending); M2 next
+## Status: M1 merged. M2 (evaluation harness + baseline) built and run on branch m2/eval-harness; PR pending
 
 ### 2026-11-04
 - Architecture reviewed; hybrid three-plane design adopted.
@@ -35,3 +35,14 @@ Everything is in git; each milestone is a commit.
 - Only CISA KEV is indexed; no NVD/ATT&CK/OWASP yet, no chunking of long documents.
 - ~1 min per answer on this CPU. No streaming output.
 - Not yet verified: GitHub CI on the M1 branch.
+
+### 2026-11-05 (M2: evaluation harness + baseline)
+- Built `viper.eval` (cases, retrieval metrics + calibration, answer checks, runner, report compare), frozen held-out datasets (130 retrieval, 22 answer cases), CLI `viper eval build|run|compare`. 59 tests; ruff and mypy strict clean.
+- Findings from running it (details: model-evaluation-plan.md, ADR 0003):
+  1. My first retrieval set had ambiguous gold answers (shared titles); rebuilt with unique records only.
+  2. Synthetic calibration (cutoff 0.717, "perfect") was misleading: realistic questions score lower. Rejected; chose 0.65 using grouped natural/off-topic/adjacent questions.
+  3. nomic task prefixes: recall@4 97% -> 99%, but raised all scores; adopted as index `v2p` (v1 kept for rollback).
+  4. Requiring citations everywhere regressed JSON answers to 0/3 (overall 86% -> 77%); caught only because the full eval was re-run. Scoped to the semantic path: overall 90.9%.
+- Process notes: several bugs were escape-sequence slips in generated code (regex ``, f-string newlines, dataset-line wrapping); caught by tests/linters, not by inspection. Large heredocs and nested escapes are unreliable here; use file-write tools for code.
+- Not done: comparison against other models (needs approval for downloads); NVD/ATT&CK/OWASP ingestion; weekly automation (M3).
+- Not verified: GitHub CI on the M2 branch.
