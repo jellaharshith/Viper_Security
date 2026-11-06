@@ -151,3 +151,41 @@ def test_named_cve_answer_stays_grounded_without_inline_citations() -> None:
     ingest([Document("cisa-kev:CVE-2021-44228", "Apache Log4j2 RCE", "CISA KEV", "u", "T")], emb, s)
     a = answer("Reply with ONLY JSON for CVE-2021-44228", emb, s, FakeLLM('{"cve": "CVE-2021-44228"}'))
     assert a.grounded and a.sources[0].document.id == "cisa-kev:CVE-2021-44228"
+
+
+def test_extract_attack_ids() -> None:
+    from viper.rag.pipeline import extract_attack_ids
+
+    assert extract_attack_ids("is t1059.001 and T1059 and T1059.001 used? not T12345 or T105") == [
+        "T1059.001", "T1059"]
+    assert extract_attack_ids("CVE-2021-44228 only") == []
+
+
+def _attack_store() -> VectorStore:
+    s = VectorStore(None, "kb_attack")
+    ingest([Document("attack:T1059.001", "PowerShell abuse for execution", "mitre-attack", "u", "T"),
+            Document("attack:T1059", "Command and scripting interpreter", "mitre-attack", "u", "U"),
+            Document("cisa-kev:CVE-2021-44228", "Apache Log4j2 RCE", "CISA KEV", "u", "V")],
+           FakeEmbedder(), s)
+    return s
+
+
+def test_exact_attack_lookup_beats_semantic_miss() -> None:
+    llm = FakeLLM("PowerShell [1]")
+    a = answer("What is T1059.001 qqq?", FakeEmbedder(), _attack_store(), llm, min_score=0.99)
+    assert a.grounded and [h.document.id for h in a.sources] == ["attack:T1059.001"]
+
+
+def test_unknown_attack_id_is_reported_without_calling_the_llm() -> None:
+    llm = FakeLLM("unused")
+    a = answer("What is T9999?", FakeEmbedder(), _attack_store(), llm, min_score=0.0)
+    assert "T9999 is not in the MITRE ATT&CK" in a.text and not a.grounded and llm.calls == []
+
+
+def test_mixed_cve_and_attack_ids_use_only_named_records_and_note_missing() -> None:
+    llm = FakeLLM("ok [1][2]")
+    a = answer("Relate CVE-2021-44228 to T1059 and T9999", FakeEmbedder(), _attack_store(), llm,
+               min_score=0.0)
+    assert {h.document.id for h in a.sources} == {"cisa-kev:CVE-2021-44228", "attack:T1059"}
+    assert "T9999 is NOT in the MITRE ATT&CK" in llm.calls[0][1]["content"]
+    assert a.grounded
