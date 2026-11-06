@@ -6,7 +6,7 @@ Rule: secrets are ``SecretStr`` and are never hardcoded, logged, or committed.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = ""  # set once a model is chosen/pulled (M1)
     qdrant_path: Path = Path("data/qdrant")  # embedded mode, no server/Docker
+    store: Literal["qdrant", "pgvector"] = "qdrant"
+    database_url: SecretStr = SecretStr("")
     embed_model: str = "nomic-embed-text"
     embed_query_prefix: str = "search_query: "  # nomic-embed-text task prefix
     embed_doc_prefix: str = "search_document: "
