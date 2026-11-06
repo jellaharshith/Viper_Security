@@ -13,21 +13,18 @@ from viper import __version__
 from viper.config import Settings, get_settings
 from viper.llm import LLMError, OllamaClient
 from viper.logging_setup import configure_logging
-from viper.rag import Answer, IngestError, VectorStore, answer, ingest
+from viper.rag import Answer, IngestError, answer, ingest
+from viper.rag.backend import active_collection, open_registry, open_store
 from viper.rag.cisa_kev import fetch_kev, parse_kev
 from viper.rag.embedding import PrefixEmbedder
-from viper.rag.registry import KBRegistry, resolve_collection
+from viper.rag.types import Store
 
 log = logging.getLogger("viper.cli")
 
 
-def active_collection(settings: Settings) -> str:
-    return resolve_collection(settings.kb_registry_path, f"kb_{settings.kb_version}")
-
-
-def _build(settings: Settings) -> tuple[OllamaClient, VectorStore]:
+def _build(settings: Settings) -> tuple[OllamaClient, Store]:
     llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
-    store = VectorStore(settings.qdrant_path, active_collection(settings))
+    store = open_store(settings, active_collection(settings))
     return llm, store
 
 
@@ -92,7 +89,7 @@ def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
     from viper.rag.sources import all_sources
     from viper.rag.update import collect, run_update
 
-    reg = KBRegistry.load(settings.kb_registry_path)
+    reg = open_registry(settings)
     if args.kb_cmd == "status":
         print(json.dumps({"active": reg.active or f"(default) kb_{settings.kb_version}",
                           "previous": reg.previous, "history": reg.history[-5:]}, indent=1))
@@ -108,12 +105,12 @@ def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
     reg.bootstrap(active_collection(settings))
     llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
     qembed = PrefixEmbedder(llm, settings.embed_query_prefix)
-    base = VectorStore(settings.qdrant_path, reg.active or "")
+    base = open_store(settings, reg.active or "")
     active = base
     staging = base.view(f"kb_{settings.kb_version}_{datetime.now(UTC):%Y%m%d%H%M%S}")
     cases = load_retrieval()
 
-    def recall(store: VectorStore) -> float:
+    def recall(store: Store) -> float:
         return float(evaluate_retrieval(cases, qembed, store)["overall"]["recall@4"])
 
     try:
@@ -150,7 +147,7 @@ def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
     from viper.eval.build import build
 
     if args.eval_cmd == "build":
-        store = VectorStore(settings.qdrant_path, active_collection(settings))
+        store = open_store(settings, active_collection(settings))
         try:
             print(build(store))
         finally:

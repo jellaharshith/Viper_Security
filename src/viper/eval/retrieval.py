@@ -6,14 +6,13 @@ from collections import defaultdict
 from typing import Any
 
 from viper.eval.cases import RetrievalCase
-from viper.rag.store import VectorStore
-from viper.rag.types import Embedder
+from viper.rag.types import Embedder, Store
 
 TOP_K = 10
 
 
 def evaluate_retrieval(
-    cases: list[RetrievalCase], embedder: Embedder, store: VectorStore, batch: int = 16
+    cases: list[RetrievalCase], embedder: Embedder, store: Store, batch: int = 16
 ) -> dict[str, Any]:
     ranks: dict[str, list[int | None]] = defaultdict(list)  # style -> rank of gold (1-based)
     gold_scores: list[float] = []  # score of the gold doc (0 when not retrieved)

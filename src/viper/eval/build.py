@@ -13,8 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from viper.eval.cases import DATASET_DIR
-from viper.rag.store import VectorStore
-from viper.rag.types import Document
+from viper.rag.types import Document, Store
 
 SEED = 20261104
 _REC = re.compile(
@@ -43,20 +42,16 @@ NEGATIVE_QUERIES = [
 MISSING_CVES = ["CVE-2010-0001", "CVE-2012-0002", "CVE-1999-0003"]
 
 
-def _records(store: VectorStore) -> list[dict[str, Any]]:
+def _records(store: Store) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    offset = None
-    while True:
-        pts, offset = store._client.scroll(store.collection, limit=500, offset=offset, with_payload=True)
-        for p in pts:
-            m = _REC.match((p.payload or {})["text"])
-            if m:
-                out.append({"id": (p.payload or {})["id"], **m.groupdict()})
-        if offset is None:
-            return out
+    for doc, _vec in store.export():
+        m = _REC.match(doc.text)
+        if m:
+            out.append({"id": doc.id, **m.groupdict()})
+    return out
 
 
-def build(store: VectorStore, out_dir: Path = DATASET_DIR) -> dict[str, int]:
+def build(store: Store, out_dir: Path = DATASET_DIR) -> dict[str, int]:
     rng = random.Random(SEED)  # noqa: S311 (reproducible sampling, not security)
     recs = sorted(_records(store), key=lambda r: r["id"])
     for m in MISSING_CVES:
@@ -276,32 +271,15 @@ def load_fixture_docs(fixture_dir: Path = Path("tests/fixtures_eval")) -> list[D
     return docs
 
 
-def docs_from_store(store: VectorStore) -> list[Document]:
-    """Scroll all documents present in a VectorStore."""
+def docs_from_store(store: Store) -> list[Document]:
+    """All documents present in a Store (any backend)."""
     if not store.exists():
         return []
-    docs: list[Document] = []
-    offset = None
-    while True:
-        pts, offset = store._client.scroll(store.collection, limit=500, offset=offset, with_payload=True)
-        for p in pts:
-            pl = p.payload or {}
-            if "id" in pl and "text" in pl and "source" in pl:
-                docs.append(Document(
-                    id=pl["id"],
-                    text=pl["text"],
-                    source=pl["source"],
-                    url=pl.get("url", ""),
-                    title=pl.get("title", ""),
-                    meta=pl.get("meta", {}),
-                ))
-        if offset is None:
-            break
-    return docs
+    return [doc for doc, _vec in store.export()]
 
 
 def build_attack_owasp(
-    store: VectorStore | None = None,
+    store: Store | None = None,
     docs: list[Document] | None = None,
     out_dir: Path = DATASET_DIR,
     seed: int = SEED,
@@ -520,7 +498,7 @@ def build_answers_v2(out_dir: Path = DATASET_DIR, seed: int = SEED) -> dict[str,
 
 
 def build_v2(
-    store: VectorStore | None = None,
+    store: Store | None = None,
     docs: list[Document] | None = None,
     out_dir: Path = DATASET_DIR,
     seed: int = SEED,
