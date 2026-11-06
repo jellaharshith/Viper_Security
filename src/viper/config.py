@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     """Typed configuration. Env vars use the ``VIPER_`` prefix (e.g. VIPER_LOG_LEVEL)."""
 
     model_config = SettingsConfigDict(
-        env_prefix="VIPER_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_prefix="VIPER_", env_file=".env", env_file_encoding="utf-8", extra="ignore",
+        populate_by_name=True,
     )
 
     app_env: str = "dev"
@@ -26,7 +27,10 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = ""  # set once a model is chosen/pulled (M1)
     qdrant_path: Path = Path("data/qdrant")  # embedded mode, no server/Docker
-    store: Literal["qdrant", "pgvector"] = "qdrant"
+    store: Literal["qdrant", "pgvector", "supabase"] = "qdrant"
+    # Supabase over its HTTPS API: read under the exact names used in .env (no VIPER_ prefix).
+    supabase_url: str = Field(default="", validation_alias="SUPABASE_URL")
+    supabase_secret_key: SecretStr = Field(default=SecretStr(""), validation_alias="SUPABASE_SECRET_KEY")
     database_url: SecretStr = SecretStr("")
     embed_model: str = "nomic-embed-text"
     embed_query_prefix: str = "search_query: "  # nomic-embed-text task prefix

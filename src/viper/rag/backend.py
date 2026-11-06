@@ -1,7 +1,11 @@
-"""Backend selection: local embedded Qdrant (default) or Supabase/Postgres pgvector.
+"""Backend selection for the knowledge base.
 
-``VIPER_STORE`` picks the backend. Nothing here connects until a store/registry is opened,
-so the default (qdrant) path never imports or touches psycopg.
+``VIPER_STORE`` picks the backend:
+  * ``qdrant``   (default) local embedded Qdrant, file-based registry
+  * ``supabase`` Supabase over HTTPS, reads SUPABASE_URL + SUPABASE_SECRET_KEY from .env
+  * ``pgvector`` direct Postgres, reads VIPER_DATABASE_URL
+
+Nothing connects until a store/registry is opened, and each remote driver is imported lazily.
 """
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ from viper.rag.types import Store
 
 if TYPE_CHECKING:
     from viper.rag.pgstore import PgKBRegistry
-
+    from viper.rag.reststore import RestKBRegistry
 
 
 def _require_url(settings: Settings) -> str:
@@ -24,7 +28,11 @@ def _require_url(settings: Settings) -> str:
     return url
 
 
-def open_registry(settings: Settings) -> KBRegistry | PgKBRegistry:
+def open_registry(settings: Settings) -> KBRegistry | PgKBRegistry | RestKBRegistry:
+    if settings.store == "supabase":
+        from viper.rag.reststore import RestKBRegistry
+
+        return RestKBRegistry(settings.supabase_url, settings.supabase_secret_key)
     if settings.store == "pgvector":
         from viper.rag.pgstore import PgKBRegistry
 
@@ -33,6 +41,10 @@ def open_registry(settings: Settings) -> KBRegistry | PgKBRegistry:
 
 
 def open_store(settings: Settings, collection: str) -> Store:
+    if settings.store == "supabase":
+        from viper.rag.reststore import RestVectorStore
+
+        return RestVectorStore(settings.supabase_url, settings.supabase_secret_key, collection)
     if settings.store == "pgvector":
         from viper.rag.pgstore import PgVectorStore
 
@@ -42,10 +54,10 @@ def open_store(settings: Settings, collection: str) -> Store:
 
 def active_collection(settings: Settings) -> str:
     fallback = f"kb_{settings.kb_version}"
-    if settings.store == "pgvector":
-        reg = open_registry(settings)
-        try:
-            return reg.active or fallback
-        finally:
-            reg.close()  # type: ignore[union-attr]
-    return resolve_collection(settings.kb_registry_path, fallback)
+    reg = open_registry(settings)
+    if isinstance(reg, KBRegistry):
+        return resolve_collection(settings.kb_registry_path, fallback)
+    try:
+        return reg.active or fallback
+    finally:
+        reg.close()
