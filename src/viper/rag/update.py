@@ -14,8 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from viper.rag.sources import Source
-from viper.rag.store import VectorStore
-from viper.rag.types import Document, Embedder, IngestError
+from viper.rag.types import Document, Embedder, IngestError, Store
 
 
 def content_hash(doc: Document) -> str:
@@ -80,7 +79,7 @@ def source_of(doc_id: str) -> str:
     return doc_id.split(":", 1)[0]
 
 
-def collect(sources: list[Source], active: VectorStore) -> tuple[list[Document], list[SourceOutcome]]:
+def collect(sources: list[Source], active: Store) -> tuple[list[Document], list[SourceOutcome]]:
     """Fetch every source. A source that fails keeps its records from the live collection."""
     outcomes: list[SourceOutcome] = []
     live: list[Document] | None = None
@@ -96,7 +95,7 @@ def collect(sources: list[Source], active: VectorStore) -> tuple[list[Document],
 
 
 def validate_sources(
-    docs: list[Document], outcomes: list[SourceOutcome], active: VectorStore, max_shrink: float
+    docs: list[Document], outcomes: list[SourceOutcome], active: Store, max_shrink: float
 ) -> list[str]:
     """Per-source validation (shrink is measured against that source's live records)."""
     if all(o.error for o in outcomes):
@@ -110,7 +109,7 @@ def validate_sources(
 
 
 def stage(
-    docs: list[Document], doc_embedder: Embedder, active: VectorStore, staging: VectorStore
+    docs: list[Document], doc_embedder: Embedder, active: Store, staging: Store
 ) -> tuple[int, int, int]:
     """Build the staging collection. Unchanged records reuse their stored vector (no re-embedding).
 
@@ -140,9 +139,9 @@ def run_update(
     source: str,
     docs: list[Document],
     doc_embedder: Embedder,
-    active: VectorStore,
-    staging: VectorStore,
-    recall_at_4: Callable[[VectorStore], float],
+    active: Store,
+    staging: Store,
+    recall_at_4: Callable[[Store], float],
     min_recall: float,
     max_shrink: float,
     promote: Callable[[str], None] | None,

@@ -54,3 +54,21 @@ incremental embedding (unchanged records reuse vectors). 66 tests pass. Real run
 
 Remaining in M3 (needs decisions): scheduling/persistent Qdrant, extra sources (MITRE ATT&CK, OWASP, NVD),
 dataset v2 so the gate covers them.
+
+## M3b/c/d - Multi-source KB, dataset v2, pgvector backend (2026-11-06, branch `m3/integration`)
+Built by three parallel lanes (Claude subagent, Codex, Antigravity), each in its own worktree; the lead re-ran
+pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and mypy strict clean.
+- **M3b** (`rag/sources.py`, `attack.py`, `owasp.py`): MITRE ATT&CK v20.1 (706 active techniques) and OWASP Top 10 2025
+  (40 chunks, pinned to a commit SHA). A failed source is carried over from the live collection and flagged;
+  shrink validation is per source. Exact-ID lookup now covers ATT&CK ids.
+- **M3c** (`eval/build.py`, `runner.py`, ADR 0005): dataset v2 builders, per-source recall gate. v1 datasets are
+  hash-pinned and untouched. The v2 files were built from fixtures and must be rebuilt from the live index.
+- **M3d** (`rag/pgstore.py`, `db/migrations/0001_kb.sql`, ADR 0006): pgvector store and transactional registry,
+  RLS on with no policies, no ANN index. Selected with `VIPER_STORE=pgvector` + `VIPER_DATABASE_URL`
+  (`rag/backend.py` is the only place that chooses the backend).
+
+### Not done / not verified
+- Nothing has run against a real Supabase project (migration, promote/rollback, RLS blocks the anon key).
+- Live `kb update` with ATT&CK + OWASP, dataset v2 rebuild from the live index, and `min_score` recalibration need Ollama.
+- Three flipped expectations in `answers_v2.jsonl` (SQL injection, XSS acronym, XSS definition) await human review.
+- GitHub CI has not run on these branches. Nothing is pushed.

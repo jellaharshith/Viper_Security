@@ -24,10 +24,10 @@ from viper.eval.cases import (
 )
 from viper.eval.retrieval import evaluate_retrieval
 from viper.llm import OllamaClient
-from viper.rag import VectorStore, answer
+from viper.rag import answer
+from viper.rag.backend import active_collection, open_store
 from viper.rag.embedding import PrefixEmbedder
-from viper.rag.registry import resolve_collection
-from viper.rag.types import Embedder
+from viper.rag.types import Embedder, Store
 
 RESULTS_DIR = Path("eval/results")
 
@@ -49,7 +49,7 @@ def _git_commit() -> str:
 def evaluate_retrieval_per_source(
     cases: list[RetrievalCase],
     embedder: Embedder,
-    store: VectorStore,
+    store: Store,
     top_k: int = 10,
     batch: int = 16,
 ) -> dict[str, dict[str, float]]:
@@ -82,7 +82,7 @@ def evaluate_retrieval_per_source(
 
 
 def check_recall_gate(
-    store: VectorStore,
+    store: Store,
     embedder: Embedder,
     cases: list[RetrievalCase] | None = None,
     min_recall: float = 0.95,
@@ -128,9 +128,9 @@ def make_recall_gate(
     cases: list[RetrievalCase] | None = None,
     min_recall: float = 0.95,
     per_source_floors: dict[str, float] | None = None,
-) -> Callable[[VectorStore], float]:
+) -> Callable[[Store], float]:
     """Callable for run_update's recall_at_4 argument that checks per-source recall floors."""
-    def _gate(store: VectorStore) -> float:
+    def _gate(store: Store) -> float:
         passed, scores, _ = check_recall_gate(
             store, embedder, cases=cases, min_recall=min_recall, per_source_floors=per_source_floors
         )
@@ -149,10 +149,7 @@ def run_eval(
 ) -> dict[str, Any]:
     llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
     qembed = PrefixEmbedder(llm, settings.embed_query_prefix)
-    store = VectorStore(
-        settings.qdrant_path,
-        resolve_collection(settings.kb_registry_path, f"kb_{settings.kb_version}"),
-    )
+    store = open_store(settings, active_collection(settings))
     if dataset_version == "v2":
         ret_cases = load_retrieval_all()
         ans_cases = load_answers_v2()

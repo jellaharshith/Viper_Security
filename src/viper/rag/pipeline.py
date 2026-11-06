@@ -6,8 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from viper.rag.store import VectorStore
-from viper.rag.types import Document, Embedder, Hit
+from viper.rag.types import Document, Embedder, Hit, Store
 
 UNVERIFIED_PREFIX = (
     "[No relevant knowledge-base sources found - the answer below comes from the model's own "
@@ -56,7 +55,7 @@ class Answer:
     invalid_citations: list[int] = field(default_factory=list)
 
 
-def ingest(docs: list[Document], embedder: Embedder, store: VectorStore, batch: int = 32) -> int:
+def ingest(docs: list[Document], embedder: Embedder, store: Store, batch: int = 32) -> int:
     """Embed and store documents. Safe to re-run: ids are deterministic."""
     for i in range(0, len(docs), batch):
         chunk = docs[i : i + batch]
@@ -96,7 +95,7 @@ def is_unverified(text: str) -> bool:
 def answer(
     question: str,
     embedder: Embedder,
-    store: VectorStore,
+    store: Store,
     llm: ChatModel,
     top_k: int = 4,
     min_score: float = 0.55,
