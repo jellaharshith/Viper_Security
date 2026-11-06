@@ -24,6 +24,11 @@ _NOT_IN_KEV = (
     "KEV only lists vulnerabilities CISA has confirmed as exploited. Check NVD or the vendor advisory."
 )
 
+_NOT_IN_ATTACK = (
+    "{ids} is not in the MITRE ATT&CK knowledge base (active enterprise techniques and "
+    "sub-techniques only; revoked or deprecated ones are excluded). Check attack.mitre.org."
+)
+
 SYSTEM_GROUNDED = (
     "You are a cybersecurity assistant for authorized security work. Answer ONLY using the "
     "numbered sources provided. Cite each claim with its source number like [1]. If the sources "
@@ -36,6 +41,7 @@ SYSTEM_UNGROUNDED = (
 )
 
 _CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,7}\b", re.IGNORECASE)
+_ATTACK_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b", re.IGNORECASE)
 
 
 class ChatModel(Protocol):
@@ -67,6 +73,11 @@ def extract_cves(question: str) -> list[str]:
     return list(dict.fromkeys(m.upper() for m in _CVE_RE.findall(question)))
 
 
+def extract_attack_ids(question: str) -> list[str]:
+    """Distinct ATT&CK technique ids (T1059, T1059.001) in the question, upper-cased, in order."""
+    return list(dict.fromkeys(m.upper() for m in _ATTACK_RE.findall(question)))
+
+
 def cited_numbers(text: str) -> set[int]:
     """Source numbers the answer cites, e.g. [1] or [Source: 2]."""
     return {int(m) for m in re.findall(r"\[(?:source:?\s*)?(\d+)\]", text, re.IGNORECASE)}
@@ -90,17 +101,25 @@ def answer(
     top_k: int = 4,
     min_score: float = 0.55,
 ) -> Answer:
-    # Exact CVE ids are looked up directly: embeddings match meaning, not identifiers.
+    # Exact ids (CVE, ATT&CK technique) are looked up directly: embeddings match meaning, not ids.
     cves = extract_cves(question)
-    exact = store.get_many([f"cisa-kev:{c}" for c in cves])
+    techniques = extract_attack_ids(question)
+    named = [f"cisa-kev:{c}" for c in cves] + [f"attack:{t}" for t in techniques]
+    exact = store.get_many(named)
     found = {d.id for d in exact}
-    missing = [c for c in cves if f"cisa-kev:{c}" not in found]
+    missing_cves = [c for c in cves if f"cisa-kev:{c}" not in found]
+    missing_techs = [t for t in techniques if f"attack:{t}" not in found]
 
-    if cves and not exact:
-        # Named CVE(s), none in the KB: say so deterministically; similar-sounding records are noise.
-        return Answer(text=_NOT_IN_KEV.format(ids=", ".join(missing)), grounded=False)
+    if named and not exact:
+        # Named id(s), none in the KB: say so deterministically; similar-sounding records are noise.
+        parts = []
+        if missing_cves:
+            parts.append(_NOT_IN_KEV.format(ids=", ".join(missing_cves)))
+        if missing_techs:
+            parts.append(_NOT_IN_ATTACK.format(ids=", ".join(missing_techs)))
+        return Answer(text=" ".join(parts), grounded=False)
 
-    if cves:
+    if named:
         hits = [Hit(document=d, score=1.0) for d in exact]  # answer from the named records only
     else:
         qvec = embedder.embed([question])[0]
@@ -111,12 +130,17 @@ def answer(
                          {"role": "user", "content": question}])
         return Answer(text=UNVERIFIED_PREFIX + text, grounded=False)
 
-    note = f"\nNote: {', '.join(missing)} is NOT in the CISA KEV catalog; say so.\n" if missing else ""
+    notes = []
+    if missing_cves:
+        notes.append(f"{', '.join(missing_cves)} is NOT in the CISA KEV catalog; say so.")
+    if missing_techs:
+        notes.append(f"{', '.join(missing_techs)} is NOT in the MITRE ATT&CK knowledge base; say so.")
+    note = "".join(f"\nNote: {n}\n" for n in notes)
     prompt = f"Sources:\n{_format_sources(hits)}\n{note}\nQuestion: {question}"
     text = llm.chat([{"role": "system", "content": SYSTEM_GROUNDED},
                      {"role": "user", "content": prompt}])
     invalid = check_citations(text, len(hits))
-    if not cves and not cited_numbers(text) - set(invalid):
+    if not named and not cited_numbers(text) - set(invalid):
         # Semantic hits only prove topical similarity, not that the model used them. If the answer
         # cites none, it is not grounded. (A named CVE is grounded by construction: the answer is
         # built from that exact record, and structured replies such as JSON have no room for [n].)

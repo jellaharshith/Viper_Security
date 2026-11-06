@@ -89,7 +89,8 @@ def cmd_ask(settings: Settings, question: str | None) -> int:
 def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
     from viper.eval.cases import load_retrieval
     from viper.eval.retrieval import evaluate_retrieval
-    from viper.rag.update import run_update
+    from viper.rag.sources import all_sources
+    from viper.rag.update import collect, run_update
 
     reg = KBRegistry.load(settings.kb_registry_path)
     if args.kb_cmd == "status":
@@ -116,9 +117,11 @@ def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
         return float(evaluate_retrieval(cases, qembed, store)["overall"]["recall@4"])
 
     try:
-        docs = parse_kev(fetch_kev())
+        sources = all_sources()
+        docs, outcomes = collect(sources, active)  # a failed source keeps its live records
         report = run_update(
-            source="cisa-kev", docs=docs, doc_embedder=PrefixEmbedder(llm, settings.embed_doc_prefix),
+            source="+".join(s.name for s in sources), docs=docs, outcomes=outcomes,
+            doc_embedder=PrefixEmbedder(llm, settings.embed_doc_prefix),
             active=active, staging=staging, recall_at_4=recall,
             min_recall=settings.kb_min_recall_at_4, max_shrink=settings.kb_max_shrink,
             promote=None if args.no_promote else reg.promote,
@@ -188,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     p_cmp.add_argument("b")
     p_kb = sub.add_parser("kb", help="knowledge-base lifecycle (safe weekly update)")
     ksub = p_kb.add_subparsers(dest="kb_cmd", required=True)
-    p_upd = ksub.add_parser("update", help="fetch, stage, gate and promote a new KEV snapshot")
+    p_upd = ksub.add_parser("update", help="fetch all sources (KEV, ATT&CK, OWASP), stage, gate and promote")
     p_upd.add_argument("--no-promote", action="store_true", help="stage and gate only (dry run)")
     ksub.add_parser("status", help="show the live collection and history")
     ksub.add_parser("rollback", help="point back at the previous collection")
