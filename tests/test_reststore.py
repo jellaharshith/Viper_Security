@@ -34,7 +34,9 @@ def test_upsert_batches_and_sends_vectors() -> None:
 
     store = RestVectorStore("", "", "kb_v1", client=_client(handler))
     store.upsert([_doc(i) for i in range(120)], [VEC] * 120)
-    assert [len(json.loads(r.content)) for r in seen] == [50, 50, 20]
+    sizes = [len(json.loads(r.content)) for r in seen]
+    assert sum(sizes) == 120 and max(sizes) <= 50
+    assert all(len(r.content) <= 200_000 + 10_000 for r in seen)  # stays under the measured limit
     first = json.loads(seen[0].content)[0]
     assert first["collection"] == "kb_v1" and json.loads(first["embedding"]) == VEC
     assert seen[0].url.params["on_conflict"] == "collection,id"

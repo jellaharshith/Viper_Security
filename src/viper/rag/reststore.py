@@ -21,6 +21,7 @@ from viper.rag.types import Document, Hit
 
 _PAGE = 500
 _UPSERT_BATCH = 50
+_UPSERT_MAX_BYTES = 200_000  # Supabase resets the connection on ~800 KB bodies (measured)
 
 
 class RestError(RuntimeError):
@@ -115,15 +116,25 @@ class RestVectorStore:
     def upsert(self, docs: list[Document], vectors: list[list[float]]) -> None:
         if len(docs) != len(vectors):
             raise ValueError("docs and vectors differ in length")
-        for i in range(0, len(docs), _UPSERT_BATCH):
-            rows = [
-                {"collection": self.collection, "id": d.id, "text": d.text, "source": d.source,
-                 "url": d.url, "title": d.title, "meta": d.meta, "embedding": _vector(v)}
-                for d, v in zip(docs[i:i + _UPSERT_BATCH], vectors[i:i + _UPSERT_BATCH], strict=True)
-            ]
-            _send(self._client, "POST", "/kb_docs", params={"on_conflict": "collection,id"},
-                  json=rows,
-                  headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+        batch: list[dict[str, Any]] = []
+        size = 0
+
+        def flush() -> None:
+            nonlocal batch, size
+            if batch:
+                _send(self._client, "POST", "/kb_docs", params={"on_conflict": "collection,id"},
+                      json=batch, headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+            batch, size = [], 0
+
+        for d, v in zip(docs, vectors, strict=True):
+            row = {"collection": self.collection, "id": d.id, "text": d.text, "source": d.source,
+                   "url": d.url, "title": d.title, "meta": d.meta, "embedding": _vector(v)}
+            row_size = len(json.dumps(row))
+            if batch and (len(batch) >= _UPSERT_BATCH or size + row_size > _UPSERT_MAX_BYTES):
+                flush()
+            batch.append(row)
+            size += row_size
+        flush()
 
     def get_many(self, doc_ids: list[str]) -> list[Document]:
         out: list[Document] = []
