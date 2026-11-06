@@ -1,4 +1,5 @@
-from pydantic import SecretStr
+import pytest
+from pydantic import SecretStr, ValidationError
 
 from viper.config import Settings
 
@@ -21,3 +22,24 @@ def test_redacted_masks_secretstr() -> None:
     out = WithSecret(_env_file=None).redacted()
     assert out["api_token"] == "***"  # noqa: S105
     assert "super-secret" not in str(out)
+
+
+def test_pgvector_settings_are_secret(monkeypatch) -> None:
+    url = "postgresql://fixture:fake-password@localhost/fixture"
+    monkeypatch.setenv("VIPER_DATABASE_URL", url)
+    monkeypatch.setenv("VIPER_STORE", "pgvector")
+    settings = Settings(_env_file=None)
+    assert settings.store == "pgvector"
+    assert settings.database_url.get_secret_value() == url
+    assert settings.redacted()["database_url"] == "***"
+    for rendered in (repr(settings), str(settings), str(settings.redacted()), settings.model_dump_json()):
+        assert url not in rendered
+        assert "fake-password" not in rendered
+
+
+def test_store_default_and_validation(monkeypatch) -> None:
+    monkeypatch.delenv("VIPER_STORE", raising=False)
+    assert Settings(_env_file=None).store == "qdrant"
+    monkeypatch.setenv("VIPER_STORE", "unsupported")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
