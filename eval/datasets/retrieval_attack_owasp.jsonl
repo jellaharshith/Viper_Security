@@ -1,0 +1,23 @@
+{"id": "ret-atk-000", "query": "OS Credential Dumping", "style": "title", "gold_id": "attack:T1003"}
+{"id": "ret-atk-001", "query": "Platforms: Windows. Adversaries may attempt to access LSASS memory to extract password hashes. Detection: Enable LSA protection and monitor process access to lsass.exe.", "style": "description", "gold_id": "attack:T1003.001"}
+{"id": "ret-atk-002", "query": "defense-evasion technique abusing Process Injection on Linux", "style": "hint", "gold_id": "attack:T1055"}
+{"id": "ret-atk-003", "query": "Dynamic-link Library Injection", "style": "title", "gold_id": "attack:T1055.001"}
+{"id": "ret-atk-004", "query": "Platforms: Linux, macOS, Windows. Adversaries may abuse command and script interpreters to execute commands. Detection: Monitor executed commands and arguments for suspicious activ", "style": "description", "gold_id": "attack:T1059"}
+{"id": "ret-atk-005", "query": "execution technique abusing PowerShell on Windows", "style": "hint", "gold_id": "attack:T1059.001"}
+{"id": "ret-atk-006", "query": "Valid Accounts", "style": "title", "gold_id": "attack:T1078"}
+{"id": "ret-atk-007", "query": "Platforms: Linux, macOS, Windows. Adversaries may encrypt data on target systems to interrupt availability. Detection: Monitor file modification and rename events for mass encrypti", "style": "description", "gold_id": "attack:T1486"}
+{"id": "ret-atk-008", "query": "initial-access technique abusing Phishing on Linux", "style": "hint", "gold_id": "attack:T1566"}
+{"id": "ret-atk-009", "query": "Spearphishing Attachment", "style": "title", "gold_id": "attack:T1566.001"}
+{"id": "ret-owasp-010", "query": "What is the description of OWASP Broken Access Control?", "style": "description", "gold_id": "owasp-top10:2025:A01:description"}
+{"id": "ret-owasp-011", "query": "What is the OWASP Top 10 category for Broken Access Control?", "style": "category", "gold_id": "owasp-top10:2025:A01:overview"}
+{"id": "ret-owasp-012", "query": "How to prevent Broken Access Control vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A01:prevention"}
+{"id": "ret-owasp-013", "query": "What are example attack scenarios for OWASP Broken Access Control?", "style": "scenarios", "gold_id": "owasp-top10:2025:A01:scenarios"}
+{"id": "ret-owasp-014", "query": "What is the description of OWASP Injection?", "style": "description", "gold_id": "owasp-top10:2025:A05:description"}
+{"id": "ret-owasp-015", "query": "What is the OWASP Top 10 category for Injection?", "style": "category", "gold_id": "owasp-top10:2025:A05:overview"}
+{"id": "ret-owasp-016", "query": "How to prevent Injection vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A05:prevention"}
+{"id": "ret-owasp-017", "query": "What are example attack scenarios for OWASP Injection?", "style": "scenarios", "gold_id": "owasp-top10:2025:A05:scenarios"}
+{"id": "neg-ao-000", "query": "What is a good recipe for sourdough bread?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-001", "query": "Who won the 2022 FIFA World Cup final in Qatar?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-002", "query": "How do plants convert sunlight into chemical energy?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-003", "query": "What is the MITRE ATT&CK technique T9999.001?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-004", "query": "What is the OWASP Top 10 2025 category A99?", "style": "negative", "gold_id": null}
