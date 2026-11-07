@@ -13,21 +13,18 @@ from viper import __version__
 from viper.config import Settings, get_settings
 from viper.llm import LLMError, OllamaClient
 from viper.logging_setup import configure_logging
-from viper.rag import Answer, IngestError, VectorStore, answer, ingest
+from viper.rag import Answer, IngestError, answer, ingest
+from viper.rag.backend import active_collection, open_registry, open_store
 from viper.rag.cisa_kev import fetch_kev, parse_kev
 from viper.rag.embedding import PrefixEmbedder
-from viper.rag.registry import KBRegistry, resolve_collection
+from viper.rag.types import Store
 
 log = logging.getLogger("viper.cli")
 
 
-def active_collection(settings: Settings) -> str:
-    return resolve_collection(settings.kb_registry_path, f"kb_{settings.kb_version}")
-
-
-def _build(settings: Settings) -> tuple[OllamaClient, VectorStore]:
+def _build(settings: Settings) -> tuple[OllamaClient, Store]:
     llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
-    store = VectorStore(settings.qdrant_path, active_collection(settings))
+    store = open_store(settings, active_collection(settings))
     return llm, store
 
 
@@ -89,9 +86,10 @@ def cmd_ask(settings: Settings, question: str | None) -> int:
 def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
     from viper.eval.cases import load_retrieval
     from viper.eval.retrieval import evaluate_retrieval
-    from viper.rag.update import run_update
+    from viper.rag.sources import all_sources
+    from viper.rag.update import collect, run_update
 
-    reg = KBRegistry.load(settings.kb_registry_path)
+    reg = open_registry(settings)
     if args.kb_cmd == "status":
         print(json.dumps({"active": reg.active or f"(default) kb_{settings.kb_version}",
                           "previous": reg.previous, "history": reg.history[-5:]}, indent=1))
@@ -107,18 +105,20 @@ def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
     reg.bootstrap(active_collection(settings))
     llm = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
     qembed = PrefixEmbedder(llm, settings.embed_query_prefix)
-    base = VectorStore(settings.qdrant_path, reg.active or "")
+    base = open_store(settings, reg.active or "")
     active = base
     staging = base.view(f"kb_{settings.kb_version}_{datetime.now(UTC):%Y%m%d%H%M%S}")
     cases = load_retrieval()
 
-    def recall(store: VectorStore) -> float:
+    def recall(store: Store) -> float:
         return float(evaluate_retrieval(cases, qembed, store)["overall"]["recall@4"])
 
     try:
-        docs = parse_kev(fetch_kev())
+        sources = all_sources()
+        docs, outcomes = collect(sources, active)  # a failed source keeps its live records
         report = run_update(
-            source="cisa-kev", docs=docs, doc_embedder=PrefixEmbedder(llm, settings.embed_doc_prefix),
+            source="+".join(s.name for s in sources), docs=docs, outcomes=outcomes,
+            doc_embedder=PrefixEmbedder(llm, settings.embed_doc_prefix),
             active=active, staging=staging, recall_at_4=recall,
             min_recall=settings.kb_min_recall_at_4, max_shrink=settings.kb_max_shrink,
             promote=None if args.no_promote else reg.promote,
@@ -147,7 +147,7 @@ def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
     from viper.eval.build import build
 
     if args.eval_cmd == "build":
-        store = VectorStore(settings.qdrant_path, active_collection(settings))
+        store = open_store(settings, active_collection(settings))
         try:
             print(build(store))
         finally:
@@ -159,7 +159,9 @@ def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
             print(line)
         return 0
     only = set(args.only.split(",")) if args.only else None
-    report = runner.run_eval(settings, args.tag, skip_llm=args.skip_llm, only=only)
+    report = runner.run_eval(
+        settings, args.tag, skip_llm=args.skip_llm, only=only, dataset_version=args.dataset
+    )
     path = runner.save_report(report)
     print(json.dumps({"retrieval": report["retrieval"]["overall"],
                       "calibration": report["retrieval"]["calibration"],
@@ -181,6 +183,10 @@ def main(argv: list[str] | None = None) -> int:
     esub.add_parser("build", help="regenerate frozen datasets from the indexed KEV snapshot")
     p_run = esub.add_parser("run", help="run evaluation and save a report")
     p_run.add_argument("--tag", required=True, help="name for this run, e.g. baseline-fsec-1.1")
+    p_run.add_argument(
+        "--dataset", choices=("v1", "v2"), default="v1",
+        help="dataset version: v1 (default) or v2 (KEV + ATT&CK + OWASP)",
+    )
     p_run.add_argument("--skip-llm", action="store_true", help="retrieval metrics only (fast)")
     p_run.add_argument("--only", default=None, help="comma list of case ids or categories")
     p_cmp = esub.add_parser("compare", help="compare two saved reports")
@@ -188,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     p_cmp.add_argument("b")
     p_kb = sub.add_parser("kb", help="knowledge-base lifecycle (safe weekly update)")
     ksub = p_kb.add_subparsers(dest="kb_cmd", required=True)
-    p_upd = ksub.add_parser("update", help="fetch, stage, gate and promote a new KEV snapshot")
+    p_upd = ksub.add_parser("update", help="fetch all sources (KEV, ATT&CK, OWASP), stage, gate and promote")
     p_upd.add_argument("--no-promote", action="store_true", help="stage and gate only (dry run)")
     ksub.add_parser("status", help="show the live collection and history")
     ksub.add_parser("rollback", help="point back at the previous collection")

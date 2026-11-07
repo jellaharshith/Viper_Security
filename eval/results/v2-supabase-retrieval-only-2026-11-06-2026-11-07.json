@@ -1,0 +1,102 @@
+{
+ "meta": {
+  "tag": "v2-supabase-retrieval-only-2026-11-06",
+  "created": "2026-11-07T00:14:25+00:00",
+  "chat_model": "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF:Q4_K_M",
+  "embed_model": "nomic-embed-text",
+  "embed_query_prefix": "search_query: ",
+  "embed_doc_prefix": "search_document: ",
+  "kb_version": "v2p",
+  "kb_records": 2515,
+  "min_score": 0.65,
+  "top_k": 4,
+  "dataset_version": "v2",
+  "dataset_hash": "39774fdcd9310950",
+  "git_commit": "20a8ccd"
+ },
+ "retrieval": {
+  "overall": {
+   "n": 846,
+   "recall@1": 0.8191489361702128,
+   "recall@4": 0.9479905437352246,
+   "recall@10": 0.9739952718676123,
+   "mrr": 0.8808299560959135
+  },
+  "by_style": {
+   "category": {
+    "n": 10,
+    "recall@1": 0.7,
+    "recall@4": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.825
+   },
+   "description": {
+    "n": 278,
+    "recall@1": 0.8669064748201439,
+    "recall@4": 0.9568345323741008,
+    "recall@10": 0.9820143884892086,
+    "mrr": 0.9107399794450154
+   },
+   "hint": {
+    "n": 268,
+    "recall@1": 0.75,
+    "recall@4": 0.917910447761194,
+    "recall@10": 0.9626865671641791,
+    "mrr": 0.8320406894100923
+   },
+   "prevention": {
+    "n": 10,
+    "recall@1": 0.7,
+    "recall@4": 0.9,
+    "recall@10": 0.9,
+    "mrr": 0.8
+   },
+   "scenarios": {
+    "n": 10,
+    "recall@1": 1.0,
+    "recall@4": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0
+   },
+   "title": {
+    "n": 270,
+    "recall@1": 0.8407407407407408,
+    "recall@4": 0.9666666666666667,
+    "recall@10": 0.9777777777777777,
+    "mrr": 0.8991093474426808
+   }
+  },
+  "calibration": {
+   "threshold": 0.6733,
+   "balanced_accuracy": 0.8236,
+   "tpr": 0.9043,
+   "tnr": 0.7429,
+   "pos_mean": 0.7822,
+   "neg_mean": 0.6216,
+   "neg_max": 0.8222
+  },
+  "by_source": {
+   "cisa-kev": {
+    "n": 100.0,
+    "recall@1": 0.89,
+    "recall@4": 0.99,
+    "recall@10": 1.0,
+    "mrr": 0.9366666666666668
+   },
+   "mitre-attack": {
+    "n": 706.0,
+    "recall@1": 0.8172804532577904,
+    "recall@4": 0.9405099150141643,
+    "recall@10": 0.9702549575070821,
+    "mrr": 0.8772646027249428
+   },
+   "owasp-top10": {
+    "n": 40.0,
+    "recall@1": 0.675,
+    "recall@4": 0.975,
+    "recall@10": 0.975,
+    "mrr": 0.8041666666666666
+   }
+  }
+ }
+}

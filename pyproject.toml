@@ -3,7 +3,7 @@ name = "viper"
 version = "0.1.0"
 description = "Personal, human-controlled cybersecurity AI assistant"
 requires-python = ">=3.12"
-dependencies = ["pydantic>=2.7,<3", "pydantic-settings>=2.3,<3", "httpx>=0.27,<1", "qdrant-client>=1.9,<2"]
+dependencies = ["pydantic>=2.7,<3", "pydantic-settings>=2.3,<3", "httpx>=0.27,<1", "qdrant-client>=1.9,<2", "psycopg[binary]>=3.2,<4"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -17,6 +17,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.ruff]
+extend-exclude = ["notebooks"]  # Colab notebooks use shell magics
 line-length = 110
 src = ["src", "tests"]
 

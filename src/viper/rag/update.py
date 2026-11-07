@@ -7,13 +7,14 @@ every gate, and only then does the registry pointer move. Rollback moves it back
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from viper.rag.store import VectorStore
-from viper.rag.types import Document, Embedder
+from viper.rag.sources import Source
+from viper.rag.types import Document, Embedder, IngestError, Store
 
 
 def content_hash(doc: Document) -> str:
@@ -35,6 +36,8 @@ class UpdateReport:
     embedded: int = 0
     removed: int = 0
     problems: list[str] = field(default_factory=list)
+    per_source: dict[str, int] = field(default_factory=dict)  # records per source in the new KB
+    carried_over: list[str] = field(default_factory=list)  # sources kept from live after a failure
     recall_at_4_staged: float | None = None
     recall_at_4_active: float | None = None
     promoted: bool = False
@@ -62,8 +65,51 @@ def validate(docs: list[Document], active_count: int, max_shrink: float) -> list
     return problems
 
 
+@dataclass
+class SourceOutcome:
+    """Result of fetching one source; `error` set means its records were carried over from live."""
+
+    name: str
+    docs: list[Document]
+    error: str | None = None
+    carried: int = 0
+
+
+def source_of(doc_id: str) -> str:
+    return doc_id.split(":", 1)[0]
+
+
+def collect(sources: list[Source], active: Store) -> tuple[list[Document], list[SourceOutcome]]:
+    """Fetch every source. A source that fails keeps its records from the live collection."""
+    outcomes: list[SourceOutcome] = []
+    live: list[Document] | None = None
+    for s in sources:
+        try:
+            outcomes.append(SourceOutcome(s.name, s.fetch()))
+        except IngestError as exc:
+            if live is None:
+                live = [d for d, _ in active.export()]
+            kept = [d for d in live if source_of(d.id) == s.name]
+            outcomes.append(SourceOutcome(s.name, kept, error=str(exc), carried=len(kept)))
+    return [d for o in outcomes for d in o.docs], outcomes
+
+
+def validate_sources(
+    docs: list[Document], outcomes: list[SourceOutcome], active: Store, max_shrink: float
+) -> list[str]:
+    """Per-source validation (shrink is measured against that source's live records)."""
+    if all(o.error for o in outcomes):
+        return ["no source could be fetched; nothing new to promote"]
+    live = Counter(source_of(d.id) for d, _ in active.export())
+    problems = [f"{o.name}: {p}" for o in outcomes if not o.error
+                for p in validate(o.docs, live.get(o.name, 0), max_shrink)]
+    if len({d.id for d in docs}) != len(docs):
+        problems.append("duplicate document ids across sources")
+    return problems
+
+
 def stage(
-    docs: list[Document], doc_embedder: Embedder, active: VectorStore, staging: VectorStore
+    docs: list[Document], doc_embedder: Embedder, active: Store, staging: Store
 ) -> tuple[int, int, int]:
     """Build the staging collection. Unchanged records reuse their stored vector (no re-embedding).
 
@@ -93,12 +139,13 @@ def run_update(
     source: str,
     docs: list[Document],
     doc_embedder: Embedder,
-    active: VectorStore,
-    staging: VectorStore,
-    recall_at_4: Callable[[VectorStore], float],
+    active: Store,
+    staging: Store,
+    recall_at_4: Callable[[Store], float],
     min_recall: float,
     max_shrink: float,
     promote: Callable[[str], None] | None,
+    outcomes: list[SourceOutcome] | None = None,
 ) -> UpdateReport:
     """Run the full gated update. `promote` is called only if every gate passes (None = dry run)."""
     rep = UpdateReport(
@@ -108,7 +155,15 @@ def run_update(
         staged=staging.collection,
         fetched=len(docs),
     )
-    rep.problems = validate(docs, active.count(), max_shrink)
+    if outcomes is None:
+        rep.problems = validate(docs, active.count(), max_shrink)
+    else:
+        rep.problems = validate_sources(docs, outcomes, active, max_shrink)
+        rep.per_source = {o.name: len(o.docs) for o in outcomes}
+        rep.carried_over = [
+            f"{o.name}: fetch failed ({o.error}); {o.carried} live records carried over"
+            for o in outcomes if o.error
+        ]
     if rep.problems:
         rep.decision = "REJECTED: validation failed (nothing staged)"
         return rep

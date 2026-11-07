@@ -35,4 +35,5 @@ A CVE that is not in KEV is reported as such without asking the model. CPU-only:
 python -m viper.cli kb update --no-promote   # fetch, stage, gate (dry run)
 python -m viper.cli kb update                # ...and promote if every gate passes
 python -m viper.cli kb status | rollback
+# Sources: CISA KEV + MITRE ATT&CK + OWASP Top 10. Optional Supabase backend: VIPER_STORE=pgvector (see ADR 0006)
 ```

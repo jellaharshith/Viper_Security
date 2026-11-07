@@ -1,0 +1,751 @@
+{"id": "ret-atk-000", "query": "T1001 Data Obfuscation", "style": "title", "gold_id": "attack:T1001"}
+{"id": "ret-atk-001", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may add junk data to protocols used for command and control to make detection more difficult. By adding random or meaningless da", "style": "description", "gold_id": "attack:T1001.001"}
+{"id": "ret-atk-002", "query": "command-and-control technique abusing T1001.002 Steganography on target platform", "style": "hint", "gold_id": "attack:T1001.002"}
+{"id": "ret-atk-003", "query": "T1001.003 Protocol or Service Impersonation", "style": "title", "gold_id": "attack:T1001.003"}
+{"id": "ret-atk-004", "query": "Platforms: Linux, macOS, Windows. Adversaries may attempt to dump credentials to obtain account login and credential material, normally in the form of a hash or a clear text passwo", "style": "description", "gold_id": "attack:T1003"}
+{"id": "ret-atk-005", "query": "credential-access technique abusing T1003.001 LSASS Memory on target platform", "style": "hint", "gold_id": "attack:T1003.001"}
+{"id": "ret-atk-006", "query": "T1003.002 Security Account Manager", "style": "title", "gold_id": "attack:T1003.002"}
+{"id": "ret-atk-007", "query": "Platforms: Windows. Adversaries may attempt to access or create a copy of the Active Directory domain database in order to steal credential information, as well as obtain other inf", "style": "description", "gold_id": "attack:T1003.003"}
+{"id": "ret-atk-008", "query": "credential-access technique abusing T1003.004 LSA Secrets on target platform", "style": "hint", "gold_id": "attack:T1003.004"}
+{"id": "ret-atk-009", "query": "T1003.005 Cached Domain Credentials", "style": "title", "gold_id": "attack:T1003.005"}
+{"id": "ret-atk-010", "query": "Platforms: Windows. Adversaries may attempt to access credentials and other sensitive information by abusing a Windows Domain Controller's application programming interface (API) t", "style": "description", "gold_id": "attack:T1003.006"}
+{"id": "ret-atk-011", "query": "credential-access technique abusing T1003.007 Proc Filesystem on target platform", "style": "hint", "gold_id": "attack:T1003.007"}
+{"id": "ret-atk-012", "query": "T1003.008 /etc/passwd and /etc/shadow", "style": "title", "gold_id": "attack:T1003.008"}
+{"id": "ret-atk-013", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may search local system sources, such as file systems, configuration files, local databases, virtual machine fi", "style": "description", "gold_id": "attack:T1005"}
+{"id": "ret-atk-014", "query": "stealth technique abusing T1006 Direct Volume Access on target platform", "style": "hint", "gold_id": "attack:T1006"}
+{"id": "ret-atk-015", "query": "T1007 System Service Discovery", "style": "title", "gold_id": "attack:T1007"}
+{"id": "ret-atk-016", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may use fallback or alternate communication channels if the primary channel is compromised or inaccessible in order to maintain ", "style": "description", "gold_id": "attack:T1008"}
+{"id": "ret-atk-017", "query": "discovery technique abusing T1010 Application Window Discovery on target platform", "style": "hint", "gold_id": "attack:T1010"}
+{"id": "ret-atk-018", "query": "T1011 Exfiltration Over Other Network Medium", "style": "title", "gold_id": "attack:T1011"}
+{"id": "ret-atk-019", "query": "Platforms: Linux, macOS, Windows. Adversaries may attempt to exfiltrate data over Bluetooth rather than the command and control channel. If the command and control network is a wir", "style": "description", "gold_id": "attack:T1011.001"}
+{"id": "ret-atk-020", "query": "discovery technique abusing T1012 Query Registry on target platform", "style": "hint", "gold_id": "attack:T1012"}
+{"id": "ret-atk-021", "query": "T1014 Rootkit", "style": "title", "gold_id": "attack:T1014"}
+{"id": "ret-atk-022", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may look for details about the network configuration and settings, such as IP and/or MAC addresses, of systems ", "style": "description", "gold_id": "attack:T1016"}
+{"id": "ret-atk-023", "query": "discovery technique abusing T1016.001 Internet Connection Discovery on target platform", "style": "hint", "gold_id": "attack:T1016.001"}
+{"id": "ret-atk-024", "query": "T1016.002 Wi-Fi Discovery", "style": "title", "gold_id": "attack:T1016.002"}
+{"id": "ret-atk-025", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may attempt to get a listing of other systems by IP address, hostname, or other logical identifier on a network", "style": "description", "gold_id": "attack:T1018"}
+{"id": "ret-atk-026", "query": "exfiltration technique abusing T1020 Automated Exfiltration on target platform", "style": "hint", "gold_id": "attack:T1020"}
+{"id": "ret-atk-027", "query": "T1020.001 Traffic Duplication", "style": "title", "gold_id": "attack:T1020.001"}
+{"id": "ret-atk-028", "query": "Platforms: Linux, macOS, Windows, IaaS, ESXi. Adversaries may use [Valid Accounts](https://attack.mitre.org/techniques/T1078) to log into a service that accepts remote connections,", "style": "description", "gold_id": "attack:T1021"}
+{"id": "ret-atk-029", "query": "lateral-movement technique abusing T1021.001 Remote Desktop Protocol on target platform", "style": "hint", "gold_id": "attack:T1021.001"}
+{"id": "ret-atk-030", "query": "T1021.002 SMB/Windows Admin Shares", "style": "title", "gold_id": "attack:T1021.002"}
+{"id": "ret-atk-031", "query": "Platforms: Windows. Adversaries may use [Valid Accounts](https://attack.mitre.org/techniques/T1078) to interact with remote machines by taking advantage of Distributed Component Ob", "style": "description", "gold_id": "attack:T1021.003"}
+{"id": "ret-atk-032", "query": "lateral-movement technique abusing T1021.004 SSH on target platform", "style": "hint", "gold_id": "attack:T1021.004"}
+{"id": "ret-atk-033", "query": "T1021.005 VNC", "style": "title", "gold_id": "attack:T1021.005"}
+{"id": "ret-atk-034", "query": "Platforms: Windows. Adversaries may use [Valid Accounts](https://attack.mitre.org/techniques/T1078) to interact with remote systems using Windows Remote Management (WinRM). The adv", "style": "description", "gold_id": "attack:T1021.006"}
+{"id": "ret-atk-035", "query": "lateral-movement technique abusing T1021.007 Cloud Services on target platform", "style": "hint", "gold_id": "attack:T1021.007"}
+{"id": "ret-atk-036", "query": "T1021.008 Direct Cloud VM Connections", "style": "title", "gold_id": "attack:T1021.008"}
+{"id": "ret-atk-037", "query": "Platforms: Linux, macOS, Windows. Adversaries may search connected removable media on computers they have compromised to find files of interest. Sensitive data can be collected fro", "style": "description", "gold_id": "attack:T1025"}
+{"id": "ret-atk-038", "query": "stealth technique abusing T1027 Obfuscated Files or Information on target platform", "style": "hint", "gold_id": "attack:T1027"}
+{"id": "ret-atk-039", "query": "T1027.001 Binary Padding", "style": "title", "gold_id": "attack:T1027.001"}
+{"id": "ret-atk-040", "query": "Platforms: Linux, macOS, Windows. Adversaries may perform software packing or virtual machine software protection to conceal their code. Software packing is a method of compressing", "style": "description", "gold_id": "attack:T1027.002"}
+{"id": "ret-atk-041", "query": "stealth technique abusing T1027.003 Steganography on target platform", "style": "hint", "gold_id": "attack:T1027.003"}
+{"id": "ret-atk-042", "query": "T1027.004 Compile After Delivery", "style": "title", "gold_id": "attack:T1027.004"}
+{"id": "ret-atk-043", "query": "Platforms: Linux, macOS, Windows. Adversaries may remove indicators from tools if they believe their malicious tool was detected, quarantined, or otherwise curtailed. They can modi", "style": "description", "gold_id": "attack:T1027.005"}
+{"id": "ret-atk-044", "query": "stealth technique abusing T1027.006 HTML Smuggling on target platform", "style": "hint", "gold_id": "attack:T1027.006"}
+{"id": "ret-atk-045", "query": "T1027.007 Dynamic API Resolution", "style": "title", "gold_id": "attack:T1027.007"}
+{"id": "ret-atk-046", "query": "Platforms: Linux, macOS, Network Devices, Windows. Adversaries may attempt to make a payload difficult to analyze by removing symbols, strings, and other human readable information", "style": "description", "gold_id": "attack:T1027.008"}
+{"id": "ret-atk-047", "query": "stealth technique abusing T1027.009 Embedded Payloads on target platform", "style": "hint", "gold_id": "attack:T1027.009"}
+{"id": "ret-atk-048", "query": "T1027.010 Command Obfuscation", "style": "title", "gold_id": "attack:T1027.010"}
+{"id": "ret-atk-049", "query": "Platforms: Linux, Windows. Adversaries may store data in \"fileless\" formats to conceal malicious activity from defenses. Fileless storage can be broadly defined as any format other", "style": "description", "gold_id": "attack:T1027.011"}
+{"id": "ret-atk-050", "query": "stealth technique abusing T1027.012 LNK Icon Smuggling on target platform", "style": "hint", "gold_id": "attack:T1027.012"}
+{"id": "ret-atk-051", "query": "T1027.013 Encrypted/Encoded File", "style": "title", "gold_id": "attack:T1027.013"}
+{"id": "ret-atk-052", "query": "Platforms: Linux, macOS, Windows. Adversaries may utilize polymorphic code (also known as metamorphic or mutating code) to evade detection. Polymorphic code is a type of software c", "style": "description", "gold_id": "attack:T1027.014"}
+{"id": "ret-atk-053", "query": "stealth technique abusing T1027.015 Compression on target platform", "style": "hint", "gold_id": "attack:T1027.015"}
+{"id": "ret-atk-054", "query": "T1027.016 Junk Code Insertion", "style": "title", "gold_id": "attack:T1027.016"}
+{"id": "ret-atk-055", "query": "Platforms: Linux, macOS, Windows. Adversaries may smuggle data and files past content filters by hiding malicious payloads inside of seemingly benign SVG files. SVGs, or Scalable V", "style": "description", "gold_id": "attack:T1027.017"}
+{"id": "ret-atk-056", "query": "stealth technique abusing T1027.018 Invisible Unicode on target platform", "style": "hint", "gold_id": "attack:T1027.018"}
+{"id": "ret-atk-057", "query": "T1029 Scheduled Transfer", "style": "title", "gold_id": "attack:T1029"}
+{"id": "ret-atk-058", "query": "Platforms: Linux, macOS, Windows, ESXi. An adversary may exfiltrate data in fixed size chunks instead of whole files or limit packet sizes below certain thresholds. This approach m", "style": "description", "gold_id": "attack:T1030"}
+{"id": "ret-atk-059", "query": "discovery technique abusing T1033 System Owner/User Discovery on target platform", "style": "hint", "gold_id": "attack:T1033"}
+{"id": "ret-atk-060", "query": "T1036 Masquerading", "style": "title", "gold_id": "attack:T1036"}
+{"id": "ret-atk-061", "query": "Platforms: macOS, Windows. Adversaries may attempt to mimic features of valid code signatures to increase the chance of deceiving a user, analyst, or tool. Code signing provides a ", "style": "description", "gold_id": "attack:T1036.001"}
+{"id": "ret-atk-062", "query": "stealth technique abusing T1036.002 Right-to-Left Override on target platform", "style": "hint", "gold_id": "attack:T1036.002"}
+{"id": "ret-atk-063", "query": "T1036.003 Rename Legitimate Utilities", "style": "title", "gold_id": "attack:T1036.003"}
+{"id": "ret-atk-064", "query": "Platforms: Linux, macOS, Windows. Adversaries may attempt to manipulate the name of a task or service to make it appear legitimate or benign. Tasks/services executed by the Task Sc", "style": "description", "gold_id": "attack:T1036.004"}
+{"id": "ret-atk-065", "query": "stealth technique abusing T1036.005 Match Legitimate Resource Name or Location on target platform", "style": "hint", "gold_id": "attack:T1036.005"}
+{"id": "ret-atk-066", "query": "T1036.006 Space after Filename", "style": "title", "gold_id": "attack:T1036.006"}
+{"id": "ret-atk-067", "query": "Platforms: Windows. Adversaries may abuse a double extension in the filename as a means of masquerading the true file type. A file name may include a secondary file type extension ", "style": "description", "gold_id": "attack:T1036.007"}
+{"id": "ret-atk-068", "query": "stealth technique abusing T1036.008 Masquerade File Type on target platform", "style": "hint", "gold_id": "attack:T1036.008"}
+{"id": "ret-atk-069", "query": "T1036.009 Break Process Trees", "style": "title", "gold_id": "attack:T1036.009"}
+{"id": "ret-atk-070", "query": "Platforms: Containers, IaaS, Identity Provider, Linux, macOS, Office Suite, SaaS, Windows. Adversaries may match or approximate the names of legitimate accounts to make newly creat", "style": "description", "gold_id": "attack:T1036.010"}
+{"id": "ret-atk-071", "query": "stealth technique abusing T1036.011 Overwrite Process Arguments on target platform", "style": "hint", "gold_id": "attack:T1036.011"}
+{"id": "ret-atk-072", "query": "T1036.012 Browser Fingerprint", "style": "title", "gold_id": "attack:T1036.012"}
+{"id": "ret-atk-073", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may use scripts automatically executed at boot or logon initialization to establish persistence. Initialization", "style": "description", "gold_id": "attack:T1037"}
+{"id": "ret-atk-074", "query": "persistence technique abusing T1037.001 Logon Script (Windows) on target platform", "style": "hint", "gold_id": "attack:T1037.001"}
+{"id": "ret-atk-075", "query": "T1037.002 Login Hook", "style": "title", "gold_id": "attack:T1037.002"}
+{"id": "ret-atk-076", "query": "Platforms: Windows. Adversaries may use network logon scripts automatically executed at logon initialization to establish persistence. Network logon scripts can be assigned using A", "style": "description", "gold_id": "attack:T1037.003"}
+{"id": "ret-atk-077", "query": "persistence technique abusing T1037.004 RC Scripts on target platform", "style": "hint", "gold_id": "attack:T1037.004"}
+{"id": "ret-atk-078", "query": "T1037.005 Startup Items", "style": "title", "gold_id": "attack:T1037.005"}
+{"id": "ret-atk-079", "query": "Platforms: Linux, macOS, Windows. Adversaries may search network shares on computers they have compromised to find files of interest. Sensitive data can be collected from remote sy", "style": "description", "gold_id": "attack:T1039"}
+{"id": "ret-atk-080", "query": "credential-access technique abusing T1040 Network Sniffing on target platform", "style": "hint", "gold_id": "attack:T1040"}
+{"id": "ret-atk-081", "query": "T1041 Exfiltration Over C2 Channel", "style": "title", "gold_id": "attack:T1041"}
+{"id": "ret-atk-082", "query": "Platforms: Containers, IaaS, Linux, macOS, Network Devices, Windows. Adversaries may attempt to get a listing of services running on remote hosts and local network infrastructure d", "style": "description", "gold_id": "attack:T1046"}
+{"id": "ret-atk-083", "query": "execution technique abusing T1047 Windows Management Instrumentation on target platform", "style": "hint", "gold_id": "attack:T1047"}
+{"id": "ret-atk-084", "query": "T1048 Exfiltration Over Alternative Protocol", "style": "title", "gold_id": "attack:T1048"}
+{"id": "ret-atk-085", "query": "Platforms: Linux, macOS, Windows, ESXi. Adversaries may steal data by exfiltrating it over a symmetrically encrypted network protocol other than that of the existing command and co", "style": "description", "gold_id": "attack:T1048.001"}
+{"id": "ret-atk-086", "query": "exfiltration technique abusing T1048.002 Exfiltration Over Asymmetric Encrypted Non-C2 Protocol on target platform", "style": "hint", "gold_id": "attack:T1048.002"}
+{"id": "ret-atk-087", "query": "T1048.003 Exfiltration Over Unencrypted Non-C2 Protocol", "style": "title", "gold_id": "attack:T1048.003"}
+{"id": "ret-atk-088", "query": "Platforms: ESXi, IaaS, Linux, macOS, Network Devices, Windows. Adversaries may attempt to get a listing of network connections to or from the compromised system they are currently ", "style": "description", "gold_id": "attack:T1049"}
+{"id": "ret-atk-089", "query": "exfiltration technique abusing T1052 Exfiltration Over Physical Medium on target platform", "style": "hint", "gold_id": "attack:T1052"}
+{"id": "ret-atk-090", "query": "T1052.001 Exfiltration over USB", "style": "title", "gold_id": "attack:T1052.001"}
+{"id": "ret-atk-091", "query": "Platforms: Containers, ESXi, Linux, macOS, Network Devices, Windows. Adversaries may abuse task scheduling functionality to facilitate initial or recurring execution of malicious c", "style": "description", "gold_id": "attack:T1053"}
+{"id": "ret-atk-092", "query": "execution technique abusing T1053.002 At on target platform", "style": "hint", "gold_id": "attack:T1053.002"}
+{"id": "ret-atk-093", "query": "T1053.003 Cron", "style": "title", "gold_id": "attack:T1053.003"}
+{"id": "ret-atk-094", "query": "Platforms: Windows. Adversaries may abuse the Windows Task Scheduler to perform task scheduling for initial or recurring execution of malicious code. There are multiple ways to acc", "style": "description", "gold_id": "attack:T1053.005"}
+{"id": "ret-atk-095", "query": "execution technique abusing T1053.006 Systemd Timers on target platform", "style": "hint", "gold_id": "attack:T1053.006"}
+{"id": "ret-atk-096", "query": "T1053.007 Container Orchestration Job", "style": "title", "gold_id": "attack:T1053.007"}
+{"id": "ret-atk-097", "query": "Platforms: Linux, macOS, Windows. Adversaries may inject code into processes in order to evade process-based defenses as well as possibly elevate privileges. Process injection is a", "style": "description", "gold_id": "attack:T1055"}
+{"id": "ret-atk-098", "query": "stealth technique abusing T1055.001 Dynamic-link Library Injection on target platform", "style": "hint", "gold_id": "attack:T1055.001"}
+{"id": "ret-atk-099", "query": "T1055.002 Portable Executable Injection", "style": "title", "gold_id": "attack:T1055.002"}
+{"id": "ret-atk-100", "query": "Platforms: Windows. Adversaries may inject malicious code into hijacked processes in order to evade process-based defenses as well as possibly elevate privileges. Thread Execution ", "style": "description", "gold_id": "attack:T1055.003"}
+{"id": "ret-atk-101", "query": "stealth technique abusing T1055.004 Asynchronous Procedure Call on target platform", "style": "hint", "gold_id": "attack:T1055.004"}
+{"id": "ret-atk-102", "query": "T1055.005 Thread Local Storage", "style": "title", "gold_id": "attack:T1055.005"}
+{"id": "ret-atk-103", "query": "Platforms: Linux. Adversaries may inject malicious code into processes via ptrace (process trace) system calls in order to evade process-based defenses as well as possibly elevate ", "style": "description", "gold_id": "attack:T1055.008"}
+{"id": "ret-atk-104", "query": "stealth technique abusing T1055.009 Proc Memory on target platform", "style": "hint", "gold_id": "attack:T1055.009"}
+{"id": "ret-atk-105", "query": "T1055.011 Extra Window Memory Injection", "style": "title", "gold_id": "attack:T1055.011"}
+{"id": "ret-atk-106", "query": "Platforms: Windows. Adversaries may inject malicious code into suspended and hollowed processes in order to evade process-based defenses. Process hollowing is a method of executing", "style": "description", "gold_id": "attack:T1055.012"}
+{"id": "ret-atk-107", "query": "stealth technique abusing T1055.013 Process Doppelgänging on target platform", "style": "hint", "gold_id": "attack:T1055.013"}
+{"id": "ret-atk-108", "query": "T1055.014 VDSO Hijacking", "style": "title", "gold_id": "attack:T1055.014"}
+{"id": "ret-atk-109", "query": "Platforms: Windows. Adversaries may abuse list-view controls to inject malicious code into hijacked processes in order to evade process-based defenses as well as possibly elevate p", "style": "description", "gold_id": "attack:T1055.015"}
+{"id": "ret-atk-110", "query": "collection technique abusing T1056 Input Capture on target platform", "style": "hint", "gold_id": "attack:T1056"}
+{"id": "ret-atk-111", "query": "T1056.001 Keylogging", "style": "title", "gold_id": "attack:T1056.001"}
+{"id": "ret-atk-112", "query": "Platforms: Linux, macOS, Windows. Adversaries may mimic common operating system GUI components to prompt users for credentials with a seemingly legitimate prompt. When programs are", "style": "description", "gold_id": "attack:T1056.002"}
+{"id": "ret-atk-113", "query": "collection technique abusing T1056.003 Web Portal Capture on target platform", "style": "hint", "gold_id": "attack:T1056.003"}
+{"id": "ret-atk-114", "query": "T1056.004 Credential API Hooking", "style": "title", "gold_id": "attack:T1056.004"}
+{"id": "ret-atk-115", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may attempt to get information about running processes on a system. Information obtained could be used to gain ", "style": "description", "gold_id": "attack:T1057"}
+{"id": "ret-atk-116", "query": "execution technique abusing T1059 Command and Scripting Interpreter on target platform", "style": "hint", "gold_id": "attack:T1059"}
+{"id": "ret-atk-117", "query": "T1059.001 PowerShell", "style": "title", "gold_id": "attack:T1059.001"}
+{"id": "ret-atk-118", "query": "Platforms: macOS. Adversaries may abuse AppleScript for execution. AppleScript is a macOS scripting language designed to control applications and parts of the OS via inter-applicat", "style": "description", "gold_id": "attack:T1059.002"}
+{"id": "ret-atk-119", "query": "execution technique abusing T1059.003 Windows Command Shell on target platform", "style": "hint", "gold_id": "attack:T1059.003"}
+{"id": "ret-atk-120", "query": "T1059.004 Unix Shell", "style": "title", "gold_id": "attack:T1059.004"}
+{"id": "ret-atk-121", "query": "Platforms: Linux, macOS, Windows. Adversaries may abuse Visual Basic (VB) for execution. VB is a programming language created by Microsoft with interoperability with many Windows t", "style": "description", "gold_id": "attack:T1059.005"}
+{"id": "ret-atk-122", "query": "execution technique abusing T1059.006 Python on target platform", "style": "hint", "gold_id": "attack:T1059.006"}
+{"id": "ret-atk-123", "query": "T1059.007 JavaScript", "style": "title", "gold_id": "attack:T1059.007"}
+{"id": "ret-atk-124", "query": "Platforms: Network Devices. Adversaries may abuse scripting or built-in command line interpreters (CLI) on network devices to execute malicious command and payloads. The CLI is the", "style": "description", "gold_id": "attack:T1059.008"}
+{"id": "ret-atk-125", "query": "execution technique abusing T1059.009 Cloud API on target platform", "style": "hint", "gold_id": "attack:T1059.009"}
+{"id": "ret-atk-126", "query": "T1059.010 AutoHotKey & AutoIT", "style": "title", "gold_id": "attack:T1059.010"}
+{"id": "ret-atk-127", "query": "Platforms: Linux, Network Devices, Windows, macOS. Adversaries may abuse Lua commands and scripts for execution. Lua is a cross-platform scripting and programming language primaril", "style": "description", "gold_id": "attack:T1059.011"}
+{"id": "ret-atk-128", "query": "execution technique abusing T1059.012 Hypervisor CLI on target platform", "style": "hint", "gold_id": "attack:T1059.012"}
+{"id": "ret-atk-129", "query": "T1059.013 Container CLI/API", "style": "title", "gold_id": "attack:T1059.013"}
+{"id": "ret-atk-130", "query": "Platforms: Containers, Linux, macOS, Windows. Adversaries may exploit software vulnerabilities in an attempt to elevate privileges. Exploitation of a software vulnerability occurs ", "style": "description", "gold_id": "attack:T1068"}
+{"id": "ret-atk-131", "query": "discovery technique abusing T1069 Permission Groups Discovery on target platform", "style": "hint", "gold_id": "attack:T1069"}
+{"id": "ret-atk-132", "query": "T1069.001 Local Groups", "style": "title", "gold_id": "attack:T1069.001"}
+{"id": "ret-atk-133", "query": "Platforms: Linux, macOS, Windows. Adversaries may attempt to find domain-level groups and permission settings. The knowledge of domain-level permission groups can help adversaries ", "style": "description", "gold_id": "attack:T1069.002"}
+{"id": "ret-atk-134", "query": "discovery technique abusing T1069.003 Cloud Groups on target platform", "style": "hint", "gold_id": "attack:T1069.003"}
+{"id": "ret-atk-135", "query": "T1070 Indicator Removal", "style": "title", "gold_id": "attack:T1070"}
+{"id": "ret-atk-136", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. In addition to clearing system logs, an adversary may clear the command history of a compromised account to conceal the act", "style": "description", "gold_id": "attack:T1070.003"}
+{"id": "ret-atk-137", "query": "stealth technique abusing T1070.004 File Deletion on target platform", "style": "hint", "gold_id": "attack:T1070.004"}
+{"id": "ret-atk-138", "query": "T1070.005 Network Share Connection Removal", "style": "title", "gold_id": "attack:T1070.005"}
+{"id": "ret-atk-139", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may modify file time attributes to hide new files or changes to existing files. Timestomping is a technique that modifies the ti", "style": "description", "gold_id": "attack:T1070.006"}
+{"id": "ret-atk-140", "query": "stealth technique abusing T1070.007 Clear Network Connection History and Configurations on target platform", "style": "hint", "gold_id": "attack:T1070.007"}
+{"id": "ret-atk-141", "query": "T1070.008 Clear Mailbox Data", "style": "title", "gold_id": "attack:T1070.008"}
+{"id": "ret-atk-142", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may clear artifacts associated with previously established persistence on a host system to remove evidence of their activity. Th", "style": "description", "gold_id": "attack:T1070.009"}
+{"id": "ret-atk-143", "query": "stealth technique abusing T1070.010 Relocate Malware on target platform", "style": "hint", "gold_id": "attack:T1070.010"}
+{"id": "ret-atk-144", "query": "T1071 Application Layer Protocol", "style": "title", "gold_id": "attack:T1071"}
+{"id": "ret-atk-145", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may communicate using application layer protocols associated with web traffic to avoid detection/network filter", "style": "description", "gold_id": "attack:T1071.001"}
+{"id": "ret-atk-146", "query": "command-and-control technique abusing T1071.002 File Transfer Protocols on target platform", "style": "hint", "gold_id": "attack:T1071.002"}
+{"id": "ret-atk-147", "query": "T1071.003 Mail Protocols", "style": "title", "gold_id": "attack:T1071.003"}
+{"id": "ret-atk-148", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may communicate using the Domain Name System (DNS) application layer protocol to avoid detection/network filter", "style": "description", "gold_id": "attack:T1071.004"}
+{"id": "ret-atk-149", "query": "command-and-control technique abusing T1071.005 Publish/Subscribe Protocols on target platform", "style": "hint", "gold_id": "attack:T1071.005"}
+{"id": "ret-atk-150", "query": "T1072 Software Deployment Tools", "style": "title", "gold_id": "attack:T1072"}
+{"id": "ret-atk-151", "query": "Platforms: ESXi, IaaS, Linux, macOS, Windows. Adversaries may stage collected data in a central location or directory prior to Exfiltration. Data may be kept in separate files or c", "style": "description", "gold_id": "attack:T1074"}
+{"id": "ret-atk-152", "query": "collection technique abusing T1074.001 Local Data Staging on target platform", "style": "hint", "gold_id": "attack:T1074.001"}
+{"id": "ret-atk-153", "query": "T1074.002 Remote Data Staging", "style": "title", "gold_id": "attack:T1074.002"}
+{"id": "ret-atk-154", "query": "Platforms: Containers, ESXi, IaaS, Identity Provider, Linux, macOS, Network Devices, Office Suite, SaaS, Windows. Adversaries may obtain and abuse credentials of existing accounts ", "style": "description", "gold_id": "attack:T1078"}
+{"id": "ret-atk-155", "query": "stealth technique abusing T1078.001 Default Accounts on target platform", "style": "hint", "gold_id": "attack:T1078.001"}
+{"id": "ret-atk-156", "query": "T1078.002 Domain Accounts", "style": "title", "gold_id": "attack:T1078.002"}
+{"id": "ret-atk-157", "query": "Platforms: Containers, ESXi, Linux, macOS, Network Devices, Windows. Adversaries may obtain and abuse credentials of a local account as a means of gaining Initial Access, Persisten", "style": "description", "gold_id": "attack:T1078.003"}
+{"id": "ret-atk-158", "query": "stealth technique abusing T1078.004 Cloud Accounts on target platform", "style": "hint", "gold_id": "attack:T1078.004"}
+{"id": "ret-atk-159", "query": "T1080 Taint Shared Content", "style": "title", "gold_id": "attack:T1080"}
+{"id": "ret-atk-160", "query": "Platforms: ESXi, IaaS, Linux, macOS, Network Devices, Windows. An adversary may attempt to get detailed information about the operating system and hardware, including version, patc", "style": "description", "gold_id": "attack:T1082"}
+{"id": "ret-atk-161", "query": "discovery technique abusing T1083 File and Directory Discovery on target platform", "style": "hint", "gold_id": "attack:T1083"}
+{"id": "ret-atk-162", "query": "T1087 Account Discovery", "style": "title", "gold_id": "attack:T1087"}
+{"id": "ret-atk-163", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may attempt to get a listing of local system accounts. This information can help adversaries determine which local accounts exis", "style": "description", "gold_id": "attack:T1087.001"}
+{"id": "ret-atk-164", "query": "discovery technique abusing T1087.002 Domain Account on target platform", "style": "hint", "gold_id": "attack:T1087.002"}
+{"id": "ret-atk-165", "query": "T1087.003 Email Account", "style": "title", "gold_id": "attack:T1087.003"}
+{"id": "ret-atk-166", "query": "Platforms: IaaS, Identity Provider, Office Suite, SaaS. Adversaries may attempt to get a listing of cloud accounts. Cloud accounts are those created and configured by an organizati", "style": "description", "gold_id": "attack:T1087.004"}
+{"id": "ret-atk-167", "query": "command-and-control technique abusing T1090 Proxy on target platform", "style": "hint", "gold_id": "attack:T1090"}
+{"id": "ret-atk-168", "query": "T1090.001 Internal Proxy", "style": "title", "gold_id": "attack:T1090.001"}
+{"id": "ret-atk-169", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may use an external proxy to act as an intermediary for network communications to a command and control server ", "style": "description", "gold_id": "attack:T1090.002"}
+{"id": "ret-atk-170", "query": "command-and-control technique abusing T1090.003 Multi-hop Proxy on target platform", "style": "hint", "gold_id": "attack:T1090.003"}
+{"id": "ret-atk-171", "query": "T1090.004 Domain Fronting", "style": "title", "gold_id": "attack:T1090.004"}
+{"id": "ret-atk-172", "query": "Platforms: Windows. Adversaries may move onto systems, possibly those on disconnected or air-gapped networks, by copying malware to removable media and taking advantage of Autorun ", "style": "description", "gold_id": "attack:T1091"}
+{"id": "ret-atk-173", "query": "command-and-control technique abusing T1092 Communication Through Removable Media on target platform", "style": "hint", "gold_id": "attack:T1092"}
+{"id": "ret-atk-174", "query": "T1095 Non-Application Layer Protocol", "style": "title", "gold_id": "attack:T1095"}
+{"id": "ret-atk-175", "query": "Platforms: Containers, ESXi, IaaS, Identity Provider, Linux, macOS, Network Devices, Office Suite, SaaS, Windows. Adversaries may manipulate accounts to maintain and/or elevate acc", "style": "description", "gold_id": "attack:T1098"}
+{"id": "ret-atk-176", "query": "persistence technique abusing T1098.001 Additional Cloud Credentials on target platform", "style": "hint", "gold_id": "attack:T1098.001"}
+{"id": "ret-atk-177", "query": "T1098.002 Additional Email Delegate Permissions", "style": "title", "gold_id": "attack:T1098.002"}
+{"id": "ret-atk-178", "query": "Platforms: IaaS, Identity Provider, Office Suite, SaaS. An adversary may add additional roles or permissions to an adversary-controlled cloud account to maintain persistent access ", "style": "description", "gold_id": "attack:T1098.003"}
+{"id": "ret-atk-179", "query": "persistence technique abusing T1098.004 SSH Authorized Keys on target platform", "style": "hint", "gold_id": "attack:T1098.004"}
+{"id": "ret-atk-180", "query": "T1098.005 Device Registration", "style": "title", "gold_id": "attack:T1098.005"}
+{"id": "ret-atk-181", "query": "Platforms: Containers. An adversary may add additional roles or permissions to an adversary-controlled user or service account to maintain persistent access to a container orchestr", "style": "description", "gold_id": "attack:T1098.006"}
+{"id": "ret-atk-182", "query": "persistence technique abusing T1098.007 Additional Local or Domain Groups on target platform", "style": "hint", "gold_id": "attack:T1098.007"}
+{"id": "ret-atk-183", "query": "T1102 Web Service", "style": "title", "gold_id": "attack:T1102"}
+{"id": "ret-atk-184", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may use an existing, legitimate external Web service to host information that points to additional command and control (C2) infr", "style": "description", "gold_id": "attack:T1102.001"}
+{"id": "ret-atk-185", "query": "command-and-control technique abusing T1102.002 Bidirectional Communication on target platform", "style": "hint", "gold_id": "attack:T1102.002"}
+{"id": "ret-atk-186", "query": "T1102.003 One-Way Communication", "style": "title", "gold_id": "attack:T1102.003"}
+{"id": "ret-atk-187", "query": "Platforms: Linux, macOS, Windows, ESXi. Adversaries may create multiple stages for command and control that are employed under different conditions or for certain functions. Use of", "style": "description", "gold_id": "attack:T1104"}
+{"id": "ret-atk-188", "query": "command-and-control technique abusing T1105 Ingress Tool Transfer on target platform", "style": "hint", "gold_id": "attack:T1105"}
+{"id": "ret-atk-189", "query": "T1106 Native API", "style": "title", "gold_id": "attack:T1106"}
+{"id": "ret-atk-190", "query": "Platforms: Containers, ESXi, IaaS, Identity Provider, Linux, macOS, Network Devices, Office Suite, SaaS, Windows. Adversaries may use brute force techniques to gain access to accou", "style": "description", "gold_id": "attack:T1110"}
+{"id": "ret-atk-191", "query": "credential-access technique abusing T1110.001 Password Guessing on target platform", "style": "hint", "gold_id": "attack:T1110.001"}
+{"id": "ret-atk-192", "query": "T1110.002 Password Cracking", "style": "title", "gold_id": "attack:T1110.002"}
+{"id": "ret-atk-193", "query": "Platforms: Containers, ESXi, IaaS, Identity Provider, Linux, Network Devices, Office Suite, SaaS, Windows, macOS. Adversaries may use a single or small list of commonly used passwo", "style": "description", "gold_id": "attack:T1110.003"}
+{"id": "ret-atk-194", "query": "credential-access technique abusing T1110.004 Credential Stuffing on target platform", "style": "hint", "gold_id": "attack:T1110.004"}
+{"id": "ret-atk-195", "query": "T1111 Multi-Factor Authentication Interception", "style": "title", "gold_id": "attack:T1111"}
+{"id": "ret-atk-196", "query": "Platforms: Windows. Adversaries may interact with the Windows Registry as part of a variety of other techniques to aid in defense evasion, persistence, and execution. Access to spe", "style": "description", "gold_id": "attack:T1112"}
+{"id": "ret-atk-197", "query": "collection technique abusing T1113 Screen Capture on target platform", "style": "hint", "gold_id": "attack:T1113"}
+{"id": "ret-atk-198", "query": "T1114 Email Collection", "style": "title", "gold_id": "attack:T1114"}
+{"id": "ret-atk-199", "query": "Platforms: Windows. Adversaries may target user email on local systems to collect sensitive information. Files containing email data can be acquired from a user’s local system, suc", "style": "description", "gold_id": "attack:T1114.001"}
+{"id": "ret-atk-200", "query": "collection technique abusing T1114.002 Remote Email Collection on target platform", "style": "hint", "gold_id": "attack:T1114.002"}
+{"id": "ret-atk-201", "query": "T1114.003 Email Forwarding Rule", "style": "title", "gold_id": "attack:T1114.003"}
+{"id": "ret-atk-202", "query": "Platforms: Linux, macOS, Windows. Adversaries may collect data stored in the clipboard from users copying information within or between applications. For example, on Windows advers", "style": "description", "gold_id": "attack:T1115"}
+{"id": "ret-atk-203", "query": "collection technique abusing T1119 Automated Collection on target platform", "style": "hint", "gold_id": "attack:T1119"}
+{"id": "ret-atk-204", "query": "T1120 Peripheral Device Discovery", "style": "title", "gold_id": "attack:T1120"}
+{"id": "ret-atk-205", "query": "Platforms: Linux, macOS, Windows. An adversary can leverage a computer's peripheral devices (e.g., microphones and webcams) or applications (e.g., voice and video call services) to", "style": "description", "gold_id": "attack:T1123"}
+{"id": "ret-atk-206", "query": "discovery technique abusing T1124 System Time Discovery on target platform", "style": "hint", "gold_id": "attack:T1124"}
+{"id": "ret-atk-207", "query": "T1125 Video Capture", "style": "title", "gold_id": "attack:T1125"}
+{"id": "ret-atk-208", "query": "Platforms: Windows. Adversaries may take advantage of trusted developer utilities to proxy execution of malicious payloads. There are many utilities used for software development r", "style": "description", "gold_id": "attack:T1127"}
+{"id": "ret-atk-209", "query": "stealth technique abusing T1127.001 MSBuild on target platform", "style": "hint", "gold_id": "attack:T1127.001"}
+{"id": "ret-atk-210", "query": "T1127.002 ClickOnce", "style": "title", "gold_id": "attack:T1127.002"}
+{"id": "ret-atk-211", "query": "Platforms: Windows. Adversaries may use `JamPlus` to proxy the execution of a malicious script. `JamPlus` is a build utility tool for code and data build systems. It works with sev", "style": "description", "gold_id": "attack:T1127.003"}
+{"id": "ret-atk-212", "query": "execution technique abusing T1129 Shared Modules on target platform", "style": "hint", "gold_id": "attack:T1129"}
+{"id": "ret-atk-213", "query": "T1132 Data Encoding", "style": "title", "gold_id": "attack:T1132"}
+{"id": "ret-atk-214", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may encode data with a standard data encoding system to make the content of command and control traffic more difficult to detect", "style": "description", "gold_id": "attack:T1132.001"}
+{"id": "ret-atk-215", "query": "command-and-control technique abusing T1132.002 Non-Standard Encoding on target platform", "style": "hint", "gold_id": "attack:T1132.002"}
+{"id": "ret-atk-216", "query": "T1133 External Remote Services", "style": "title", "gold_id": "attack:T1133"}
+{"id": "ret-atk-217", "query": "Platforms: Windows. Adversaries may modify access tokens to operate under a different user or system security context to perform actions and bypass access controls. Windows uses ac", "style": "description", "gold_id": "attack:T1134"}
+{"id": "ret-atk-218", "query": "stealth technique abusing T1134.001 Token Impersonation/Theft on target platform", "style": "hint", "gold_id": "attack:T1134.001"}
+{"id": "ret-atk-219", "query": "T1134.002 Create Process with Token", "style": "title", "gold_id": "attack:T1134.002"}
+{"id": "ret-atk-220", "query": "Platforms: Windows. Adversaries may make new tokens and impersonate users to escalate privileges and bypass access controls. For example, if an adversary has a username and passwor", "style": "description", "gold_id": "attack:T1134.003"}
+{"id": "ret-atk-221", "query": "stealth technique abusing T1134.004 Parent PID Spoofing on target platform", "style": "hint", "gold_id": "attack:T1134.004"}
+{"id": "ret-atk-222", "query": "T1134.005 SID-History Injection", "style": "title", "gold_id": "attack:T1134.005"}
+{"id": "ret-atk-223", "query": "Platforms: Linux, macOS, Windows. Adversaries may look for folders and drives shared on remote systems as a means of identifying sources of information to gather as a precursor for", "style": "description", "gold_id": "attack:T1135"}
+{"id": "ret-atk-224", "query": "persistence technique abusing T1136 Create Account on target platform", "style": "hint", "gold_id": "attack:T1136"}
+{"id": "ret-atk-225", "query": "T1136.001 Local Account", "style": "title", "gold_id": "attack:T1136.001"}
+{"id": "ret-atk-226", "query": "Platforms: Linux, macOS, Windows. Adversaries may create a domain account to maintain access to victim systems. Domain accounts are those managed by Active Directory Domain Service", "style": "description", "gold_id": "attack:T1136.002"}
+{"id": "ret-atk-227", "query": "persistence technique abusing T1136.003 Cloud Account on target platform", "style": "hint", "gold_id": "attack:T1136.003"}
+{"id": "ret-atk-228", "query": "T1137 Office Application Startup", "style": "title", "gold_id": "attack:T1137"}
+{"id": "ret-atk-229", "query": "Platforms: Office Suite, Windows. Adversaries may abuse Microsoft Office templates to obtain persistence on a compromised system. Microsoft Office contains templates that are part ", "style": "description", "gold_id": "attack:T1137.001"}
+{"id": "ret-atk-230", "query": "persistence technique abusing T1137.002 Office Test on target platform", "style": "hint", "gold_id": "attack:T1137.002"}
+{"id": "ret-atk-231", "query": "T1137.003 Outlook Forms", "style": "title", "gold_id": "attack:T1137.003"}
+{"id": "ret-atk-232", "query": "Platforms: Windows, Office Suite. Adversaries may abuse Microsoft Outlook's Home Page feature to obtain persistence on a compromised system. Outlook Home Page is a legacy feature u", "style": "description", "gold_id": "attack:T1137.004"}
+{"id": "ret-atk-233", "query": "persistence technique abusing T1137.005 Outlook Rules on target platform", "style": "hint", "gold_id": "attack:T1137.005"}
+{"id": "ret-atk-234", "query": "T1137.006 Add-ins", "style": "title", "gold_id": "attack:T1137.006"}
+{"id": "ret-atk-235", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may use [Obfuscated Files or Information](https://attack.mitre.org/techniques/T1027) to hide artifacts of an intrusion from anal", "style": "description", "gold_id": "attack:T1140"}
+{"id": "ret-atk-236", "query": "persistence technique abusing T1176 Software Extensions on target platform", "style": "hint", "gold_id": "attack:T1176"}
+{"id": "ret-atk-237", "query": "T1176.001 Browser Extensions", "style": "title", "gold_id": "attack:T1176.001"}
+{"id": "ret-atk-238", "query": "Platforms: Linux, macOS, Windows. Adversaries may abuse an integrated development environment (IDE) extension to establish persistent access to victim systems. IDEs such as Visual ", "style": "description", "gold_id": "attack:T1176.002"}
+{"id": "ret-atk-239", "query": "collection technique abusing T1185 Browser Session Hijacking on target platform", "style": "hint", "gold_id": "attack:T1185"}
+{"id": "ret-atk-240", "query": "T1187 Forced Authentication", "style": "title", "gold_id": "attack:T1187"}
+{"id": "ret-atk-241", "query": "Platforms: Identity Provider, Linux, macOS, Windows. Adversaries may gain access to a system through a user visiting a website over the normal course of browsing. Multiple ways of ", "style": "description", "gold_id": "attack:T1189"}
+{"id": "ret-atk-242", "query": "initial-access technique abusing T1190 Exploit Public-Facing Application on target platform", "style": "hint", "gold_id": "attack:T1190"}
+{"id": "ret-atk-243", "query": "T1195 Supply Chain Compromise", "style": "title", "gold_id": "attack:T1195"}
+{"id": "ret-atk-244", "query": "Platforms: Linux, macOS, Windows. Adversaries may manipulate software dependencies and development tools prior to receipt by a final consumer for the purpose of data or system comp", "style": "description", "gold_id": "attack:T1195.001"}
+{"id": "ret-atk-245", "query": "initial-access technique abusing T1195.002 Compromise Software Supply Chain on target platform", "style": "hint", "gold_id": "attack:T1195.002"}
+{"id": "ret-atk-246", "query": "T1195.003 Compromise Hardware Supply Chain", "style": "title", "gold_id": "attack:T1195.003"}
+{"id": "ret-atk-247", "query": "Platforms: Windows. Adversaries may abuse BITS jobs to persistently execute code and perform various background tasks. Windows Background Intelligent Transfer Service (BITS) is a l", "style": "description", "gold_id": "attack:T1197"}
+{"id": "ret-atk-248", "query": "initial-access technique abusing T1199 Trusted Relationship on target platform", "style": "hint", "gold_id": "attack:T1199"}
+{"id": "ret-atk-249", "query": "T1200 Hardware Additions", "style": "title", "gold_id": "attack:T1200"}
+{"id": "ret-atk-250", "query": "Platforms: Windows, Linux, macOS, IaaS, Network Devices, Identity Provider, SaaS, Office Suite. Adversaries may attempt to access detailed information about the password policy use", "style": "description", "gold_id": "attack:T1201"}
+{"id": "ret-atk-251", "query": "stealth technique abusing T1202 Indirect Command Execution on target platform", "style": "hint", "gold_id": "attack:T1202"}
+{"id": "ret-atk-252", "query": "T1203 Exploitation for Client Execution", "style": "title", "gold_id": "attack:T1203"}
+{"id": "ret-atk-253", "query": "Platforms: Linux, Windows, macOS, IaaS, Containers. An adversary may rely upon specific actions by a user in order to gain execution. Users may be subjected to social engineering t", "style": "description", "gold_id": "attack:T1204"}
+{"id": "ret-atk-254", "query": "execution technique abusing T1204.001 Malicious Link on target platform", "style": "hint", "gold_id": "attack:T1204.001"}
+{"id": "ret-atk-255", "query": "T1204.002 Malicious File", "style": "title", "gold_id": "attack:T1204.002"}
+{"id": "ret-atk-256", "query": "Platforms: IaaS, Containers. Adversaries may rely on a user running a malicious image to facilitate execution. Amazon Web Services (AWS) Amazon Machine Images (AMIs), Google Cloud ", "style": "description", "gold_id": "attack:T1204.003"}
+{"id": "ret-atk-257", "query": "execution technique abusing T1204.004 Malicious Copy and Paste on target platform", "style": "hint", "gold_id": "attack:T1204.004"}
+{"id": "ret-atk-258", "query": "T1204.005 Malicious Library", "style": "title", "gold_id": "attack:T1204.005"}
+{"id": "ret-atk-259", "query": "Platforms: Linux, macOS, Network Devices, Windows. Adversaries may use traffic signaling to hide open ports or other malicious functionality used for persistence or command and con", "style": "description", "gold_id": "attack:T1205"}
+{"id": "ret-atk-260", "query": "stealth technique abusing T1205.001 Port Knocking on target platform", "style": "hint", "gold_id": "attack:T1205.001"}
+{"id": "ret-atk-261", "query": "T1205.002 Socket Filters", "style": "title", "gold_id": "attack:T1205.002"}
+{"id": "ret-atk-262", "query": "Platforms: Windows. Adversaries may register a rogue Domain Controller to enable manipulation of Active Directory data. DCShadow may be used to create a rogue Domain Controller (DC", "style": "description", "gold_id": "attack:T1207"}
+{"id": "ret-atk-263", "query": "lateral-movement technique abusing T1210 Exploitation of Remote Services on target platform", "style": "hint", "gold_id": "attack:T1210"}
+{"id": "ret-atk-264", "query": "T1211 Exploitation for Stealth", "style": "title", "gold_id": "attack:T1211"}
+{"id": "ret-atk-265", "query": "Platforms: Linux, Windows, macOS, Identity Provider. Adversaries may exploit software vulnerabilities in an attempt to collect credentials. Exploitation of a software vulnerability", "style": "description", "gold_id": "attack:T1212"}
+{"id": "ret-atk-266", "query": "collection technique abusing T1213 Data from Information Repositories on target platform", "style": "hint", "gold_id": "attack:T1213"}
+{"id": "ret-atk-267", "query": "T1213.001 Confluence", "style": "title", "gold_id": "attack:T1213.001"}
+{"id": "ret-atk-268", "query": "Platforms: Office Suite, Windows. Adversaries may leverage the SharePoint repository as a source to mine valuable information. SharePoint will often contain useful information for ", "style": "description", "gold_id": "attack:T1213.002"}
+{"id": "ret-atk-269", "query": "collection technique abusing T1213.003 Code Repositories on target platform", "style": "hint", "gold_id": "attack:T1213.003"}
+{"id": "ret-atk-270", "query": "T1213.004 Customer Relationship Management Software", "style": "title", "gold_id": "attack:T1213.004"}
+{"id": "ret-atk-271", "query": "Platforms: Office Suite, SaaS. Adversaries may leverage chat and messaging applications, such as Microsoft Teams, Google Chat, and Slack, to mine valuable information. The followin", "style": "description", "gold_id": "attack:T1213.005"}
+{"id": "ret-atk-272", "query": "collection technique abusing T1213.006 Databases on target platform", "style": "hint", "gold_id": "attack:T1213.006"}
+{"id": "ret-atk-273", "query": "T1216 System Script Proxy Execution", "style": "title", "gold_id": "attack:T1216"}
+{"id": "ret-atk-274", "query": "Platforms: Windows. Adversaries may use PubPrn to proxy execution of malicious remote files. PubPrn.vbs is a [Visual Basic](https://attack.mitre.org/techniques/T1059/005) script th", "style": "description", "gold_id": "attack:T1216.001"}
+{"id": "ret-atk-275", "query": "stealth technique abusing T1216.002 SyncAppvPublishingServer on target platform", "style": "hint", "gold_id": "attack:T1216.002"}
+{"id": "ret-atk-276", "query": "T1217 Browser Information Discovery", "style": "title", "gold_id": "attack:T1217"}
+{"id": "ret-atk-277", "query": "Platforms: Linux, macOS, Windows. Adversaries may bypass process and/or signature-based defenses by proxying execution of malicious content with signed, or otherwise trusted, binar", "style": "description", "gold_id": "attack:T1218"}
+{"id": "ret-atk-278", "query": "stealth technique abusing T1218.001 Compiled HTML File on target platform", "style": "hint", "gold_id": "attack:T1218.001"}
+{"id": "ret-atk-279", "query": "T1218.002 Control Panel", "style": "title", "gold_id": "attack:T1218.002"}
+{"id": "ret-atk-280", "query": "Platforms: Windows. Adversaries may abuse CMSTP to proxy execution of malicious code. The Microsoft Connection Manager Profile Installer (CMSTP.exe) is a command-line program used ", "style": "description", "gold_id": "attack:T1218.003"}
+{"id": "ret-atk-281", "query": "stealth technique abusing T1218.004 InstallUtil on target platform", "style": "hint", "gold_id": "attack:T1218.004"}
+{"id": "ret-atk-282", "query": "T1218.005 Mshta", "style": "title", "gold_id": "attack:T1218.005"}
+{"id": "ret-atk-283", "query": "Platforms: Windows. Adversaries may abuse msiexec.exe to proxy execution of malicious payloads. Msiexec.exe is the command-line utility for the Windows Installer and is thus common", "style": "description", "gold_id": "attack:T1218.007"}
+{"id": "ret-atk-284", "query": "stealth technique abusing T1218.008 Odbcconf on target platform", "style": "hint", "gold_id": "attack:T1218.008"}
+{"id": "ret-atk-285", "query": "T1218.009 Regsvcs/Regasm", "style": "title", "gold_id": "attack:T1218.009"}
+{"id": "ret-atk-286", "query": "Platforms: Windows. Adversaries may abuse Regsvr32.exe to proxy execution of malicious code. Regsvr32.exe is a command-line program used to register and unregister object linking a", "style": "description", "gold_id": "attack:T1218.010"}
+{"id": "ret-atk-287", "query": "stealth technique abusing T1218.011 Rundll32 on target platform", "style": "hint", "gold_id": "attack:T1218.011"}
+{"id": "ret-atk-288", "query": "T1218.012 Verclsid", "style": "title", "gold_id": "attack:T1218.012"}
+{"id": "ret-atk-289", "query": "Platforms: Windows. Adversaries may abuse mavinject.exe to proxy execution of malicious code. Mavinject.exe is the Microsoft Application Virtualization Injector, a Windows utility ", "style": "description", "gold_id": "attack:T1218.013"}
+{"id": "ret-atk-290", "query": "stealth technique abusing T1218.014 MMC on target platform", "style": "hint", "gold_id": "attack:T1218.014"}
+{"id": "ret-atk-291", "query": "T1218.015 Electron Applications", "style": "title", "gold_id": "attack:T1218.015"}
+{"id": "ret-atk-292", "query": "Platforms: Linux, macOS, Windows. An adversary may use legitimate remote access tools to establish an interactive command and control channel within a network. Remote access tools ", "style": "description", "gold_id": "attack:T1219"}
+{"id": "ret-atk-293", "query": "command-and-control technique abusing T1219.001 IDE Tunneling on target platform", "style": "hint", "gold_id": "attack:T1219.001"}
+{"id": "ret-atk-294", "query": "T1219.002 Remote Desktop Software", "style": "title", "gold_id": "attack:T1219.002"}
+{"id": "ret-atk-295", "query": "Platforms: Linux, macOS, Windows. An adversary may use legitimate remote access hardware to establish an interactive command and control channel to target systems within networks. ", "style": "description", "gold_id": "attack:T1219.003"}
+{"id": "ret-atk-296", "query": "stealth technique abusing T1220 XSL Script Processing on target platform", "style": "hint", "gold_id": "attack:T1220"}
+{"id": "ret-atk-297", "query": "T1221 Template Injection", "style": "title", "gold_id": "attack:T1221"}
+{"id": "ret-atk-298", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may modify file or directory permissions/attributes to evade access control lists (ACLs) and access protected files. File and di", "style": "description", "gold_id": "attack:T1222"}
+{"id": "ret-atk-299", "query": "defense-impairment technique abusing T1222.001 Windows Permissions on target platform", "style": "hint", "gold_id": "attack:T1222.001"}
+{"id": "ret-atk-300", "query": "T1222.002 Linux and Mac Permissions", "style": "title", "gold_id": "attack:T1222.002"}
+{"id": "ret-atk-301", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may use execution guardrails to constrain execution or actions based on adversary supplied and environment specific conditions t", "style": "description", "gold_id": "attack:T1480"}
+{"id": "ret-atk-302", "query": "stealth technique abusing T1480.001 Environmental Keying on target platform", "style": "hint", "gold_id": "attack:T1480.001"}
+{"id": "ret-atk-303", "query": "T1480.002 Mutual Exclusion", "style": "title", "gold_id": "attack:T1480.002"}
+{"id": "ret-atk-304", "query": "Platforms: Windows. Adversaries may attempt to gather information on domain trust relationships that may be used to identify lateral movement opportunities in Windows multi-domain/", "style": "description", "gold_id": "attack:T1482"}
+{"id": "ret-atk-305", "query": "defense-impairment technique abusing T1484 Domain or Tenant Policy Modification on target platform", "style": "hint", "gold_id": "attack:T1484"}
+{"id": "ret-atk-306", "query": "T1484.001 Group Policy Modification", "style": "title", "gold_id": "attack:T1484.001"}
+{"id": "ret-atk-307", "query": "Platforms: Identity Provider, Windows. Adversaries may add new domain trusts, modify the properties of existing domain trusts, or otherwise change the configuration of trust relati", "style": "description", "gold_id": "attack:T1484.002"}
+{"id": "ret-atk-308", "query": "impact technique abusing T1485 Data Destruction on target platform", "style": "hint", "gold_id": "attack:T1485"}
+{"id": "ret-atk-309", "query": "T1485.001 Lifecycle-Triggered Deletion", "style": "title", "gold_id": "attack:T1485.001"}
+{"id": "ret-atk-310", "query": "Platforms: ESXi, IaaS, Linux, macOS, Windows. Adversaries may encrypt data on target systems or on large numbers of systems in a network to interrupt availability to system and net", "style": "description", "gold_id": "attack:T1486"}
+{"id": "ret-atk-311", "query": "impact technique abusing T1489 Service Stop on target platform", "style": "hint", "gold_id": "attack:T1489"}
+{"id": "ret-atk-312", "query": "T1490 Inhibit System Recovery", "style": "title", "gold_id": "attack:T1490"}
+{"id": "ret-atk-313", "query": "Platforms: Windows, IaaS, Linux, macOS, ESXi. Adversaries may modify visual content available internally or externally to an enterprise network, thus affecting the integrity of the", "style": "description", "gold_id": "attack:T1491"}
+{"id": "ret-atk-314", "query": "impact technique abusing T1491.001 Internal Defacement on target platform", "style": "hint", "gold_id": "attack:T1491.001"}
+{"id": "ret-atk-315", "query": "T1491.002 External Defacement", "style": "title", "gold_id": "attack:T1491.002"}
+{"id": "ret-atk-316", "query": "Platforms: Linux, macOS, Network Devices, Windows. Adversaries may overwrite or corrupt the flash memory contents of system BIOS or other firmware in devices attached to a system i", "style": "description", "gold_id": "attack:T1495"}
+{"id": "ret-atk-317", "query": "impact technique abusing T1496 Resource Hijacking on target platform", "style": "hint", "gold_id": "attack:T1496"}
+{"id": "ret-atk-318", "query": "T1496.001 Compute Hijacking", "style": "title", "gold_id": "attack:T1496.001"}
+{"id": "ret-atk-319", "query": "Platforms: Linux, Windows, macOS, IaaS, Containers. Adversaries may leverage the network bandwidth resources of co-opted systems to complete resource-intensive tasks, which may imp", "style": "description", "gold_id": "attack:T1496.002"}
+{"id": "ret-atk-320", "query": "impact technique abusing T1496.003 SMS Pumping on target platform", "style": "hint", "gold_id": "attack:T1496.003"}
+{"id": "ret-atk-321", "query": "T1496.004 Cloud Service Hijacking", "style": "title", "gold_id": "attack:T1496.004"}
+{"id": "ret-atk-322", "query": "Platforms: Linux, macOS, Windows. Adversaries may employ various means to detect and avoid virtualization and analysis environments. This may include changing behaviors based on th", "style": "description", "gold_id": "attack:T1497"}
+{"id": "ret-atk-323", "query": "stealth technique abusing T1497.001 System Checks on target platform", "style": "hint", "gold_id": "attack:T1497.001"}
+{"id": "ret-atk-324", "query": "T1497.002 User Activity Based Checks", "style": "title", "gold_id": "attack:T1497.002"}
+{"id": "ret-atk-325", "query": "Platforms: Linux, macOS, Windows. Adversaries may employ various time-based methods to detect virtualization and analysis environments, particularly those that attempt to manipulat", "style": "description", "gold_id": "attack:T1497.003"}
+{"id": "ret-atk-326", "query": "impact technique abusing T1498 Network Denial of Service on target platform", "style": "hint", "gold_id": "attack:T1498"}
+{"id": "ret-atk-327", "query": "T1498.001 Direct Network Flood", "style": "title", "gold_id": "attack:T1498.001"}
+{"id": "ret-atk-328", "query": "Platforms: Windows, IaaS, Linux, macOS. Adversaries may attempt to cause a denial of service (DoS) by reflecting a high-volume of network traffic to a target. This type of Network ", "style": "description", "gold_id": "attack:T1498.002"}
+{"id": "ret-atk-329", "query": "impact technique abusing T1499 Endpoint Denial of Service on target platform", "style": "hint", "gold_id": "attack:T1499"}
+{"id": "ret-atk-330", "query": "T1499.001 OS Exhaustion Flood", "style": "title", "gold_id": "attack:T1499.001"}
+{"id": "ret-atk-331", "query": "Platforms: Windows, IaaS, Linux, macOS. Adversaries may target the different network services provided by systems to conduct a denial of service (DoS). Adversaries often target the", "style": "description", "gold_id": "attack:T1499.002"}
+{"id": "ret-atk-332", "query": "impact technique abusing T1499.003 Application Exhaustion Flood on target platform", "style": "hint", "gold_id": "attack:T1499.003"}
+{"id": "ret-atk-333", "query": "T1499.004 Application or System Exploitation", "style": "title", "gold_id": "attack:T1499.004"}
+{"id": "ret-atk-334", "query": "Platforms: Windows, Linux, macOS, Network Devices, ESXi. Adversaries may abuse legitimate extensible development features of servers to establish persistent access to systems. Ente", "style": "description", "gold_id": "attack:T1505"}
+{"id": "ret-atk-335", "query": "persistence technique abusing T1505.001 SQL Stored Procedures on target platform", "style": "hint", "gold_id": "attack:T1505.001"}
+{"id": "ret-atk-336", "query": "T1505.002 Transport Agent", "style": "title", "gold_id": "attack:T1505.002"}
+{"id": "ret-atk-337", "query": "Platforms: Linux, macOS, Network Devices, Windows. Adversaries may backdoor web servers with web shells to establish persistent access to systems. A Web shell is a Web script that ", "style": "description", "gold_id": "attack:T1505.003"}
+{"id": "ret-atk-338", "query": "persistence technique abusing T1505.004 IIS Components on target platform", "style": "hint", "gold_id": "attack:T1505.004"}
+{"id": "ret-atk-339", "query": "T1505.005 Terminal Services DLL", "style": "title", "gold_id": "attack:T1505.005"}
+{"id": "ret-atk-340", "query": "Platforms: ESXi. Adversaries may abuse vSphere Installation Bundles (VIBs) to establish persistent access to ESXi hypervisors. VIBs are collections of files used for software distr", "style": "description", "gold_id": "attack:T1505.006"}
+{"id": "ret-atk-341", "query": "discovery technique abusing T1518 Software Discovery on target platform", "style": "hint", "gold_id": "attack:T1518"}
+{"id": "ret-atk-342", "query": "T1518.001 Security Software Discovery", "style": "title", "gold_id": "attack:T1518.001"}
+{"id": "ret-atk-343", "query": "Platforms: Windows, macOS, Linux. Adversaries may attempt to get a listing of backup software or configurations that are installed on a system. Adversaries may use this information", "style": "description", "gold_id": "attack:T1518.002"}
+{"id": "ret-atk-344", "query": "persistence technique abusing T1525 Implant Internal Image on target platform", "style": "hint", "gold_id": "attack:T1525"}
+{"id": "ret-atk-345", "query": "T1526 Cloud Service Discovery", "style": "title", "gold_id": "attack:T1526"}
+{"id": "ret-atk-346", "query": "Platforms: Containers, IaaS, Identity Provider, Office Suite, SaaS. Adversaries can steal application access tokens as a means of acquiring credentials to access remote systems and", "style": "description", "gold_id": "attack:T1528"}
+{"id": "ret-atk-347", "query": "impact technique abusing T1529 System Shutdown/Reboot on target platform", "style": "hint", "gold_id": "attack:T1529"}
+{"id": "ret-atk-348", "query": "T1530 Data from Cloud Storage", "style": "title", "gold_id": "attack:T1530"}
+{"id": "ret-atk-349", "query": "Platforms: Linux, macOS, Windows, SaaS, IaaS, Office Suite, ESXi. Adversaries may interrupt availability of system and network resources by inhibiting access to accounts utilized b", "style": "description", "gold_id": "attack:T1531"}
+{"id": "ret-atk-350", "query": "lateral-movement technique abusing T1534 Internal Spearphishing on target platform", "style": "hint", "gold_id": "attack:T1534"}
+{"id": "ret-atk-351", "query": "T1535 Unused/Unsupported Cloud Regions", "style": "title", "gold_id": "attack:T1535"}
+{"id": "ret-atk-352", "query": "Platforms: IaaS, Office Suite, SaaS. Adversaries may exfiltrate data by transferring the data, including through sharing/syncing and creating backups of cloud environments, to anot", "style": "description", "gold_id": "attack:T1537"}
+{"id": "ret-atk-353", "query": "discovery technique abusing T1538 Cloud Service Dashboard on target platform", "style": "hint", "gold_id": "attack:T1538"}
+{"id": "ret-atk-354", "query": "T1539 Steal Web Session Cookie", "style": "title", "gold_id": "attack:T1539"}
+{"id": "ret-atk-355", "query": "Platforms: Linux, macOS, Network Devices, Windows. Adversaries may abuse Pre-OS Boot mechanisms as a way to establish persistence on a system. During the booting process of a compu", "style": "description", "gold_id": "attack:T1542"}
+{"id": "ret-atk-356", "query": "stealth technique abusing T1542.001 System Firmware on target platform", "style": "hint", "gold_id": "attack:T1542.001"}
+{"id": "ret-atk-357", "query": "T1542.002 Component Firmware", "style": "title", "gold_id": "attack:T1542.002"}
+{"id": "ret-atk-358", "query": "Platforms: Linux, Windows. Adversaries may use bootkits to persist on systems. A bootkit is a malware variant that modifies the boot sectors of a hard drive, allowing malicious cod", "style": "description", "gold_id": "attack:T1542.003"}
+{"id": "ret-atk-359", "query": "stealth technique abusing T1542.004 ROMMONkit on target platform", "style": "hint", "gold_id": "attack:T1542.004"}
+{"id": "ret-atk-360", "query": "T1542.005 TFTP Boot", "style": "title", "gold_id": "attack:T1542.005"}
+{"id": "ret-atk-361", "query": "Platforms: Containers, Linux, macOS, Windows. Adversaries may create or modify system-level processes to repeatedly execute malicious payloads as part of persistence. When operatin", "style": "description", "gold_id": "attack:T1543"}
+{"id": "ret-atk-362", "query": "persistence technique abusing T1543.001 Launch Agent on target platform", "style": "hint", "gold_id": "attack:T1543.001"}
+{"id": "ret-atk-363", "query": "T1543.002 Systemd Service", "style": "title", "gold_id": "attack:T1543.002"}
+{"id": "ret-atk-364", "query": "Platforms: Windows. Adversaries may create or modify Windows services to repeatedly execute malicious payloads as part of persistence. When Windows boots up, it starts programs or ", "style": "description", "gold_id": "attack:T1543.003"}
+{"id": "ret-atk-365", "query": "persistence technique abusing T1543.004 Launch Daemon on target platform", "style": "hint", "gold_id": "attack:T1543.004"}
+{"id": "ret-atk-366", "query": "T1543.005 Container Service", "style": "title", "gold_id": "attack:T1543.005"}
+{"id": "ret-atk-367", "query": "Platforms: Linux, macOS, Windows, SaaS, IaaS, Office Suite. Adversaries may establish persistence and/or elevate privileges using system mechanisms that trigger execution based on ", "style": "description", "gold_id": "attack:T1546"}
+{"id": "ret-atk-368", "query": "privilege-escalation technique abusing T1546.001 Change Default File Association on target platform", "style": "hint", "gold_id": "attack:T1546.001"}
+{"id": "ret-atk-369", "query": "T1546.002 Screensaver", "style": "title", "gold_id": "attack:T1546.002"}
+{"id": "ret-atk-370", "query": "Platforms: Windows. Adversaries may establish persistence and elevate privileges by executing malicious content triggered by a Windows Management Instrumentation (WMI) event subscr", "style": "description", "gold_id": "attack:T1546.003"}
+{"id": "ret-atk-371", "query": "privilege-escalation technique abusing T1546.004 Unix Shell Configuration Modification on target platform", "style": "hint", "gold_id": "attack:T1546.004"}
+{"id": "ret-atk-372", "query": "T1546.005 Trap", "style": "title", "gold_id": "attack:T1546.005"}
+{"id": "ret-atk-373", "query": "Platforms: macOS. Adversaries may establish persistence by executing malicious content triggered by the execution of tainted binaries. Mach-O binaries have a series of headers that", "style": "description", "gold_id": "attack:T1546.006"}
+{"id": "ret-atk-374", "query": "privilege-escalation technique abusing T1546.007 Netsh Helper DLL on target platform", "style": "hint", "gold_id": "attack:T1546.007"}
+{"id": "ret-atk-375", "query": "T1546.008 Accessibility Features", "style": "title", "gold_id": "attack:T1546.008"}
+{"id": "ret-atk-376", "query": "Platforms: Windows. Adversaries may establish persistence and/or elevate privileges by executing malicious content triggered by AppCert DLLs loaded into processes. Dynamic-link lib", "style": "description", "gold_id": "attack:T1546.009"}
+{"id": "ret-atk-377", "query": "privilege-escalation technique abusing T1546.010 AppInit DLLs on target platform", "style": "hint", "gold_id": "attack:T1546.010"}
+{"id": "ret-atk-378", "query": "T1546.011 Application Shimming", "style": "title", "gold_id": "attack:T1546.011"}
+{"id": "ret-atk-379", "query": "Platforms: Windows. Adversaries may establish persistence and/or elevate privileges by executing malicious content triggered by Image File Execution Options (IFEO) debuggers. IFEOs", "style": "description", "gold_id": "attack:T1546.012"}
+{"id": "ret-atk-380", "query": "privilege-escalation technique abusing T1546.013 PowerShell Profile on target platform", "style": "hint", "gold_id": "attack:T1546.013"}
+{"id": "ret-atk-381", "query": "T1546.014 Emond", "style": "title", "gold_id": "attack:T1546.014"}
+{"id": "ret-atk-382", "query": "Platforms: Windows. Adversaries may establish persistence by executing malicious content triggered by hijacked references to Component Object Model (COM) objects. COM is a system w", "style": "description", "gold_id": "attack:T1546.015"}
+{"id": "ret-atk-383", "query": "privilege-escalation technique abusing T1546.016 Installer Packages on target platform", "style": "hint", "gold_id": "attack:T1546.016"}
+{"id": "ret-atk-384", "query": "T1546.017 Udev Rules", "style": "title", "gold_id": "attack:T1546.017"}
+{"id": "ret-atk-385", "query": "Platforms: Linux, macOS, Windows. Adversaries may achieve persistence by leveraging Python’s startup mechanisms, including path configuration (`.pth`) files and the `sitecustomize.", "style": "description", "gold_id": "attack:T1546.018"}
+{"id": "ret-atk-386", "query": "persistence technique abusing T1547 Boot or Logon Autostart Execution on target platform", "style": "hint", "gold_id": "attack:T1547"}
+{"id": "ret-atk-387", "query": "T1547.001 Registry Run Keys / Startup Folder", "style": "title", "gold_id": "attack:T1547.001"}
+{"id": "ret-atk-388", "query": "Platforms: Windows. Adversaries may abuse authentication packages to execute DLLs when the system boots. Windows authentication package DLLs are loaded by the Local Security Author", "style": "description", "gold_id": "attack:T1547.002"}
+{"id": "ret-atk-389", "query": "persistence technique abusing T1547.003 Time Providers on target platform", "style": "hint", "gold_id": "attack:T1547.003"}
+{"id": "ret-atk-390", "query": "T1547.004 Winlogon Helper DLL", "style": "title", "gold_id": "attack:T1547.004"}
+{"id": "ret-atk-391", "query": "Platforms: Windows. Adversaries may abuse security support providers (SSPs) to execute DLLs when the system boots. Windows SSP DLLs are loaded into the Local Security Authority (LS", "style": "description", "gold_id": "attack:T1547.005"}
+{"id": "ret-atk-392", "query": "persistence technique abusing T1547.006 Kernel Modules and Extensions on target platform", "style": "hint", "gold_id": "attack:T1547.006"}
+{"id": "ret-atk-393", "query": "T1547.007 Re-opened Applications", "style": "title", "gold_id": "attack:T1547.007"}
+{"id": "ret-atk-394", "query": "Platforms: Windows. Adversaries may modify or add LSASS drivers to obtain persistence on compromised systems. The Windows security subsystem is a set of components that manage and ", "style": "description", "gold_id": "attack:T1547.008"}
+{"id": "ret-atk-395", "query": "persistence technique abusing T1547.009 Shortcut Modification on target platform", "style": "hint", "gold_id": "attack:T1547.009"}
+{"id": "ret-atk-396", "query": "T1547.010 Port Monitors", "style": "title", "gold_id": "attack:T1547.010"}
+{"id": "ret-atk-397", "query": "Platforms: Windows. Adversaries may abuse print processors to run malicious DLLs during system boot for persistence and/or privilege escalation. Print processors are DLLs that are ", "style": "description", "gold_id": "attack:T1547.012"}
+{"id": "ret-atk-398", "query": "persistence technique abusing T1547.013 XDG Autostart Entries on target platform", "style": "hint", "gold_id": "attack:T1547.013"}
+{"id": "ret-atk-399", "query": "T1547.014 Active Setup", "style": "title", "gold_id": "attack:T1547.014"}
+{"id": "ret-atk-400", "query": "Platforms: macOS. Adversaries may add login items to execute upon user login to gain persistence or escalate privileges. Login items are applications, documents, folders, or server", "style": "description", "gold_id": "attack:T1547.015"}
+{"id": "ret-atk-401", "query": "privilege-escalation technique abusing T1548 Abuse Elevation Control Mechanism on target platform", "style": "hint", "gold_id": "attack:T1548"}
+{"id": "ret-atk-402", "query": "T1548.001 Setuid and Setgid", "style": "title", "gold_id": "attack:T1548.001"}
+{"id": "ret-atk-403", "query": "Platforms: Windows. Adversaries may bypass UAC mechanisms to elevate process privileges on a system. Windows User Account Control (UAC) allows a program to elevate its privileges (", "style": "description", "gold_id": "attack:T1548.002"}
+{"id": "ret-atk-404", "query": "privilege-escalation technique abusing T1548.003 Sudo and Sudo Caching on target platform", "style": "hint", "gold_id": "attack:T1548.003"}
+{"id": "ret-atk-405", "query": "T1548.004 Elevated Execution with Prompt", "style": "title", "gold_id": "attack:T1548.004"}
+{"id": "ret-atk-406", "query": "Platforms: IaaS, Office Suite, Identity Provider. Adversaries may abuse permission configurations that allow them to gain temporarily elevated access to cloud resources. Many cloud", "style": "description", "gold_id": "attack:T1548.005"}
+{"id": "ret-atk-407", "query": "privilege-escalation technique abusing T1548.006 TCC Manipulation on target platform", "style": "hint", "gold_id": "attack:T1548.006"}
+{"id": "ret-atk-408", "query": "T1550 Use Alternate Authentication Material", "style": "title", "gold_id": "attack:T1550"}
+{"id": "ret-atk-409", "query": "Platforms: Containers, IaaS, Identity Provider, Office Suite, SaaS. Adversaries may use stolen application access tokens to bypass the typical authentication process and access res", "style": "description", "gold_id": "attack:T1550.001"}
+{"id": "ret-atk-410", "query": "lateral-movement technique abusing T1550.002 Pass the Hash on target platform", "style": "hint", "gold_id": "attack:T1550.002"}
+{"id": "ret-atk-411", "query": "T1550.003 Pass the Ticket", "style": "title", "gold_id": "attack:T1550.003"}
+{"id": "ret-atk-412", "query": "Platforms: IaaS, Office Suite, SaaS. Adversaries can use stolen session cookies to authenticate to web applications and services. This technique bypasses some multi-factor authenti", "style": "description", "gold_id": "attack:T1550.004"}
+{"id": "ret-atk-413", "query": "credential-access technique abusing T1552 Unsecured Credentials on target platform", "style": "hint", "gold_id": "attack:T1552"}
+{"id": "ret-atk-414", "query": "T1552.001 Credentials In Files", "style": "title", "gold_id": "attack:T1552.001"}
+{"id": "ret-atk-415", "query": "Platforms: Windows. Adversaries may search the Registry on compromised systems for insecurely stored credentials. The Windows Registry stores configuration information that can be ", "style": "description", "gold_id": "attack:T1552.002"}
+{"id": "ret-atk-416", "query": "credential-access technique abusing T1552.003 Shell History on target platform", "style": "hint", "gold_id": "attack:T1552.003"}
+{"id": "ret-atk-417", "query": "T1552.004 Private Keys", "style": "title", "gold_id": "attack:T1552.004"}
+{"id": "ret-atk-418", "query": "Platforms: IaaS. Adversaries may attempt to access the Cloud Instance Metadata API to collect credentials and other sensitive data. Most cloud service providers support a Cloud Ins", "style": "description", "gold_id": "attack:T1552.005"}
+{"id": "ret-atk-419", "query": "credential-access technique abusing T1552.006 Group Policy Preferences on target platform", "style": "hint", "gold_id": "attack:T1552.006"}
+{"id": "ret-atk-420", "query": "T1552.007 Container API", "style": "title", "gold_id": "attack:T1552.007"}
+{"id": "ret-atk-421", "query": "Platforms: SaaS, Office Suite. Adversaries may directly collect unsecured credentials stored or passed through user communication services. Credentials may be sent and stored in us", "style": "description", "gold_id": "attack:T1552.008"}
+{"id": "ret-atk-422", "query": "defense-impairment technique abusing T1553 Subvert Trust Controls on target platform", "style": "hint", "gold_id": "attack:T1553"}
+{"id": "ret-atk-423", "query": "T1553.001 Gatekeeper Bypass", "style": "title", "gold_id": "attack:T1553.001"}
+{"id": "ret-atk-424", "query": "Platforms: macOS, Windows. Adversaries may create, acquire, or steal code signing materials to sign their malware or tools. Code signing provides a level of authenticity on a binar", "style": "description", "gold_id": "attack:T1553.002"}
+{"id": "ret-atk-425", "query": "defense-impairment technique abusing T1553.003 SIP and Trust Provider Hijacking on target platform", "style": "hint", "gold_id": "attack:T1553.003"}
+{"id": "ret-atk-426", "query": "T1553.004 Install Root Certificate", "style": "title", "gold_id": "attack:T1553.004"}
+{"id": "ret-atk-427", "query": "Platforms: Windows. Adversaries may abuse specific file formats to subvert Mark-of-the-Web (MOTW) controls. In Windows, when files are downloaded from the Internet, they are tagged", "style": "description", "gold_id": "attack:T1553.005"}
+{"id": "ret-atk-428", "query": "defense-impairment technique abusing T1553.006 Code Signing Policy Modification on target platform", "style": "hint", "gold_id": "attack:T1553.006"}
+{"id": "ret-atk-429", "query": "T1554 Compromise Host Software Binary", "style": "title", "gold_id": "attack:T1554"}
+{"id": "ret-atk-430", "query": "Platforms: IaaS, Linux, macOS, Windows. Adversaries may search for common password storage locations to obtain user credentials. Passwords are stored in several places on a system,", "style": "description", "gold_id": "attack:T1555"}
+{"id": "ret-atk-431", "query": "credential-access technique abusing T1555.001 Keychain on target platform", "style": "hint", "gold_id": "attack:T1555.001"}
+{"id": "ret-atk-432", "query": "T1555.002 Securityd Memory", "style": "title", "gold_id": "attack:T1555.002"}
+{"id": "ret-atk-433", "query": "Platforms: Linux, macOS, Windows. Adversaries may acquire credentials from web browsers by reading files specific to the target browser. Web browsers commonly save credentials such", "style": "description", "gold_id": "attack:T1555.003"}
+{"id": "ret-atk-434", "query": "credential-access technique abusing T1555.004 Windows Credential Manager on target platform", "style": "hint", "gold_id": "attack:T1555.004"}
+{"id": "ret-atk-435", "query": "T1555.005 Password Managers", "style": "title", "gold_id": "attack:T1555.005"}
+{"id": "ret-atk-436", "query": "Platforms: IaaS. Adversaries may acquire credentials from cloud-native secret management solutions such as AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, and Terraform V", "style": "description", "gold_id": "attack:T1555.006"}
+{"id": "ret-atk-437", "query": "defense-impairment technique abusing T1556 Modify Authentication Process on target platform", "style": "hint", "gold_id": "attack:T1556"}
+{"id": "ret-atk-438", "query": "T1556.001 Domain Controller Authentication", "style": "title", "gold_id": "attack:T1556.001"}
+{"id": "ret-atk-439", "query": "Platforms: Windows. Adversaries may register malicious password filter dynamic link libraries (DLLs) into the authentication process to acquire user credentials as they are validat", "style": "description", "gold_id": "attack:T1556.002"}
+{"id": "ret-atk-440", "query": "defense-impairment technique abusing T1556.003 Pluggable Authentication Modules on target platform", "style": "hint", "gold_id": "attack:T1556.003"}
+{"id": "ret-atk-441", "query": "T1556.004 Network Device Authentication", "style": "title", "gold_id": "attack:T1556.004"}
+{"id": "ret-atk-442", "query": "Platforms: Windows. An adversary may abuse Active Directory authentication encryption properties to gain access to credentials on Windows systems. The <code>AllowReversiblePassword", "style": "description", "gold_id": "attack:T1556.005"}
+{"id": "ret-atk-443", "query": "defense-impairment technique abusing T1556.006 Multi-Factor Authentication on target platform", "style": "hint", "gold_id": "attack:T1556.006"}
+{"id": "ret-atk-444", "query": "T1556.007 Hybrid Identity", "style": "title", "gold_id": "attack:T1556.007"}
+{"id": "ret-atk-445", "query": "Platforms: Windows. Adversaries may register malicious network provider dynamic link libraries (DLLs) to capture cleartext user credentials during the authentication process. Netwo", "style": "description", "gold_id": "attack:T1556.008"}
+{"id": "ret-atk-446", "query": "defense-impairment technique abusing T1556.009 Conditional Access Policies on target platform", "style": "hint", "gold_id": "attack:T1556.009"}
+{"id": "ret-atk-447", "query": "T1557 Adversary-in-the-Middle", "style": "title", "gold_id": "attack:T1557"}
+{"id": "ret-atk-448", "query": "Platforms: Windows. By responding to LLMNR/NBT-NS/mDNS network traffic, adversaries may spoof an authoritative source for name resolution to force communication with an adversary c", "style": "description", "gold_id": "attack:T1557.001"}
+{"id": "ret-atk-449", "query": "credential-access technique abusing T1557.002 ARP Cache Poisoning on target platform", "style": "hint", "gold_id": "attack:T1557.002"}
+{"id": "ret-atk-450", "query": "T1557.003 DHCP Spoofing", "style": "title", "gold_id": "attack:T1557.003"}
+{"id": "ret-atk-451", "query": "Platforms: Network Devices. Adversaries may host seemingly genuine Wi-Fi access points to deceive users into connecting to malicious networks as a way of supporting follow-on behav", "style": "description", "gold_id": "attack:T1557.004"}
+{"id": "ret-atk-452", "query": "credential-access technique abusing T1558 Steal or Forge Kerberos Tickets on target platform", "style": "hint", "gold_id": "attack:T1558"}
+{"id": "ret-atk-453", "query": "T1558.001 Golden Ticket", "style": "title", "gold_id": "attack:T1558.001"}
+{"id": "ret-atk-454", "query": "Platforms: Windows. Adversaries who have the password hash of a target service account (e.g. SharePoint, MSSQL) may forge Kerberos ticket granting service (TGS) tickets, also known", "style": "description", "gold_id": "attack:T1558.002"}
+{"id": "ret-atk-455", "query": "credential-access technique abusing T1558.003 Kerberoasting on target platform", "style": "hint", "gold_id": "attack:T1558.003"}
+{"id": "ret-atk-456", "query": "T1558.004 AS-REP Roasting", "style": "title", "gold_id": "attack:T1558.004"}
+{"id": "ret-atk-457", "query": "Platforms: Linux, macOS. Adversaries may attempt to steal Kerberos tickets stored in credential cache files (or ccache). These files are used for short term storage of a user's act", "style": "description", "gold_id": "attack:T1558.005"}
+{"id": "ret-atk-458", "query": "execution technique abusing T1559 Inter-Process Communication on target platform", "style": "hint", "gold_id": "attack:T1559"}
+{"id": "ret-atk-459", "query": "T1559.001 Component Object Model", "style": "title", "gold_id": "attack:T1559.001"}
+{"id": "ret-atk-460", "query": "Platforms: Windows. Adversaries may use Windows Dynamic Data Exchange (DDE) to execute arbitrary commands. DDE is a client-server protocol for one-time and/or continuous inter-proc", "style": "description", "gold_id": "attack:T1559.002"}
+{"id": "ret-atk-461", "query": "execution technique abusing T1559.003 XPC Services on target platform", "style": "hint", "gold_id": "attack:T1559.003"}
+{"id": "ret-atk-462", "query": "T1560 Archive Collected Data", "style": "title", "gold_id": "attack:T1560"}
+{"id": "ret-atk-463", "query": "Platforms: Linux, macOS, Windows. Adversaries may use utilities to compress and/or encrypt collected data prior to exfiltration. Many utilities include functionalities to compress,", "style": "description", "gold_id": "attack:T1560.001"}
+{"id": "ret-atk-464", "query": "collection technique abusing T1560.002 Archive via Library on target platform", "style": "hint", "gold_id": "attack:T1560.002"}
+{"id": "ret-atk-465", "query": "T1560.003 Archive via Custom Method", "style": "title", "gold_id": "attack:T1560.003"}
+{"id": "ret-atk-466", "query": "Platforms: Linux, macOS, Windows, Network Devices. Adversaries may wipe or corrupt raw disk data on specific systems or in large numbers in a network to interrupt availability to s", "style": "description", "gold_id": "attack:T1561"}
+{"id": "ret-atk-467", "query": "impact technique abusing T1561.001 Disk Content Wipe on target platform", "style": "hint", "gold_id": "attack:T1561.001"}
+{"id": "ret-atk-468", "query": "T1561.002 Disk Structure Wipe", "style": "title", "gold_id": "attack:T1561.002"}
+{"id": "ret-atk-469", "query": "Platforms: Linux, macOS, Windows. Adversaries may take control of preexisting sessions with remote services to move laterally in an environment. Users may use valid credentials to ", "style": "description", "gold_id": "attack:T1563"}
+{"id": "ret-atk-470", "query": "lateral-movement technique abusing T1563.001 SSH Hijacking on target platform", "style": "hint", "gold_id": "attack:T1563.001"}
+{"id": "ret-atk-471", "query": "T1563.002 RDP Hijacking", "style": "title", "gold_id": "attack:T1563.002"}
+{"id": "ret-atk-472", "query": "Platforms: ESXi, Linux, macOS, Office Suite, Windows. Adversaries may attempt to hide artifacts associated with their behaviors to evade detection. Operating systems may have featu", "style": "description", "gold_id": "attack:T1564"}
+{"id": "ret-atk-473", "query": "stealth technique abusing T1564.001 Hidden Files and Directories on target platform", "style": "hint", "gold_id": "attack:T1564.001"}
+{"id": "ret-atk-474", "query": "T1564.002 Hidden Users", "style": "title", "gold_id": "attack:T1564.002"}
+{"id": "ret-atk-475", "query": "Platforms: Linux, macOS, Windows. Adversaries may use hidden windows to conceal malicious activity from the plain sight of users. In some cases, windows that would typically be dis", "style": "description", "gold_id": "attack:T1564.003"}
+{"id": "ret-atk-476", "query": "stealth technique abusing T1564.004 NTFS File Attributes on target platform", "style": "hint", "gold_id": "attack:T1564.004"}
+{"id": "ret-atk-477", "query": "T1564.005 Hidden File System", "style": "title", "gold_id": "attack:T1564.005"}
+{"id": "ret-atk-478", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may carry out malicious operations using a virtual instance to avoid detection. A wide variety of virtualization technologies ex", "style": "description", "gold_id": "attack:T1564.006"}
+{"id": "ret-atk-479", "query": "stealth technique abusing T1564.007 VBA Stomping on target platform", "style": "hint", "gold_id": "attack:T1564.007"}
+{"id": "ret-atk-480", "query": "T1564.008 Email Hiding Rules", "style": "title", "gold_id": "attack:T1564.008"}
+{"id": "ret-atk-481", "query": "Platforms: macOS. Adversaries may abuse resource forks to hide malicious code or executables to evade detection and bypass security applications. A resource fork provides applicati", "style": "description", "gold_id": "attack:T1564.009"}
+{"id": "ret-atk-482", "query": "stealth technique abusing T1564.010 Process Argument Spoofing on target platform", "style": "hint", "gold_id": "attack:T1564.010"}
+{"id": "ret-atk-483", "query": "T1564.011 Ignore Process Interrupts", "style": "title", "gold_id": "attack:T1564.011"}
+{"id": "ret-atk-484", "query": "Platforms: Linux, macOS, Windows. Adversaries may attempt to hide their file-based artifacts by writing them to specific folders or file names excluded from antivirus (AV) scanning", "style": "description", "gold_id": "attack:T1564.012"}
+{"id": "ret-atk-485", "query": "stealth technique abusing T1564.013 Bind Mounts on target platform", "style": "hint", "gold_id": "attack:T1564.013"}
+{"id": "ret-atk-486", "query": "T1564.014 Extended Attributes", "style": "title", "gold_id": "attack:T1564.014"}
+{"id": "ret-atk-487", "query": "Platforms: Linux, macOS, Windows. Adversaries may insert, delete, or manipulate data in order to influence external outcomes or hide activity, thus threatening the integrity of the", "style": "description", "gold_id": "attack:T1565"}
+{"id": "ret-atk-488", "query": "impact technique abusing T1565.001 Stored Data Manipulation on target platform", "style": "hint", "gold_id": "attack:T1565.001"}
+{"id": "ret-atk-489", "query": "T1565.002 Transmitted Data Manipulation", "style": "title", "gold_id": "attack:T1565.002"}
+{"id": "ret-atk-490", "query": "Platforms: Linux, macOS, Windows. Adversaries may modify systems in order to manipulate the data as it is accessed and displayed to an end user, thus threatening the integrity of t", "style": "description", "gold_id": "attack:T1565.003"}
+{"id": "ret-atk-491", "query": "initial-access technique abusing T1566 Phishing on target platform", "style": "hint", "gold_id": "attack:T1566"}
+{"id": "ret-atk-492", "query": "T1566.001 Spearphishing Attachment", "style": "title", "gold_id": "attack:T1566.001"}
+{"id": "ret-atk-493", "query": "Platforms: Identity Provider, Linux, macOS, Office Suite, SaaS, Windows. Adversaries may send spearphishing emails with a malicious link in an attempt to gain access to victim syst", "style": "description", "gold_id": "attack:T1566.002"}
+{"id": "ret-atk-494", "query": "initial-access technique abusing T1566.003 Spearphishing via Service on target platform", "style": "hint", "gold_id": "attack:T1566.003"}
+{"id": "ret-atk-495", "query": "T1566.004 Spearphishing Voice", "style": "title", "gold_id": "attack:T1566.004"}
+{"id": "ret-atk-496", "query": "Platforms: ESXi, Linux, macOS, Office Suite, SaaS, Windows. Adversaries may use an existing, legitimate external Web service to exfiltrate data rather than their primary command an", "style": "description", "gold_id": "attack:T1567"}
+{"id": "ret-atk-497", "query": "exfiltration technique abusing T1567.001 Exfiltration to Code Repository on target platform", "style": "hint", "gold_id": "attack:T1567.001"}
+{"id": "ret-atk-498", "query": "T1567.002 Exfiltration to Cloud Storage", "style": "title", "gold_id": "attack:T1567.002"}
+{"id": "ret-atk-499", "query": "Platforms: Linux, macOS, Windows, ESXi. Adversaries may exfiltrate data to text storage sites instead of their primary command and control channel. Text storage sites, such as <cod", "style": "description", "gold_id": "attack:T1567.003"}
+{"id": "ret-atk-500", "query": "exfiltration technique abusing T1567.004 Exfiltration Over Webhook on target platform", "style": "hint", "gold_id": "attack:T1567.004"}
+{"id": "ret-atk-501", "query": "T1568 Dynamic Resolution", "style": "title", "gold_id": "attack:T1568"}
+{"id": "ret-atk-502", "query": "Platforms: Linux, macOS, Windows, ESXi. Adversaries may use Fast Flux DNS to hide a command and control channel behind an array of rapidly changing IP addresses linked to a single ", "style": "description", "gold_id": "attack:T1568.001"}
+{"id": "ret-atk-503", "query": "command-and-control technique abusing T1568.002 Domain Generation Algorithms on target platform", "style": "hint", "gold_id": "attack:T1568.002"}
+{"id": "ret-atk-504", "query": "T1568.003 DNS Calculation", "style": "title", "gold_id": "attack:T1568.003"}
+{"id": "ret-atk-505", "query": "Platforms: Windows, macOS, Linux. Adversaries may abuse system services or daemons to execute commands or programs. Adversaries can execute malicious content by interacting with or", "style": "description", "gold_id": "attack:T1569"}
+{"id": "ret-atk-506", "query": "execution technique abusing T1569.001 Launchctl on target platform", "style": "hint", "gold_id": "attack:T1569.001"}
+{"id": "ret-atk-507", "query": "T1569.002 Service Execution", "style": "title", "gold_id": "attack:T1569.002"}
+{"id": "ret-atk-508", "query": "Platforms: Linux. Adversaries may abuse systemctl to execute commands or programs. Systemctl is the primary interface for systemd, the Linux init system and service manager. Typica", "style": "description", "gold_id": "attack:T1569.003"}
+{"id": "ret-atk-509", "query": "lateral-movement technique abusing T1570 Lateral Tool Transfer on target platform", "style": "hint", "gold_id": "attack:T1570"}
+{"id": "ret-atk-510", "query": "T1571 Non-Standard Port", "style": "title", "gold_id": "attack:T1571"}
+{"id": "ret-atk-511", "query": "Platforms: ESXi, Linux, macOS, Windows. Adversaries may tunnel network communications to and from a victim system within a separate protocol to avoid detection/network filtering an", "style": "description", "gold_id": "attack:T1572"}
+{"id": "ret-atk-512", "query": "command-and-control technique abusing T1573 Encrypted Channel on target platform", "style": "hint", "gold_id": "attack:T1573"}
+{"id": "ret-atk-513", "query": "T1573.001 Symmetric Cryptography", "style": "title", "gold_id": "attack:T1573.001"}
+{"id": "ret-atk-514", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may employ a known asymmetric encryption algorithm to conceal command and control traffic rather than relying o", "style": "description", "gold_id": "attack:T1573.002"}
+{"id": "ret-atk-515", "query": "stealth technique abusing T1574 Hijack Execution Flow on target platform", "style": "hint", "gold_id": "attack:T1574"}
+{"id": "ret-atk-516", "query": "T1574.001 DLL", "style": "title", "gold_id": "attack:T1574.001"}
+{"id": "ret-atk-517", "query": "Platforms: macOS. Adversaries may execute their own payloads by placing a malicious dynamic library (dylib) with an expected name in a path a victim application searches at runtime", "style": "description", "gold_id": "attack:T1574.004"}
+{"id": "ret-atk-518", "query": "stealth technique abusing T1574.005 Executable Installer File Permissions Weakness on target platform", "style": "hint", "gold_id": "attack:T1574.005"}
+{"id": "ret-atk-519", "query": "T1574.006 Dynamic Linker Hijacking", "style": "title", "gold_id": "attack:T1574.006"}
+{"id": "ret-atk-520", "query": "Platforms: Linux, macOS, Windows. Adversaries may execute their own malicious payloads by hijacking environment variables used to load libraries. The PATH environment variable cont", "style": "description", "gold_id": "attack:T1574.007"}
+{"id": "ret-atk-521", "query": "stealth technique abusing T1574.008 Path Interception by Search Order Hijacking on target platform", "style": "hint", "gold_id": "attack:T1574.008"}
+{"id": "ret-atk-522", "query": "T1574.009 Path Interception by Unquoted Path", "style": "title", "gold_id": "attack:T1574.009"}
+{"id": "ret-atk-523", "query": "Platforms: Windows. Adversaries may execute their own malicious payloads by hijacking the binaries used by services. Adversaries may use flaws in the permissions of Windows service", "style": "description", "gold_id": "attack:T1574.010"}
+{"id": "ret-atk-524", "query": "stealth technique abusing T1574.011 Services Registry Permissions Weakness on target platform", "style": "hint", "gold_id": "attack:T1574.011"}
+{"id": "ret-atk-525", "query": "T1574.012 COR_PROFILER", "style": "title", "gold_id": "attack:T1574.012"}
+{"id": "ret-atk-526", "query": "Platforms: Windows. Adversaries may abuse the <code>KernelCallbackTable</code> of a process to hijack its execution flow in order to run their own payloads. The <code>KernelCallbac", "style": "description", "gold_id": "attack:T1574.013"}
+{"id": "ret-atk-527", "query": "stealth technique abusing T1574.014 AppDomainManager on target platform", "style": "hint", "gold_id": "attack:T1574.014"}
+{"id": "ret-atk-528", "query": "T1578 Modify Cloud Compute Infrastructure", "style": "title", "gold_id": "attack:T1578"}
+{"id": "ret-atk-529", "query": "Platforms: IaaS. An adversary may create a snapshot or data backup within a cloud account to evade defenses. A snapshot is a point-in-time copy of an existing cloud compute compone", "style": "description", "gold_id": "attack:T1578.001"}
+{"id": "ret-atk-530", "query": "defense-impairment technique abusing T1578.002 Create Cloud Instance on target platform", "style": "hint", "gold_id": "attack:T1578.002"}
+{"id": "ret-atk-531", "query": "T1578.003 Delete Cloud Instance", "style": "title", "gold_id": "attack:T1578.003"}
+{"id": "ret-atk-532", "query": "Platforms: IaaS. An adversary may revert changes made to a cloud instance after they have performed malicious activities in attempt to evade detection and remove evidence of their ", "style": "description", "gold_id": "attack:T1578.004"}
+{"id": "ret-atk-533", "query": "defense-impairment technique abusing T1578.005 Modify Cloud Compute Configurations on target platform", "style": "hint", "gold_id": "attack:T1578.005"}
+{"id": "ret-atk-534", "query": "T1580 Cloud Infrastructure Discovery", "style": "title", "gold_id": "attack:T1580"}
+{"id": "ret-atk-535", "query": "Platforms: PRE. Adversaries may buy, lease, rent, or obtain infrastructure that can be used during targeting. A wide variety of infrastructure exists for hosting and orchestrating ", "style": "description", "gold_id": "attack:T1583"}
+{"id": "ret-atk-536", "query": "resource-development technique abusing T1583.001 Domains on target platform", "style": "hint", "gold_id": "attack:T1583.001"}
+{"id": "ret-atk-537", "query": "T1583.002 DNS Server", "style": "title", "gold_id": "attack:T1583.002"}
+{"id": "ret-atk-538", "query": "Platforms: PRE. Adversaries may rent Virtual Private Servers (VPSs) that can be used during targeting. There exist a variety of cloud service providers that will sell virtual machi", "style": "description", "gold_id": "attack:T1583.003"}
+{"id": "ret-atk-539", "query": "resource-development technique abusing T1583.004 Server on target platform", "style": "hint", "gold_id": "attack:T1583.004"}
+{"id": "ret-atk-540", "query": "T1583.005 Botnet", "style": "title", "gold_id": "attack:T1583.005"}
+{"id": "ret-atk-541", "query": "Platforms: PRE. Adversaries may register for web services that can be used during targeting. A variety of popular websites exist for adversaries to register for a web-based service", "style": "description", "gold_id": "attack:T1583.006"}
+{"id": "ret-atk-542", "query": "resource-development technique abusing T1583.007 Serverless on target platform", "style": "hint", "gold_id": "attack:T1583.007"}
+{"id": "ret-atk-543", "query": "T1583.008 Malvertising", "style": "title", "gold_id": "attack:T1583.008"}
+{"id": "ret-atk-544", "query": "Platforms: PRE. Adversaries may compromise third-party infrastructure that can be used during targeting. Infrastructure solutions include physical or cloud servers, domains, networ", "style": "description", "gold_id": "attack:T1584"}
+{"id": "ret-atk-545", "query": "resource-development technique abusing T1584.001 Domains on target platform", "style": "hint", "gold_id": "attack:T1584.001"}
+{"id": "ret-atk-546", "query": "T1584.002 DNS Server", "style": "title", "gold_id": "attack:T1584.002"}
+{"id": "ret-atk-547", "query": "Platforms: PRE. Adversaries may compromise third-party Virtual Private Servers (VPSs) that can be used during targeting. There exist a variety of cloud service providers that will ", "style": "description", "gold_id": "attack:T1584.003"}
+{"id": "ret-atk-548", "query": "resource-development technique abusing T1584.004 Server on target platform", "style": "hint", "gold_id": "attack:T1584.004"}
+{"id": "ret-atk-549", "query": "T1584.005 Botnet", "style": "title", "gold_id": "attack:T1584.005"}
+{"id": "ret-atk-550", "query": "Platforms: PRE. Adversaries may compromise access to third-party web services that can be used during targeting. A variety of popular websites exist for legitimate users to registe", "style": "description", "gold_id": "attack:T1584.006"}
+{"id": "ret-atk-551", "query": "resource-development technique abusing T1584.007 Serverless on target platform", "style": "hint", "gold_id": "attack:T1584.007"}
+{"id": "ret-atk-552", "query": "T1584.008 Network Devices", "style": "title", "gold_id": "attack:T1584.008"}
+{"id": "ret-atk-553", "query": "Platforms: PRE. Adversaries may create and cultivate accounts with services that can be used during targeting. Adversaries can create accounts that can be used to build a persona t", "style": "description", "gold_id": "attack:T1585"}
+{"id": "ret-atk-554", "query": "resource-development technique abusing T1585.001 Social Media Accounts on target platform", "style": "hint", "gold_id": "attack:T1585.001"}
+{"id": "ret-atk-555", "query": "T1585.002 Email Accounts", "style": "title", "gold_id": "attack:T1585.002"}
+{"id": "ret-atk-556", "query": "Platforms: PRE. Adversaries may create accounts with cloud providers that can be used during targeting. Adversaries can use cloud accounts to further their operations, including le", "style": "description", "gold_id": "attack:T1585.003"}
+{"id": "ret-atk-557", "query": "resource-development technique abusing T1586 Compromise Accounts on target platform", "style": "hint", "gold_id": "attack:T1586"}
+{"id": "ret-atk-558", "query": "T1586.001 Social Media Accounts", "style": "title", "gold_id": "attack:T1586.001"}
+{"id": "ret-atk-559", "query": "Platforms: PRE. Adversaries may compromise email accounts that can be used during targeting. Adversaries can use compromised email accounts to further their operations, such as lev", "style": "description", "gold_id": "attack:T1586.002"}
+{"id": "ret-atk-560", "query": "resource-development technique abusing T1586.003 Cloud Accounts on target platform", "style": "hint", "gold_id": "attack:T1586.003"}
+{"id": "ret-atk-561", "query": "T1587 Develop Capabilities", "style": "title", "gold_id": "attack:T1587"}
+{"id": "ret-atk-562", "query": "Platforms: PRE. Adversaries may develop malware and malware components that can be used during targeting. Building malicious software can include the development of payloads, dropp", "style": "description", "gold_id": "attack:T1587.001"}
+{"id": "ret-atk-563", "query": "resource-development technique abusing T1587.002 Code Signing Certificates on target platform", "style": "hint", "gold_id": "attack:T1587.002"}
+{"id": "ret-atk-564", "query": "T1587.003 Digital Certificates", "style": "title", "gold_id": "attack:T1587.003"}
+{"id": "ret-atk-565", "query": "Platforms: PRE. Adversaries may develop exploits that can be used during targeting. An exploit takes advantage of a bug or vulnerability in order to cause unintended or unanticipat", "style": "description", "gold_id": "attack:T1587.004"}
+{"id": "ret-atk-566", "query": "resource-development technique abusing T1588 Obtain Capabilities on target platform", "style": "hint", "gold_id": "attack:T1588"}
+{"id": "ret-atk-567", "query": "T1588.001 Malware", "style": "title", "gold_id": "attack:T1588.001"}
+{"id": "ret-atk-568", "query": "Platforms: PRE. Adversaries may buy, steal, or download software tools that can be used during targeting. Tools can be open or closed source, free or commercial. A tool can be used", "style": "description", "gold_id": "attack:T1588.002"}
+{"id": "ret-atk-569", "query": "resource-development technique abusing T1588.003 Code Signing Certificates on target platform", "style": "hint", "gold_id": "attack:T1588.003"}
+{"id": "ret-atk-570", "query": "T1588.004 Digital Certificates", "style": "title", "gold_id": "attack:T1588.004"}
+{"id": "ret-atk-571", "query": "Platforms: PRE. Adversaries may buy, steal, or download exploits that can be used during targeting. An exploit takes advantage of a bug or vulnerability in order to cause unintende", "style": "description", "gold_id": "attack:T1588.005"}
+{"id": "ret-atk-572", "query": "resource-development technique abusing T1588.006 Vulnerabilities on target platform", "style": "hint", "gold_id": "attack:T1588.006"}
+{"id": "ret-atk-573", "query": "T1588.007 Artificial Intelligence", "style": "title", "gold_id": "attack:T1588.007"}
+{"id": "ret-atk-574", "query": "Platforms: PRE. Adversaries may gather information about the victim's identity that can be used during targeting. Information about identities may include a variety of details, inc", "style": "description", "gold_id": "attack:T1589"}
+{"id": "ret-atk-575", "query": "reconnaissance technique abusing T1589.001 Credentials on target platform", "style": "hint", "gold_id": "attack:T1589.001"}
+{"id": "ret-atk-576", "query": "T1589.002 Email Addresses", "style": "title", "gold_id": "attack:T1589.002"}
+{"id": "ret-atk-577", "query": "Platforms: PRE. Adversaries may gather employee names that can be used during targeting. Employee names can be used to derive email addresses as well as to help guide other reconna", "style": "description", "gold_id": "attack:T1589.003"}
+{"id": "ret-atk-578", "query": "reconnaissance technique abusing T1590 Gather Victim Network Information on target platform", "style": "hint", "gold_id": "attack:T1590"}
+{"id": "ret-atk-579", "query": "T1590.001 Domain Properties", "style": "title", "gold_id": "attack:T1590.001"}
+{"id": "ret-atk-580", "query": "Platforms: PRE. Adversaries may gather information about the victim's DNS that can be used during targeting. DNS information may include a variety of details, including registered ", "style": "description", "gold_id": "attack:T1590.002"}
+{"id": "ret-atk-581", "query": "reconnaissance technique abusing T1590.003 Network Trust Dependencies on target platform", "style": "hint", "gold_id": "attack:T1590.003"}
+{"id": "ret-atk-582", "query": "T1590.004 Network Topology", "style": "title", "gold_id": "attack:T1590.004"}
+{"id": "ret-atk-583", "query": "Platforms: PRE. Adversaries may gather the victim's IP addresses that can be used during targeting. Public IP addresses may be allocated to organizations by block, or a range of se", "style": "description", "gold_id": "attack:T1590.005"}
+{"id": "ret-atk-584", "query": "reconnaissance technique abusing T1590.006 Network Security Appliances on target platform", "style": "hint", "gold_id": "attack:T1590.006"}
+{"id": "ret-atk-585", "query": "T1591 Gather Victim Org Information", "style": "title", "gold_id": "attack:T1591"}
+{"id": "ret-atk-586", "query": "Platforms: PRE. Adversaries may gather the victim's physical location(s) that can be used during targeting. Information about physical locations of a target organization may includ", "style": "description", "gold_id": "attack:T1591.001"}
+{"id": "ret-atk-587", "query": "reconnaissance technique abusing T1591.002 Business Relationships on target platform", "style": "hint", "gold_id": "attack:T1591.002"}
+{"id": "ret-atk-588", "query": "T1591.003 Identify Business Tempo", "style": "title", "gold_id": "attack:T1591.003"}
+{"id": "ret-atk-589", "query": "Platforms: PRE. Adversaries may gather information about identities and roles within the victim organization that can be used during targeting. Information about business roles may", "style": "description", "gold_id": "attack:T1591.004"}
+{"id": "ret-atk-590", "query": "reconnaissance technique abusing T1592 Gather Victim Host Information on target platform", "style": "hint", "gold_id": "attack:T1592"}
+{"id": "ret-atk-591", "query": "T1592.001 Hardware", "style": "title", "gold_id": "attack:T1592.001"}
+{"id": "ret-atk-592", "query": "Platforms: PRE. Adversaries may gather information about the victim's host software that can be used during targeting. Information about installed software may include a variety of", "style": "description", "gold_id": "attack:T1592.002"}
+{"id": "ret-atk-593", "query": "reconnaissance technique abusing T1592.003 Firmware on target platform", "style": "hint", "gold_id": "attack:T1592.003"}
+{"id": "ret-atk-594", "query": "T1592.004 Client Configurations", "style": "title", "gold_id": "attack:T1592.004"}
+{"id": "ret-atk-595", "query": "Platforms: PRE. Adversaries may search freely available websites and/or domains for information about victims that can be used during targeting. Information about victims may be av", "style": "description", "gold_id": "attack:T1593"}
+{"id": "ret-atk-596", "query": "reconnaissance technique abusing T1593.001 Social Media on target platform", "style": "hint", "gold_id": "attack:T1593.001"}
+{"id": "ret-atk-597", "query": "T1593.002 Search Engines", "style": "title", "gold_id": "attack:T1593.002"}
+{"id": "ret-atk-598", "query": "Platforms: PRE. Adversaries may search public code repositories for information about victims that can be used during targeting. Victims may store code in repositories on various t", "style": "description", "gold_id": "attack:T1593.003"}
+{"id": "ret-atk-599", "query": "reconnaissance technique abusing T1594 Search Victim-Owned Websites on target platform", "style": "hint", "gold_id": "attack:T1594"}
+{"id": "ret-atk-600", "query": "T1595 Active Scanning", "style": "title", "gold_id": "attack:T1595"}
+{"id": "ret-atk-601", "query": "Platforms: PRE. Adversaries may scan victim IP blocks to gather information that can be used during targeting. Public IP addresses may be allocated to organizations by block, or a ", "style": "description", "gold_id": "attack:T1595.001"}
+{"id": "ret-atk-602", "query": "reconnaissance technique abusing T1595.002 Vulnerability Scanning on target platform", "style": "hint", "gold_id": "attack:T1595.002"}
+{"id": "ret-atk-603", "query": "T1595.003 Wordlist Scanning", "style": "title", "gold_id": "attack:T1595.003"}
+{"id": "ret-atk-604", "query": "Platforms: PRE. Adversaries may search freely available technical databases for information about victims that can be used during targeting. Information about victims may be availa", "style": "description", "gold_id": "attack:T1596"}
+{"id": "ret-atk-605", "query": "reconnaissance technique abusing T1596.001 DNS/Passive DNS on target platform", "style": "hint", "gold_id": "attack:T1596.001"}
+{"id": "ret-atk-606", "query": "T1596.002 WHOIS", "style": "title", "gold_id": "attack:T1596.002"}
+{"id": "ret-atk-607", "query": "Platforms: PRE. Adversaries may search public digital certificate data for information about victims that can be used during targeting. Digital certificates are issued by a certifi", "style": "description", "gold_id": "attack:T1596.003"}
+{"id": "ret-atk-608", "query": "reconnaissance technique abusing T1596.004 CDNs on target platform", "style": "hint", "gold_id": "attack:T1596.004"}
+{"id": "ret-atk-609", "query": "T1596.005 Scan Databases", "style": "title", "gold_id": "attack:T1596.005"}
+{"id": "ret-atk-610", "query": "Platforms: PRE. Adversaries may search and gather information about victims from closed (e.g., paid, private, or otherwise not freely available) sources that can be used during tar", "style": "description", "gold_id": "attack:T1597"}
+{"id": "ret-atk-611", "query": "reconnaissance technique abusing T1597.001 Threat Intel Vendors on target platform", "style": "hint", "gold_id": "attack:T1597.001"}
+{"id": "ret-atk-612", "query": "T1597.002 Purchase Technical Data", "style": "title", "gold_id": "attack:T1597.002"}
+{"id": "ret-atk-613", "query": "Platforms: PRE. Adversaries may send phishing messages to elicit sensitive information that can be used during targeting. Phishing for information is an attempt to trick targets in", "style": "description", "gold_id": "attack:T1598"}
+{"id": "ret-atk-614", "query": "reconnaissance technique abusing T1598.001 Spearphishing Service on target platform", "style": "hint", "gold_id": "attack:T1598.001"}
+{"id": "ret-atk-615", "query": "T1598.002 Spearphishing Attachment", "style": "title", "gold_id": "attack:T1598.002"}
+{"id": "ret-atk-616", "query": "Platforms: PRE. Adversaries may send spearphishing messages with a malicious link to elicit sensitive information that can be used during targeting. Spearphishing for information i", "style": "description", "gold_id": "attack:T1598.003"}
+{"id": "ret-atk-617", "query": "reconnaissance technique abusing T1598.004 Spearphishing Voice on target platform", "style": "hint", "gold_id": "attack:T1598.004"}
+{"id": "ret-atk-618", "query": "T1599 Network Boundary Bridging", "style": "title", "gold_id": "attack:T1599"}
+{"id": "ret-atk-619", "query": "Platforms: Network Devices. Adversaries may bridge network boundaries by modifying a network device’s Network Address Translation (NAT) configuration. Malicious modifications to NA", "style": "description", "gold_id": "attack:T1599.001"}
+{"id": "ret-atk-620", "query": "defense-impairment technique abusing T1600 Weaken Encryption on target platform", "style": "hint", "gold_id": "attack:T1600"}
+{"id": "ret-atk-621", "query": "T1600.001 Reduce Key Space", "style": "title", "gold_id": "attack:T1600.001"}
+{"id": "ret-atk-622", "query": "Platforms: Network Devices. Adversaries disable a network device’s dedicated hardware encryption, which may enable them to leverage weaknesses in software encryption in order to re", "style": "description", "gold_id": "attack:T1600.002"}
+{"id": "ret-atk-623", "query": "defense-impairment technique abusing T1601 Modify System Image on target platform", "style": "hint", "gold_id": "attack:T1601"}
+{"id": "ret-atk-624", "query": "T1601.001 Patch System Image", "style": "title", "gold_id": "attack:T1601.001"}
+{"id": "ret-atk-625", "query": "Platforms: Network Devices. Adversaries may install an older version of the operating system of a network device to weaken security. Older operating system versions on network devi", "style": "description", "gold_id": "attack:T1601.002"}
+{"id": "ret-atk-626", "query": "collection technique abusing T1602 Data from Configuration Repository on target platform", "style": "hint", "gold_id": "attack:T1602"}
+{"id": "ret-atk-627", "query": "T1602.001 SNMP (MIB Dump)", "style": "title", "gold_id": "attack:T1602.001"}
+{"id": "ret-atk-628", "query": "Platforms: Network Devices. Adversaries may access network configuration files to collect sensitive data about the device and the network. The network configuration is a file conta", "style": "description", "gold_id": "attack:T1602.002"}
+{"id": "ret-atk-629", "query": "credential-access technique abusing T1606 Forge Web Credentials on target platform", "style": "hint", "gold_id": "attack:T1606"}
+{"id": "ret-atk-630", "query": "T1606.001 Web Cookies", "style": "title", "gold_id": "attack:T1606.001"}
+{"id": "ret-atk-631", "query": "Platforms: SaaS, Windows, IaaS, Office Suite, Identity Provider. An adversary may forge SAML tokens with any permissions claims and lifetimes if they possess a valid SAML token-sig", "style": "description", "gold_id": "attack:T1606.002"}
+{"id": "ret-atk-632", "query": "resource-development technique abusing T1608 Stage Capabilities on target platform", "style": "hint", "gold_id": "attack:T1608"}
+{"id": "ret-atk-633", "query": "T1608.001 Upload Malware", "style": "title", "gold_id": "attack:T1608.001"}
+{"id": "ret-atk-634", "query": "Platforms: PRE. Adversaries may upload tools to third-party or adversary controlled infrastructure to make it accessible during targeting. Tools can be open or closed source, free ", "style": "description", "gold_id": "attack:T1608.002"}
+{"id": "ret-atk-635", "query": "resource-development technique abusing T1608.003 Install Digital Certificate on target platform", "style": "hint", "gold_id": "attack:T1608.003"}
+{"id": "ret-atk-636", "query": "T1608.004 Drive-by Target", "style": "title", "gold_id": "attack:T1608.004"}
+{"id": "ret-atk-637", "query": "Platforms: PRE. Adversaries may put in place resources that are referenced by a link that can be used during targeting. An adversary may rely upon a user clicking a malicious link ", "style": "description", "gold_id": "attack:T1608.005"}
+{"id": "ret-atk-638", "query": "resource-development technique abusing T1608.006 SEO Poisoning on target platform", "style": "hint", "gold_id": "attack:T1608.006"}
+{"id": "ret-atk-639", "query": "T1608.007 AI Result Poisoning", "style": "title", "gold_id": "attack:T1608.007"}
+{"id": "ret-atk-640", "query": "Platforms: Containers. Adversaries may abuse a container administration service to execute commands within a container. A container administration service such as the Docker daemon", "style": "description", "gold_id": "attack:T1609"}
+{"id": "ret-atk-641", "query": "execution technique abusing T1610 Deploy Container on target platform", "style": "hint", "gold_id": "attack:T1610"}
+{"id": "ret-atk-642", "query": "T1611 Escape to Host", "style": "title", "gold_id": "attack:T1611"}
+{"id": "ret-atk-643", "query": "Platforms: Containers. Adversaries may build a container image directly on a host to bypass defenses that monitor for the retrieval of malicious images from a public registry. A re", "style": "description", "gold_id": "attack:T1612"}
+{"id": "ret-atk-644", "query": "discovery technique abusing T1613 Container and Resource Discovery on target platform", "style": "hint", "gold_id": "attack:T1613"}
+{"id": "ret-atk-645", "query": "T1614 System Location Discovery", "style": "title", "gold_id": "attack:T1614"}
+{"id": "ret-atk-646", "query": "Platforms: Linux, macOS, Windows. Adversaries may attempt to gather information about the system language of a victim in order to infer the geographical location of that host. This", "style": "description", "gold_id": "attack:T1614.001"}
+{"id": "ret-atk-647", "query": "discovery technique abusing T1615 Group Policy Discovery on target platform", "style": "hint", "gold_id": "attack:T1615"}
+{"id": "ret-atk-648", "query": "T1619 Cloud Storage Object Discovery", "style": "title", "gold_id": "attack:T1619"}
+{"id": "ret-atk-649", "query": "Platforms: Linux, macOS, Windows. Adversaries may reflectively load code into a process in order to conceal the execution of malicious payloads. Reflective loading involves allocat", "style": "description", "gold_id": "attack:T1620"}
+{"id": "ret-atk-650", "query": "credential-access technique abusing T1621 Multi-Factor Authentication Request Generation on target platform", "style": "hint", "gold_id": "attack:T1621"}
+{"id": "ret-atk-651", "query": "T1622 Debugger Evasion", "style": "title", "gold_id": "attack:T1622"}
+{"id": "ret-atk-652", "query": "Platforms: macOS. Adversaries may modify property list files (plist files) to enable other malicious activity, while also potentially evading and bypassing system defenses. macOS a", "style": "description", "gold_id": "attack:T1647"}
+{"id": "ret-atk-653", "query": "execution technique abusing T1648 Serverless Execution on target platform", "style": "hint", "gold_id": "attack:T1648"}
+{"id": "ret-atk-654", "query": "T1649 Steal or Forge Authentication Certificates", "style": "title", "gold_id": "attack:T1649"}
+{"id": "ret-atk-655", "query": "Platforms: PRE. Adversaries may purchase or otherwise acquire an existing access to a target system or network. A variety of online services and initial access broker networks are ", "style": "description", "gold_id": "attack:T1650"}
+{"id": "ret-atk-656", "query": "execution technique abusing T1651 Cloud Administration Command on target platform", "style": "hint", "gold_id": "attack:T1651"}
+{"id": "ret-atk-657", "query": "T1652 Device Driver Discovery", "style": "title", "gold_id": "attack:T1652"}
+{"id": "ret-atk-658", "query": "Platforms: Windows, Linux, macOS, Network Devices. Adversaries may impair a system's ability to hibernate, reboot, or shut down in order to extend access to infected machines. When", "style": "description", "gold_id": "attack:T1653"}
+{"id": "ret-atk-659", "query": "discovery technique abusing T1654 Log Enumeration on target platform", "style": "hint", "gold_id": "attack:T1654"}
+{"id": "ret-atk-660", "query": "T1657 Financial Theft", "style": "title", "gold_id": "attack:T1657"}
+{"id": "ret-atk-661", "query": "Platforms: Linux, macOS, Windows. Adversaries may gain access and continuously communicate with victims by injecting malicious content into systems through online network traffic. ", "style": "description", "gold_id": "attack:T1659"}
+{"id": "ret-atk-662", "query": "command-and-control technique abusing T1665 Hide Infrastructure on target platform", "style": "hint", "gold_id": "attack:T1665"}
+{"id": "ret-atk-663", "query": "T1666 Modify Cloud Resource Hierarchy", "style": "title", "gold_id": "attack:T1666"}
+{"id": "ret-atk-664", "query": "Platforms: Linux, Office Suite, Windows, macOS. Adversaries may flood targeted email addresses with an overwhelming volume of messages. This may bury legitimate emails in a flood o", "style": "description", "gold_id": "attack:T1667"}
+{"id": "ret-atk-665", "query": "persistence technique abusing T1668 Exclusive Control on target platform", "style": "hint", "gold_id": "attack:T1668"}
+{"id": "ret-atk-666", "query": "T1669 Wi-Fi Networks", "style": "title", "gold_id": "attack:T1669"}
+{"id": "ret-atk-667", "query": "Platforms: Office Suite, SaaS. Adversaries may achieve persistence by leveraging OAuth application integrations in a software-as-a-service environment. Adversaries may create a cus", "style": "description", "gold_id": "attack:T1671"}
+{"id": "ret-atk-668", "query": "discovery technique abusing T1673 Virtual Machine Discovery on target platform", "style": "hint", "gold_id": "attack:T1673"}
+{"id": "ret-atk-669", "query": "T1674 Input Injection", "style": "title", "gold_id": "attack:T1674"}
+{"id": "ret-atk-670", "query": "Platforms: ESXi. Adversaries may abuse ESXi administration services to execute commands on guest machines hosted within an ESXi virtual environment. Persistent background services ", "style": "description", "gold_id": "attack:T1675"}
+{"id": "ret-atk-671", "query": "execution technique abusing T1677 Poisoned Pipeline Execution on target platform", "style": "hint", "gold_id": "attack:T1677"}
+{"id": "ret-atk-672", "query": "T1678 Delay Execution", "style": "title", "gold_id": "attack:T1678"}
+{"id": "ret-atk-673", "query": "Platforms: Windows. Adversaries may intentionally exclude certain files, folders, directories, file types, or system components from encryption or tampering during a ransomware or ", "style": "description", "gold_id": "attack:T1679"}
+{"id": "ret-atk-674", "query": "discovery technique abusing T1680 Local Storage Discovery on target platform", "style": "hint", "gold_id": "attack:T1680"}
+{"id": "ret-atk-675", "query": "T1681 Search Threat Vendor Data", "style": "title", "gold_id": "attack:T1681"}
+{"id": "ret-atk-676", "query": "Platforms: PRE. Adversaries may query publicly accessible artificial intelligence (AI) services, such as large language models (LLMs), to support targeting and operations. In addit", "style": "description", "gold_id": "attack:T1682"}
+{"id": "ret-atk-677", "query": "resource-development technique abusing T1683 Generate Content on target platform", "style": "hint", "gold_id": "attack:T1683"}
+{"id": "ret-atk-678", "query": "T1683.001 Written Content", "style": "title", "gold_id": "attack:T1683.001"}
+{"id": "ret-atk-679", "query": "Platforms: PRE. Adversaries may create or manipulate audio, image, and video content to support targeting and malicious operations. Adversaries may also use synthetic voice recordi", "style": "description", "gold_id": "attack:T1683.002"}
+{"id": "ret-atk-680", "query": "stealth technique abusing T1684 Social Engineering on target platform", "style": "hint", "gold_id": "attack:T1684"}
+{"id": "ret-atk-681", "query": "T1684.001 Impersonation", "style": "title", "gold_id": "attack:T1684.001"}
+{"id": "ret-atk-682", "query": "Platforms: Linux, macOS, Office Suite, Windows. Adversaries may fake, or spoof, a sender’s identity by modifying the value of relevant email headers in order to establish contact w", "style": "description", "gold_id": "attack:T1684.002"}
+{"id": "ret-atk-683", "query": "defense-impairment technique abusing T1685 Disable or Modify Tools on target platform", "style": "hint", "gold_id": "attack:T1685"}
+{"id": "ret-atk-684", "query": "T1685.001 Disable or Modify Windows Event Log", "style": "title", "gold_id": "attack:T1685.001"}
+{"id": "ret-atk-685", "query": "Platforms: IaaS, SaaS, Identity Provider, Office Suite. An adversary may disable or modify cloud logging capabilities and integrations to limit what data is collected on their acti", "style": "description", "gold_id": "attack:T1685.002"}
+{"id": "ret-atk-686", "query": "defense-impairment technique abusing T1685.003 Modify or Spoof Tool UI on target platform", "style": "hint", "gold_id": "attack:T1685.003"}
+{"id": "ret-atk-687", "query": "T1685.004 Disable or Modify Linux Audit System Log", "style": "title", "gold_id": "attack:T1685.004"}
+{"id": "ret-atk-688", "query": "Platforms: Windows. Adversaries may clear Windows Event Logs to hide the activity of an intrusion. Windows Event Logs are a record of a computer's alerts and notifications. There a", "style": "description", "gold_id": "attack:T1685.005"}
+{"id": "ret-atk-689", "query": "defense-impairment technique abusing T1685.006 Clear Linux or Mac System Logs on target platform", "style": "hint", "gold_id": "attack:T1685.006"}
+{"id": "ret-atk-690", "query": "T1685.007 Impair Autonomous Defenses", "style": "title", "gold_id": "attack:T1685.007"}
+{"id": "ret-atk-691", "query": "Platforms: ESXi, Linux, macOS, Network Devices, Windows. Adversaries may disable or modify host-based or network firewalls to impair defensive mechanisms and enable further action.", "style": "description", "gold_id": "attack:T1686"}
+{"id": "ret-atk-692", "query": "defense-impairment technique abusing T1686.001 Cloud Firewall on target platform", "style": "hint", "gold_id": "attack:T1686.001"}
+{"id": "ret-atk-693", "query": "T1686.002 Network Device Firewall", "style": "title", "gold_id": "attack:T1686.002"}
+{"id": "ret-atk-694", "query": "Platforms: Windows. Adversaries may disable or modify the Windows host firewall to bypass controls limiting network usage. This can include disabling the Windows host firewall enti", "style": "description", "gold_id": "attack:T1686.003"}
+{"id": "ret-atk-695", "query": "defense-impairment technique abusing T1687 Exploitation for Defense Impairment on target platform", "style": "hint", "gold_id": "attack:T1687"}
+{"id": "ret-atk-696", "query": "T1688 Safe Mode Boot", "style": "title", "gold_id": "attack:T1688"}
+{"id": "ret-atk-697", "query": "Platforms: macOS, Windows, Linux. Adversaries may downgrade or use a version of system features that may be outdated, vulnerable, and/or does not support updated security controls.", "style": "description", "gold_id": "attack:T1689"}
+{"id": "ret-atk-698", "query": "defense-impairment technique abusing T1690 Prevent Command History Logging on target platform", "style": "hint", "gold_id": "attack:T1690"}
+{"id": "ret-atk-699", "query": "T1696 Anti-Automation Evasion", "style": "title", "gold_id": "attack:T1696"}
+{"id": "ret-atk-700", "query": "Platforms: SaaS. Adversaries may attempt to use bots to successfully solve CAPTCHA challenges. CAPTCHA challenges are typically used by defenders to detect and prevent bot and spam", "style": "description", "gold_id": "attack:T1696.001"}
+{"id": "ret-atk-701", "query": "stealth technique abusing T1696.002 Avoid CAPTCHA on target platform", "style": "hint", "gold_id": "attack:T1696.002"}
+{"id": "ret-atk-702", "query": "T1697 Steal Application Specific Passwords", "style": "title", "gold_id": "attack:T1697"}
+{"id": "ret-atk-703", "query": "Platforms: Windows, SaaS. Adversaries may deliver malicious prompts to an LLM indirectly by embedding the prompts in content that the adversary expects may be processed by an LLM. ", "style": "description", "gold_id": "attack:T1698"}
+{"id": "ret-atk-704", "query": "execution technique abusing T1699 Direct Prompt Injection on target platform", "style": "hint", "gold_id": "attack:T1699"}
+{"id": "ret-atk-705", "query": "T1700 AI-Enabled Exfiltration", "style": "title", "gold_id": "attack:T1700"}
+{"id": "ret-owasp-706", "query": "What is the description of OWASP A01:2025 Broken Access Control?", "style": "description", "gold_id": "owasp-top10:2025:A01:description"}
+{"id": "ret-owasp-707", "query": "What is the OWASP Top 10 category for A01:2025 Broken Access Control?", "style": "category", "gold_id": "owasp-top10:2025:A01:overview"}
+{"id": "ret-owasp-708", "query": "How to prevent A01:2025 Broken Access Control vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A01:prevention"}
+{"id": "ret-owasp-709", "query": "What are example attack scenarios for OWASP A01:2025 Broken Access Control?", "style": "scenarios", "gold_id": "owasp-top10:2025:A01:scenarios"}
+{"id": "ret-owasp-710", "query": "What is the description of OWASP A02:2025 Security Misconfiguration?", "style": "description", "gold_id": "owasp-top10:2025:A02:description"}
+{"id": "ret-owasp-711", "query": "What is the OWASP Top 10 category for A02:2025 Security Misconfiguration?", "style": "category", "gold_id": "owasp-top10:2025:A02:overview"}
+{"id": "ret-owasp-712", "query": "How to prevent A02:2025 Security Misconfiguration vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A02:prevention"}
+{"id": "ret-owasp-713", "query": "What are example attack scenarios for OWASP A02:2025 Security Misconfiguration?", "style": "scenarios", "gold_id": "owasp-top10:2025:A02:scenarios"}
+{"id": "ret-owasp-714", "query": "What is the description of OWASP A03:2025 Software Supply Chain Failures?", "style": "description", "gold_id": "owasp-top10:2025:A03:description"}
+{"id": "ret-owasp-715", "query": "What is the OWASP Top 10 category for A03:2025 Software Supply Chain Failures?", "style": "category", "gold_id": "owasp-top10:2025:A03:overview"}
+{"id": "ret-owasp-716", "query": "How to prevent A03:2025 Software Supply Chain Failures vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A03:prevention"}
+{"id": "ret-owasp-717", "query": "What are example attack scenarios for OWASP A03:2025 Software Supply Chain Failures?", "style": "scenarios", "gold_id": "owasp-top10:2025:A03:scenarios"}
+{"id": "ret-owasp-718", "query": "What is the description of OWASP A04:2025 Cryptographic Failures?", "style": "description", "gold_id": "owasp-top10:2025:A04:description"}
+{"id": "ret-owasp-719", "query": "What is the OWASP Top 10 category for A04:2025 Cryptographic Failures?", "style": "category", "gold_id": "owasp-top10:2025:A04:overview"}
+{"id": "ret-owasp-720", "query": "How to prevent A04:2025 Cryptographic Failures vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A04:prevention"}
+{"id": "ret-owasp-721", "query": "What are example attack scenarios for OWASP A04:2025 Cryptographic Failures?", "style": "scenarios", "gold_id": "owasp-top10:2025:A04:scenarios"}
+{"id": "ret-owasp-722", "query": "What is the description of OWASP A05:2025 Injection?", "style": "description", "gold_id": "owasp-top10:2025:A05:description"}
+{"id": "ret-owasp-723", "query": "What is the OWASP Top 10 category for A05:2025 Injection?", "style": "category", "gold_id": "owasp-top10:2025:A05:overview"}
+{"id": "ret-owasp-724", "query": "How to prevent A05:2025 Injection vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A05:prevention"}
+{"id": "ret-owasp-725", "query": "What are example attack scenarios for OWASP A05:2025 Injection?", "style": "scenarios", "gold_id": "owasp-top10:2025:A05:scenarios"}
+{"id": "ret-owasp-726", "query": "What is the description of OWASP A06:2025 Insecure Design?", "style": "description", "gold_id": "owasp-top10:2025:A06:description"}
+{"id": "ret-owasp-727", "query": "What is the OWASP Top 10 category for A06:2025 Insecure Design?", "style": "category", "gold_id": "owasp-top10:2025:A06:overview"}
+{"id": "ret-owasp-728", "query": "How to prevent A06:2025 Insecure Design vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A06:prevention"}
+{"id": "ret-owasp-729", "query": "What are example attack scenarios for OWASP A06:2025 Insecure Design?", "style": "scenarios", "gold_id": "owasp-top10:2025:A06:scenarios"}
+{"id": "ret-owasp-730", "query": "What is the description of OWASP A07:2025 Authentication Failures?", "style": "description", "gold_id": "owasp-top10:2025:A07:description"}
+{"id": "ret-owasp-731", "query": "What is the OWASP Top 10 category for A07:2025 Authentication Failures?", "style": "category", "gold_id": "owasp-top10:2025:A07:overview"}
+{"id": "ret-owasp-732", "query": "How to prevent A07:2025 Authentication Failures vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A07:prevention"}
+{"id": "ret-owasp-733", "query": "What are example attack scenarios for OWASP A07:2025 Authentication Failures?", "style": "scenarios", "gold_id": "owasp-top10:2025:A07:scenarios"}
+{"id": "ret-owasp-734", "query": "What is the description of OWASP A08:2025 Software or Data Integrity Failures?", "style": "description", "gold_id": "owasp-top10:2025:A08:description"}
+{"id": "ret-owasp-735", "query": "What is the OWASP Top 10 category for A08:2025 Software or Data Integrity Failures?", "style": "category", "gold_id": "owasp-top10:2025:A08:overview"}
+{"id": "ret-owasp-736", "query": "How to prevent A08:2025 Software or Data Integrity Failures vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A08:prevention"}
+{"id": "ret-owasp-737", "query": "What are example attack scenarios for OWASP A08:2025 Software or Data Integrity Failures?", "style": "scenarios", "gold_id": "owasp-top10:2025:A08:scenarios"}
+{"id": "ret-owasp-738", "query": "What is the description of OWASP A09:2025 Security Logging & Alerting Failures?", "style": "description", "gold_id": "owasp-top10:2025:A09:description"}
+{"id": "ret-owasp-739", "query": "What is the OWASP Top 10 category for A09:2025 Security Logging & Alerting Failures?", "style": "category", "gold_id": "owasp-top10:2025:A09:overview"}
+{"id": "ret-owasp-740", "query": "How to prevent A09:2025 Security Logging & Alerting Failures vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A09:prevention"}
+{"id": "ret-owasp-741", "query": "What are example attack scenarios for OWASP A09:2025 Security Logging & Alerting Failures?", "style": "scenarios", "gold_id": "owasp-top10:2025:A09:scenarios"}
+{"id": "ret-owasp-742", "query": "What is the description of OWASP A10:2025 Mishandling of Exceptional Conditions?", "style": "description", "gold_id": "owasp-top10:2025:A10:description"}
+{"id": "ret-owasp-743", "query": "What is the OWASP Top 10 category for A10:2025 Mishandling of Exceptional Conditions?", "style": "category", "gold_id": "owasp-top10:2025:A10:overview"}
+{"id": "ret-owasp-744", "query": "How to prevent A10:2025 Mishandling of Exceptional Conditions vulnerabilities according to OWASP?", "style": "prevention", "gold_id": "owasp-top10:2025:A10:prevention"}
+{"id": "ret-owasp-745", "query": "What are example attack scenarios for OWASP A10:2025 Mishandling of Exceptional Conditions?", "style": "scenarios", "gold_id": "owasp-top10:2025:A10:scenarios"}
+{"id": "neg-ao-000", "query": "What is a good recipe for sourdough bread?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-001", "query": "Who won the 2022 FIFA World Cup final in Qatar?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-002", "query": "How do plants convert sunlight into chemical energy?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-003", "query": "What is the MITRE ATT&CK technique T9999.001?", "style": "negative", "gold_id": null}
+{"id": "neg-ao-004", "query": "What is the OWASP Top 10 2025 category A99?", "style": "negative", "gold_id": null}
