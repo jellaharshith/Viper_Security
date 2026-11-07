@@ -48,7 +48,7 @@
 {"id": "def-0", "category": "definition", "question": "What is the difference between TCP and UDP?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
 {"id": "def-1", "category": "definition", "question": "How do I configure a firewall rule on Linux?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
 {"id": "def-2", "category": "definition", "question": "Explain what a buffer overflow is.", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
-{"id": "def-3", "category": "definition", "question": "What is multi-factor authentication?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
+{"id": "def-3", "category": "definition", "question": "What is multi-factor authentication?", "must_contain": [], "expect_grounded": true, "review": "needs-human"}
 {"id": "def-4", "category": "definition", "question": "How does public key cryptography work?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
 {"id": "def-5", "category": "definition", "question": "What are the OWASP Top 10 categories?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
 {"id": "def-6", "category": "definition", "question": "How do I write a good security report?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
@@ -58,5 +58,5 @@
 {"id": "def-10", "category": "definition", "question": "What is a zero-day vulnerability?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
 {"id": "def-11", "category": "definition", "question": "How do I set up a home VPN?", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
 {"id": "def-12", "category": "definition", "question": "What is a SQL injection?", "must_contain": ["injection"], "expect_grounded": true, "review": "needs-human"}
-{"id": "def-13", "category": "definition", "question": "Describe how a password manager works.", "must_contain": [], "expect_grounded": false, "expect_unverified": true}
+{"id": "def-13", "category": "definition", "question": "Describe how a password manager works.", "must_contain": [], "expect_grounded": true, "review": "needs-human"}
 {"id": "def-xss", "category": "definition", "question": "What is cross-site scripting (XSS)?", "must_contain": ["cross-site scripting"], "expect_grounded": true, "review": "needs-human"}
