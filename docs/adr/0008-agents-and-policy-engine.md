@@ -1,0 +1,28 @@
+# ADR 0008: LangGraph agents with a deterministic policy engine
+
+Status: Accepted (2026-11-07)
+
+## Context
+M5 introduces autonomous agents that propose security-testing plans. The LLM is an untrusted component susceptible to prompt injection, hallucinated scope, and malicious parameter manipulation. Authoritative access control, human approval gates, and tamper-evident audit logging cannot rely on LLM outputs or unvalidated state. See `docs/security-design.md`, `docs/plans/m5-agents-policy.md`, and `docs/plans/m5-open-questions.md`.
+
+## Decision
+1. **Model separation & registry-owned risk:** Agents are implemented as a LangGraph `StateGraph`. The LLM proposes candidate `Action` objects specifying only `tool_name` and `arguments`. Tool risk levels and parameter schemas are strictly owned by `viper.tools.registry`; model-supplied risk levels are rejected. Authoritative scope is authored in YAML per project (`projects/{project_id}/scope.yaml`) with strict Pydantic validation rejecting unknown keys, loaded outside LLM-writable memory with a canonical SHA-256 `scope_revision`.
+2. **Deterministic policy & two enforcement points:** `viper.policy.evaluate` is a pure, deny-by-default function and the sole authority for `ALLOW`, `REQUIRE_APPROVAL`, or `DENY`. Human approval is required only for `ACTIVE` actions; `READ` and verified in-scope `PASSIVE` dry-run actions execute without approval. In M5, active and intrusive actions are denied while `allow_active_testing` is false. Policy is evaluated at the `policy_gate` node and independently re-evaluated immediately before dispatch in `execute` to guard against stale state or changed scope.
+3. **Cryptographically bound approvals & SQLite checkpointer:** Checkpoints are persisted in a local SQLite database (`SqliteSaver` in `data/checkpoints.db`) to enable durable CLI pause/resume across terminal sessions (`InMemorySaver` for unit tests). Approvals use LangGraph `interrupt()` and `Command(resume=...)` on the local CLI boundary, capturing the local OS username (`getpass.getuser()`) as audit metadata. Each approval generates a unique `pending_approval_id` bound to project, thread, action ID, canonical action hash, scope revision, and expiry. Resumed execution atomically consumes the pending ID, ensuring replay protection and idempotency under LangGraph node-restart semantics.
+4. **Dedicated audit sanitization & fail-closed hash chain:** The audit log is an append-only JSON Lines file stored centrally at `data/audit/{project_id}.jsonl` (git-ignored, configurable via `Settings.audit_dir`) with a SHA-256 hash chain and exclusive file locking. `viper.agents.audit` implements dedicated allowlist schemas and recursive sanitization (redacting tokens, cookies, auth headers, and exception traces), eliminating reliance on `logging_setup`. If audit writes fail, execution fails closed before dispatch.
+5. **Fixed stub execution & runtime contracts:** M5 execution is strictly bound to `DryRunExecutor` dispatching to registered stubs; no real scanners or network sockets (TCP/UDP) exist in M5. The offline CI test suite enforces zero network calls via socket/subprocess monkeypatching, and verifies approval interrupt reachability via stub actions requiring approval while real active execution remains blocked.
+
+## Consequences
+- Safety policy and approval logic are 100% testable without live targets, networks, or non-deterministic LLMs.
+- Scope and settings cannot be bypassed by prompt injection or graph state tampering.
+- Operators can run, pause, and resume agent workflows reliably across terminal sessions via durable SQLite checkpoints.
+- Because LangGraph restarts an interrupted node upon resume, pre-interrupt logic is strictly idempotent and consumption is atomic.
+- Pinned LangGraph versions and API contract tests protect against breaking changes in `interrupt()` / `stream_events`.
+- A local hash chain provides tamper evidence and internal consistency detection; cryptographic authenticity against root filesystem rewriting is deferred to M6 external anchoring.
+
+## Alternatives considered
+- **LLM self-check of scope:** Rejected; non-deterministic and easily bypassed via prompt injection.
+- **Prebuilt ReAct agent without policy node:** Rejected; lacks deterministic authorization and human approval checkpoints.
+- **In-memory checkpoints only:** Rejected for CLI; prevents pausing and resuming across terminal sessions or script invocations.
+- **PostgreSQL audit table in M5:** Deferred; file-based JSON Lines with hash chaining satisfies M5 requirements at $0 cost and zero Docker/DB dependencies until M6.
+- **Relying on logging_setup for redaction:** Rejected; `logging_setup` has no sanitization pass and `Settings.redacted()` only covers typed settings.
