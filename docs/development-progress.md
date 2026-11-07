@@ -80,9 +80,16 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
 - Found by the live run, not by tests: Supabase resets the connection on ~800 KB request bodies, so upserts are batched
   by payload size (<= ~200 KB) and retried.
 
+- **Dataset v2 rebuilt from the live index** (751 ATT&CK/OWASP retrieval cases + 62 answer cases; v1 untouched).
+  Retrieval-only eval against Supabase, 846 queries, recall@4 **0.948** overall: CISA KEV 0.99 (no regression vs v1),
+  MITRE ATT&CK 0.941 (706), OWASP Top 10 0.975 (40). Weakest style: ATT&CK `hint` queries 0.918, OWASP prevention 0.90.
+  Report: `eval/results/v2-supabase-retrieval-only-2026-11-06-2026-11-07.json`. Answer cases (LLM) not run yet.
+  Caveat: "description" queries are verbatim passage text, an easy test; synthetic calibration suggests 0.673 but ADR 0003
+  showed synthetic calibration misleads, so `min_score` stays 0.65 until recalibrated on realistic questions.
+
 ### Not done / not verified
 - The direct-Postgres store (`VIPER_STORE=pgvector`) has still never run against a real database.
-- Dataset v2 rebuild from the live index and `min_score` recalibration are pending (`eval build`, then `calibrate`).
+- `min_score` recalibration on realistic questions, and the v2 answer cases with the chat model (about an hour), are pending.
 - Three flipped expectations in `answers_v2.jsonl` (SQL injection, XSS acronym, XSS definition) await human review.
 - Open choices: OWASP edition 2025 (vs 2021), ATT&CK size cap 70 MB (plan said ~60 MB).
 - GitHub CI has not been confirmed on PR #9.
