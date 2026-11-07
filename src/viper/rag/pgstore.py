@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime
 from typing import Any
 
@@ -42,6 +44,18 @@ def _doc(row: tuple[Any, ...]) -> Document:
     return Document(id=row[0], text=row[1], source=row[2], url=row[3], title=row[4], meta=row[5])
 
 
+@contextmanager
+def _cursor(
+    conn: psycopg.Connection[Any], *, transaction: bool = False,
+) -> Iterator[psycopg.Cursor[Any]]:
+    """Mask driver diagnostics, including errors raised on commit or rollback."""
+    try:
+        with conn.transaction() if transaction else nullcontext(), conn.cursor() as cur:
+            yield cur
+    except psycopg.Error:
+        raise RuntimeError("pgvector database operation failed") from None
+
+
 class PgVectorStore:
     def __init__(
         self, database_url: str | SecretStr, collection: str,
@@ -56,20 +70,20 @@ class PgVectorStore:
         return PgVectorStore("", collection, connection=self._conn)
 
     def exists(self) -> bool:
-        with self._conn.cursor() as cur:
+        with _cursor(self._conn) as cur:
             cur.execute("SELECT EXISTS (SELECT 1 FROM kb_docs WHERE collection = %s)",
                         (self.collection,))
             row = cur.fetchone()
         return bool(row and row[0])
 
     def count(self) -> int:
-        with self._conn.cursor() as cur:
+        with _cursor(self._conn) as cur:
             cur.execute("SELECT count(*) FROM kb_docs WHERE collection = %s", (self.collection,))
             row = cur.fetchone()
         return int(row[0]) if row else 0
 
     def drop(self) -> None:
-        with self._conn.transaction(), self._conn.cursor() as cur:
+        with _cursor(self._conn, transaction=True) as cur:
             cur.execute("DELETE FROM kb_docs WHERE collection = %s", (self.collection,))
 
     def upsert(self, docs: list[Document], vectors: list[list[float]]) -> None:
@@ -79,7 +93,7 @@ class PgVectorStore:
                 for d, v in zip(docs, vectors, strict=True)]
         if not rows:
             return
-        with self._conn.transaction(), self._conn.cursor() as cur:
+        with _cursor(self._conn, transaction=True) as cur:
             cur.executemany(
                 "INSERT INTO kb_docs (collection, id, text, source, url, title, meta, embedding) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s::vector) "
@@ -91,13 +105,13 @@ class PgVectorStore:
     def get_many(self, doc_ids: list[str]) -> list[Document]:
         if not doc_ids:
             return []
-        with self._conn.cursor() as cur:
+        with _cursor(self._conn) as cur:
             cur.execute("SELECT id, text, source, url, title, meta FROM kb_docs "
                         "WHERE collection = %s AND id = ANY(%s)", (self.collection, doc_ids))
             return [_doc(row) for row in cur.fetchall()]
 
     def export(self) -> list[tuple[Document, list[float]]]:
-        with self._conn.cursor() as cur:
+        with _cursor(self._conn) as cur:
             cur.execute("SELECT id, text, source, url, title, meta, embedding::text FROM kb_docs "
                         "WHERE collection = %s ORDER BY id", (self.collection,))
             return [(_doc(row), [float(x) for x in json.loads(row[6])]) for row in cur.fetchall()]
@@ -106,7 +120,7 @@ class PgVectorStore:
         encoded = _vector(vector)
         if k < 1:
             raise ValueError("k must be positive")
-        with self._conn.cursor() as cur:
+        with _cursor(self._conn) as cur:
             cur.execute(
                 "SELECT id, text, source, url, title, meta, "
                 "1 - (embedding <=> %s::vector) AS score FROM kb_docs "
@@ -135,10 +149,14 @@ class PgKBRegistry:
         self.active: str | None = None
         self.previous: str | None = None
         self.history: list[dict[str, str]] = []
-        self.refresh()
+        try:
+            self.refresh()
+        except Exception:
+            self.close()
+            raise
 
     def refresh(self) -> None:
-        with self._conn.cursor() as cur:
+        with _cursor(self._conn) as cur:
             cur.execute("SELECT active, previous, history FROM kb_registry WHERE singleton = true")
             row = cur.fetchone()
         if row is None:
@@ -148,30 +166,31 @@ class PgKBRegistry:
     def _change(self, event: str, collection: str | None = None) -> str:
         if collection is not None:
             _collection(collection)
-        with self._conn.transaction(), self._conn.cursor() as cur:
+        with _cursor(self._conn, transaction=True) as cur:
             cur.execute("SELECT active, previous, history FROM kb_registry "
                         "WHERE singleton = true FOR UPDATE")
             row = cur.fetchone()
             if row is None:
                 raise RuntimeError("missing kb_registry singleton; apply 0001_kb.sql")
             active, previous, old_history = row
-            if event == "bootstrap":
-                if active is not None:
-                    self.active, self.previous, self.history = row
-                    return str(active)
-                active = collection
-            elif event == "promote":
-                if collection == active:
-                    raise ValueError("collection is already active")
-                previous, active = active, collection
+            if event == "bootstrap" and active is not None:
+                # Even a no-op bootstrap must publish its snapshot only after commit.
+                history = old_history
             else:
-                if not previous:
-                    raise ValueError("no previous collection to roll back to")
-                active, previous = previous, active
-            history = [*old_history, {"at": datetime.now(UTC).isoformat(timespec="seconds"),
-                                      "event": event, "collection": active or ""}]
-            cur.execute("UPDATE kb_registry SET active = %s, previous = %s, history = %s "
-                        "WHERE singleton = true", (active, previous, Jsonb(history)))
+                if event == "bootstrap":
+                    active = collection
+                elif event == "promote":
+                    if collection == active:
+                        raise ValueError("collection is already active")
+                    previous, active = active, collection
+                else:
+                    if not previous:
+                        raise ValueError("no previous collection to roll back to")
+                    active, previous = previous, active
+                history = [*old_history, {"at": datetime.now(UTC).isoformat(timespec="seconds"),
+                                          "event": event, "collection": active or ""}]
+                cur.execute("UPDATE kb_registry SET active = %s, previous = %s, history = %s "
+                            "WHERE singleton = true", (active, previous, Jsonb(history)))
         # Publish the local snapshot only after the transaction commits successfully.
         self.active, self.previous, self.history = active, previous, history
         return str(active or "")
