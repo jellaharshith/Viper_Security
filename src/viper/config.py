@@ -48,6 +48,7 @@ class Settings(BaseSettings):
 
     # --- Safety: active testing is OFF unless explicitly enabled ---
     allow_active_testing: bool = False
+    audit_dir: Path = Path("data/audit")
 
     def redacted(self) -> dict[str, Any]:
         """Settings as a dict that is safe to print/log (secrets masked)."""
