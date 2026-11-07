@@ -159,7 +159,9 @@ def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
             print(line)
         return 0
     only = set(args.only.split(",")) if args.only else None
-    report = runner.run_eval(settings, args.tag, skip_llm=args.skip_llm, only=only)
+    report = runner.run_eval(
+        settings, args.tag, skip_llm=args.skip_llm, only=only, dataset_version=args.dataset
+    )
     path = runner.save_report(report)
     print(json.dumps({"retrieval": report["retrieval"]["overall"],
                       "calibration": report["retrieval"]["calibration"],
@@ -181,6 +183,10 @@ def main(argv: list[str] | None = None) -> int:
     esub.add_parser("build", help="regenerate frozen datasets from the indexed KEV snapshot")
     p_run = esub.add_parser("run", help="run evaluation and save a report")
     p_run.add_argument("--tag", required=True, help="name for this run, e.g. baseline-fsec-1.1")
+    p_run.add_argument(
+        "--dataset", choices=("v1", "v2"), default="v1",
+        help="dataset version: v1 (default) or v2 (KEV + ATT&CK + OWASP)",
+    )
     p_run.add_argument("--skip-llm", action="store_true", help="retrieval metrics only (fast)")
     p_run.add_argument("--only", default=None, help="comma list of case ids or categories")
     p_cmp = esub.add_parser("compare", help="compare two saved reports")
