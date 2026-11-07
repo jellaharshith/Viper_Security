@@ -5,7 +5,8 @@ Status: Implemented with fake-connection tests; live verification pending.
 Local embedded Qdrant remains the default. `VIPER_STORE=pgvector` selects the alternative
 once CLI wiring is added. `VIPER_DATABASE_URL` is a SecretStr, masked by settings repr,
 JSON serialization and `redacted()` (used by health output). Connection failures omit
-driver diagnostics, which can contain credentials. Connection strings belong only in
+driver diagnostics, which can contain credentials. Query and transaction failures also omit
+driver diagnostics, including failures during commit or rollback. Connection strings belong only in
 the ignored `.env` or a secret manager. No database was contacted for this change.
 
 Apply `db/migrations/0001_kb.sql` with an administrative database connection. The application
@@ -26,7 +27,8 @@ autocommit so explicit transaction contexts remain the actual commit boundaries.
 promote and rollback without modifying the filesystem registry. Each pointer mutation
 locks the singleton row and updates both pointers and history in one transaction.
 Concurrent writers read the latest state under the lock. Local snapshots update after
-commit; long-lived readers must refresh to observe changes from other processes.
+commit (including a no-op bootstrap); long-lived readers must refresh to observe changes
+from other processes. A failed initial refresh closes a registry-owned connection.
 
 Integration required in the owning lane: select PgVectorStore using settings.store and
 settings.database_url, resolve the active collection from PgKBRegistry, use Store type
