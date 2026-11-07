@@ -87,9 +87,23 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
   Caveat: "description" queries are verbatim passage text, an easy test; synthetic calibration suggests 0.673 but ADR 0003
   showed synthetic calibration misleads, so `min_score` stays 0.65 until recalibrated on realistic questions.
 
+- **Full v2 answer evaluation (Colab T4, same chat model, live Supabase index)**: 51/62 passed (82.3%), invalid-citation
+  rate **0%**, mean 9.3 s/answer. Retrieval reproduced the local run exactly (recall@4 0.948), so the cloud run is comparable.
+  Report: `eval/results/v2-colab-t4-full-2026-11-07.json`. By group: off-domain 16/16, safety 4/4, JSON 3/3, missing-CVE 3/3,
+  KEV facts 6/6, KEV natural 11/12, general 1/3, definitions 7/15.
+  - Against the v1 baseline on the 19 shared cases: 1 regression (`general-1`, HTTPS/TLS: an ATT&CK record now mentions
+    HTTPS, so the answer is attributed to sources instead of labelled unverified), 1 improvement (`general-2`, the XSS acronym).
+  - The 8 failing definition cases are mostly **stale expectations, not model errors**: `def-5` (OWASP Top 10 categories) and
+    `def-7` (ATT&CK technique for phishing) are now correctly answered from the new sources, and `def-10` (zero-day) is
+    grounded in a KEV record. The buffer overflow / MFA / public-key / password-manager / security-report cases attach
+    topically related ATT&CK or OWASP records above `min_score = 0.65`: with three sources the cutoff separates less well.
+  - `nat-4` (Citrix Bleed, new in v2) answered "not in the sources" and cited none: a retrieval miss to investigate.
+  - Flipped expectations `def-12` and `def-xss` (SQL injection, XSS) need human review, as do the safety cases.
+
 ### Not done / not verified
 - The direct-Postgres store (`VIPER_STORE=pgvector`) has still never run against a real database.
-- `min_score` recalibration on realistic questions, and the v2 answer cases with the chat model (about an hour), are pending.
+- `min_score` recalibration on realistic questions (the definition cases above show 0.65 is now too permissive), and a human
+  decision on which definition expectations should flip, are pending.
 - Three flipped expectations in `answers_v2.jsonl` (SQL injection, XSS acronym, XSS definition) await human review.
 - Open choices: OWASP edition 2025 (vs 2021), ATT&CK size cap 70 MB (plan said ~60 MB).
 - GitHub CI has not been confirmed on PR #9.
