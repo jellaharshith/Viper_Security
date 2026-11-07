@@ -37,3 +37,11 @@ Four failures out of 62 is a small sample, and the prompt change itself can regr
 
 ## Follow-up experiment (branch m4/unverified-label)
 The grounded system prompt now says to use a source only if it directly answers the question and to start with `NOT_IN_SOURCES` otherwise; code then shows the reply as UNVERIFIED model memory. Measured on Colab against the frozen v2 set; results below.
+
+### Result (Colab T4, 2026-11-07): rejected, code reverted
+`eval/results/v2-colab-t4-notinsources-2026-11-07.json`: **57/62 (91.9%)** vs 58/62 for the baseline at the same cutoff. Invalid citations 0%.
+- Fixed: `def-2` (buffer overflow now labelled unverified).
+- Regressed: `nat-4` (the model wrote `NOT_IN_SOURCES` although the Citrix record was retrieved, so the answer lost its sources) and `general-1` (no label).
+- Unchanged failures: `general-0`, `general-2`, `def-4`.
+Conclusion: asking an 8B model to judge source relevance is unreliable and hurts a grounded case. `pipeline.py` is left as on `main`.
+Remaining options, none urgent: per-source cutoffs, a reranker that judges relevance outside the generator, or accepting these four cases as known limits. QLoRA is still not justified.
