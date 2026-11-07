@@ -26,3 +26,10 @@ M5 introduces autonomous agents that propose security-testing plans. The LLM is 
 - **In-memory checkpoints only:** Rejected for CLI; prevents pausing and resuming across terminal sessions or script invocations.
 - **PostgreSQL audit table in M5:** Deferred; file-based JSON Lines with hash chaining satisfies M5 requirements at $0 cost and zero Docker/DB dependencies until M6.
 - **Relying on logging_setup for redaction:** Rejected; `logging_setup` has no sanitization pass and `Settings.redacted()` only covers typed settings.
+
+## Addendum (2026-11-07): security review fixes
+- Dry-run ACTIVE stubs (`dry_run_only=True`) deliberately reach the approval step even with `allow_active_testing=False`, so approvals are testable. Real (non-dry-run) active tools stay denied while the switch is off.
+- Approvals and dispatches are claimed once in durable storage (`viper.agents.claims`, SQLite primary key); a concurrent or replayed resume is refused, and an interrupted dispatch is not replayed automatically.
+- `execute` re-validates the whole approval binding (project, thread, action hash, scope revision, expiry) against what is dispatched now; the CLI re-reads the scope file at each enforcement point.
+- `resume` continues the saved plan only and prints the saved action being approved; it takes no plan file.
+- Duplicate or empty action ids are rejected. Any refused approval halts the run. Failed dispatches write `run_failed` and the CLI exits non-zero.

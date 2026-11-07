@@ -170,6 +170,46 @@ def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_agent(settings: Settings, args: argparse.Namespace) -> int:
+    from viper.agents import runner
+
+    scope_path = Path(args.scope)
+    try:
+        if args.agent_cmd == "run":
+            actions = runner.load_plan(Path(args.plan))
+            out = runner.run(settings, scope_path, actions, args.request, args.thread)
+        else:
+            # Show exactly what is being decided, read from the saved checkpoint.
+            for p in runner.pending_details(settings, scope_path, args.thread):
+                act = p.get("action") or {}
+                print(f"{args.decision} -> action {p['action_id']}: tool={act.get('tool_name')} "
+                      f"args={json.dumps(act.get('args'), sort_keys=True)} "
+                      f"hash={p['action_hash'][:12]} expires={p['expires_at']}")
+            out = runner.resume(settings, scope_path, args.thread, args.decision)
+    except Exception as exc:  # noqa: BLE001 - report class only; never echo details
+        print(f"agent error: {type(exc).__name__}")
+        return 1
+    if out.get("__interrupt__"):
+        print("PAUSED: approval needed. Resume with: "
+              f"viper agent resume --scope <file> --thread {args.thread} --decision ALLOW|DENY")
+        return 0
+    print(out.get("report", out.get("status", "")))
+    return 1 if out.get("status") == "FAILED" else 0
+
+
+def cmd_audit(settings: Settings, args: argparse.Namespace) -> int:
+    from viper.agents.audit import verify
+
+    path = settings.audit_dir / f"{args.project}.jsonl"
+    try:
+        broken = verify(path)
+    except Exception as exc:  # noqa: BLE001
+        print(f"audit error: {type(exc).__name__}")
+        return 1
+    print("audit log OK" if broken is None else f"audit log BROKEN at seq {broken}")
+    return 0 if broken is None else 2
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="viper")
     parser.add_argument("--health", action="store_true", help="print redacted config and exit")
@@ -198,6 +238,21 @@ def main(argv: list[str] | None = None) -> int:
     p_upd.add_argument("--no-promote", action="store_true", help="stage and gate only (dry run)")
     ksub.add_parser("status", help="show the live collection and history")
     ksub.add_parser("rollback", help="point back at the previous collection")
+    p_agent = sub.add_parser("agent", help="dry-run agent with policy and human approvals (M5)")
+    asub = p_agent.add_subparsers(dest="agent_cmd", required=True)
+    for name in ("run", "resume"):
+        p = asub.add_parser(name)
+        p.add_argument("--scope", required=True, help="scope YAML file")
+        p.add_argument("--thread", required=True)
+        if name == "run":
+            p.add_argument("--plan", required=True, help="JSON list of proposed actions (planner stand-in)")
+            p.add_argument("--request", default="")
+        else:
+            p.add_argument("--decision", choices=("ALLOW", "DENY"), required=True)
+    p_audit = sub.add_parser("audit", help="audit log tools")
+    usub = p_audit.add_subparsers(dest="audit_cmd", required=True)
+    p_ver = usub.add_parser("verify", help="check the hash chain of a project log")
+    p_ver.add_argument("--project", required=True)
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -213,6 +268,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_kb(settings, args)
     if args.command == "eval":
         return cmd_eval(settings, args)
+    if args.command == "agent":
+        return cmd_agent(settings, args)
+    if args.command == "audit":
+        return cmd_audit(settings, args)
     if args.command == "chat":
         return cmd_ask(settings, args.question)
     parser.print_help()

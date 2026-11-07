@@ -117,3 +117,15 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
 - Three flipped expectations in `answers_v2.jsonl` (SQL injection, XSS acronym, XSS definition) await human review.
 - Open choices: OWASP edition 2025 (vs 2021), ATT&CK size cap 70 MB (plan said ~60 MB).
 - GitHub CI has not been confirmed on PR #9.
+
+## M3e close-out and M5 (2026-11-07)
+- **M3 done.** Full v2 answer eval on Colab T4 at `min_score` 0.70: **58/62 (93.5%)**, 0% invalid citations (was 51/62 at 0.65).
+  Remaining failures: `general-2` (known cutoff regression, ADR 0007) and `general-0`, `def-2`, `def-4` (missing "unverified" label: a prompt problem).
+  Report: `eval/results/v2-colab-t4-full-minscore-0-70-2026-11-07.json`. CI on PR #9: green (7 passed, 1 skipped).
+- **M4 gate decided: do not train.** See `docs/plans/m4-qlora-gate.md`; fix labelling with prompting and re-measure on Colab first.
+- **M5 built (dry-run only, no live targets), branch `m5/build`:** pure deny-by-default policy engine (`viper.policy`), single-use expiring
+  action-bound approvals, tool registry with dry-run stubs (`viper.tools`), sanitized hash-chained audit log (`viper.agents.audit`),
+  LangGraph graph with interrupt/resume and a second policy check before dispatch (`viper.agents.graph`), SQLite checkpoints.
+  CLI: `viper agent run|resume --scope scope.yaml --plan plan.json --thread T`, `viper audit verify --project P`.
+  Decisions: SQLite checkpoints, OS-user approver, YAML scope, approval for ACTIVE only, audit log in `data/audit/`. 247 tests pass.
+  Not done: an LLM-backed planner (a JSON plan file stands in), CLI repair command for a damaged audit log, external anchoring of the audit head (M6).
