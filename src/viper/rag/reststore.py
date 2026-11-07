@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -64,11 +65,20 @@ def _make_client(url: str, key: SecretStr | str) -> httpx.Client:
     )
 
 
-def _send(client: httpx.Client, method: str, path: str, **kw: Any) -> httpx.Response:
-    try:
-        resp = client.request(method, path, **kw)
-    except httpx.HTTPError:
-        raise RuntimeError("could not reach Supabase") from None  # never echo request details
+def _send(
+    client: httpx.Client, method: str, path: str, *, retries: int = 0, **kw: Any
+) -> httpx.Response:
+    """One request. ``retries`` is only for idempotent calls (upsert, reads, scoped delete)."""
+    for attempt in range(retries + 1):
+        try:
+            resp = client.request(method, path, **kw)
+            break
+        except httpx.HTTPError as exc:
+            if attempt < retries:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            # Class name only: request details and headers (the key) must never be echoed.
+            raise RuntimeError(f"could not reach Supabase ({type(exc).__name__})") from None
     if resp.status_code >= 400:
         try:
             body = resp.json()
@@ -110,7 +120,7 @@ class RestVectorStore:
         return self.count() > 0
 
     def drop(self) -> None:
-        _send(self._client, "DELETE", "/kb_docs", params=self._scope(),
+        _send(self._client, "DELETE", "/kb_docs", retries=2, params=self._scope(),
               headers={"Prefer": "return=minimal"})
 
     def upsert(self, docs: list[Document], vectors: list[list[float]]) -> None:
@@ -122,8 +132,9 @@ class RestVectorStore:
         def flush() -> None:
             nonlocal batch, size
             if batch:
-                _send(self._client, "POST", "/kb_docs", params={"on_conflict": "collection,id"},
-                      json=batch, headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+                _send(self._client, "POST", "/kb_docs", retries=3,
+                      params={"on_conflict": "collection,id"}, json=batch,
+                      headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
             batch, size = [], 0
 
         for d, v in zip(docs, vectors, strict=True):

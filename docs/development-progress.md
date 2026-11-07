@@ -67,8 +67,22 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
   RLS on with no policies, no ANN index. Selected with `VIPER_STORE=pgvector` + `VIPER_DATABASE_URL`
   (`rag/backend.py` is the only place that chooses the backend).
 
+### Live verification (2026-11-06)
+- **Supabase over HTTPS** (`VIPER_STORE=supabase`, `rag/reststore.py`): reads `SUPABASE_URL` and `SUPABASE_SECRET_KEY`
+  from `.env`; setup SQL is `db/migrations/0001_kb.sql` + `0002_kb_rest.sql`, run once in the SQL editor.
+  18/18 live checks passed (round trip, exact search score 1.0, bootstrap/promote/rollback, history, invalid names
+  refused) and the publishable key got HTTP 401 on every read, insert and function call.
+- **Real knowledge base in Supabase**: 2,515 records (KEV 1,769, ATT&CK 706, OWASP 40), staged recall@4 0.99,
+  promoted, rolled back and re-promoted. Chat answers served from Supabase: `What is T1059.001?` returns the exact
+  record (score 1.00); `What is SQL injection?` is now grounded in OWASP A05:2025 (a known M2 failure). `--health`
+  masks the secret key.
+- **Local Qdrant**: live ATT&CK + OWASP dry run passed gates (recall@4 0.99 vs 0.99); the staged collection was not promoted.
+- Found by the live run, not by tests: Supabase resets the connection on ~800 KB request bodies, so upserts are batched
+  by payload size (<= ~200 KB) and retried.
+
 ### Not done / not verified
-- Nothing has run against a real Supabase project (migration, promote/rollback, RLS blocks the anon key).
-- Live `kb update` with ATT&CK + OWASP, dataset v2 rebuild from the live index, and `min_score` recalibration need Ollama.
+- The direct-Postgres store (`VIPER_STORE=pgvector`) has still never run against a real database.
+- Dataset v2 rebuild from the live index and `min_score` recalibration are pending (`eval build`, then `calibrate`).
 - Three flipped expectations in `answers_v2.jsonl` (SQL injection, XSS acronym, XSS definition) await human review.
-- GitHub CI has not run on these branches. Nothing is pushed.
+- Open choices: OWASP edition 2025 (vs 2021), ATT&CK size cap 70 MB (plan said ~60 MB).
+- GitHub CI has not been confirmed on PR #9.

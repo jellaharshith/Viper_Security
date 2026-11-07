@@ -121,6 +121,27 @@ def test_errors_never_leak_the_key_or_request_details() -> None:
     assert exc2.value.status == 401
 
 
+def test_upsert_retries_transient_errors_and_reports_only_the_class(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("viper.rag.reststore.time.sleep", lambda s: None)
+    calls = {"n": 0}
+
+    def flaky(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise httpx.ReadError("reset", request=req)
+        return httpx.Response(201)
+
+    RestVectorStore("", "", "kb_v1", client=_client(flaky)).upsert([_doc(1)], [VEC])
+    assert calls["n"] == 3
+
+    def dead(req: httpx.Request) -> httpx.Response:
+        raise httpx.ReadError(f"secret {SECRET}", request=req)
+
+    with pytest.raises(RuntimeError, match=r"\(ReadError\)") as exc:
+        RestVectorStore("", "", "kb_v1", client=_client(dead)).upsert([_doc(1)], [VEC])
+    assert SECRET not in str(exc.value)
+
+
 def test_client_requires_https_supabase_host_and_a_key() -> None:
     with pytest.raises(ValueError):
         _make_client("http://p.supabase.co", SECRET)
