@@ -28,15 +28,10 @@ _NOT_IN_ATTACK = (
     "sub-techniques only; revoked or deprecated ones are excluded). Check attack.mitre.org."
 )
 
-NOT_IN_SOURCES = "NOT_IN_SOURCES"
-
 SYSTEM_GROUNDED = (
     "You are a cybersecurity assistant for authorized security work. Answer ONLY using the "
-    "numbered sources provided, and use a source only if it directly answers the question; "
-    "being on a related topic is not enough. Cite each claim with its source number like [1]. "
-    f"If no source directly answers the question, begin your reply with the exact word "
-    f"{NOT_IN_SOURCES} and then answer briefly from general knowledge without citing anything. "
-    "Never invent CVE details, versions, or sources."
+    "numbered sources provided. Cite each claim with its source number like [1]. If the sources "
+    "do not contain the answer, say so. Never invent CVE details, versions, or sources."
 )
 SYSTEM_UNGROUNDED = (
     "You are a cybersecurity assistant for authorized security work. No reference sources are "
@@ -143,10 +138,6 @@ def answer(
     prompt = f"Sources:\n{_format_sources(hits)}\n{note}\nQuestion: {question}"
     text = llm.chat([{"role": "system", "content": SYSTEM_GROUNDED},
                      {"role": "user", "content": prompt}])
-    if not named and text.lstrip().startswith(NOT_IN_SOURCES):
-        # The model judged the retrieved sources off-topic; show the answer as model memory.
-        body = text.lstrip()[len(NOT_IN_SOURCES):].lstrip(" :,-.\n")
-        return Answer(text=UNVERIFIED_PREFIX + body, grounded=False)
     invalid = check_citations(text, len(hits))
     if not named and not cited_numbers(text) - set(invalid):
         # Semantic hits only prove topical similarity, not that the model used them. If the answer

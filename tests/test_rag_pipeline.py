@@ -189,28 +189,3 @@ def test_mixed_cve_and_attack_ids_use_only_named_records_and_note_missing() -> N
     assert {h.document.id for h in a.sources} == {"cisa-kev:CVE-2021-44228", "attack:T1059"}
     assert "T9999 is NOT in the MITRE ATT&CK" in llm.calls[0][1]["content"]
     assert a.grounded
-
-
-def test_model_can_declare_sources_irrelevant_and_answer_is_unverified(store: VectorStore) -> None:
-    from viper.rag.pipeline import NOT_IN_SOURCES, is_unverified
-
-    llm = FakeLLM(f"{NOT_IN_SOURCES} A buffer overflow writes past a buffer's end.")
-    a = answer("Acme Widget remote code execution", FakeEmbedder(), store, llm, min_score=0.3)
-    assert not a.grounded and is_unverified(a.text) and a.sources == []
-    assert NOT_IN_SOURCES not in a.text and "buffer overflow writes" in a.text
-
-
-def test_not_in_sources_marker_is_ignored_for_named_records() -> None:
-    from viper.rag.pipeline import NOT_IN_SOURCES
-
-    s = VectorStore(None, "kb_named")
-    ingest([Document("cisa-kev:CVE-2021-44228", "Log4j RCE", "CISA KEV", "https://x", "Log4Shell")],
-           FakeEmbedder(), s)
-    a = answer("Tell me about CVE-2021-44228", FakeEmbedder(), s, FakeLLM(f"{NOT_IN_SOURCES} x"))
-    assert a.grounded  # a named record is the answer by construction
-
-
-def test_grounded_prompt_asks_for_the_marker() -> None:
-    from viper.rag.pipeline import NOT_IN_SOURCES, SYSTEM_GROUNDED
-
-    assert NOT_IN_SOURCES in SYSTEM_GROUNDED and "directly" in SYSTEM_GROUNDED
