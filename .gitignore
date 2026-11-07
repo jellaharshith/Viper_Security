@@ -13,3 +13,4 @@ data/
 qdrant_data/
 models/
 *.gguf
+.crew/
