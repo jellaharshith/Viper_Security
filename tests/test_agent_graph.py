@@ -96,35 +96,35 @@ def test_human_deny_blocks_execution(tmp_path):
     graph, _, deps = make(tmp_path, [ACTIVE])
     cfg, _ = run(graph)
     final = answer(graph, cfg, decision="DENY")
-    assert final["results"] == [] and "approval_denied" in events(deps.audit.path)
+    assert final.get("results", []) == [] and "approval_denied" in events(deps.audit.path)
 
 
 def test_tampered_action_hash_blocks_execution(tmp_path):
     graph, _, _ = make(tmp_path, [ACTIVE])
     cfg, _ = run(graph)
     final = answer(graph, cfg, action_hash=action_hash(PASSIVE, default_registry.get_info("plan_scan")))
-    assert final["results"] == []
+    assert final.get("results", []) == []
 
 
 def test_expired_approval_blocks_execution(tmp_path):
     graph, holder, _ = make(tmp_path, [ACTIVE])
     cfg, _ = run(graph)
     holder["now"] = NOW + timedelta(hours=1)
-    assert answer(graph, cfg)["results"] == []
+    assert answer(graph, cfg).get("results", []) == []
 
 
 def test_scope_change_during_pause_blocks_execution(tmp_path):
     graph, holder, _ = make(tmp_path, [ACTIVE])
     cfg, _ = run(graph)
     holder["scope"] = Scope(project_id="p1", in_scope=("other.com",))
-    assert answer(graph, cfg)["results"] == []
+    assert answer(graph, cfg).get("results", []) == []
 
 
 def test_missing_or_garbage_answer_grants_nothing(tmp_path):
     graph, _, _ = make(tmp_path, [ACTIVE])
     cfg, _ = run(graph)
     final = graph.invoke(Command(resume=[{"bogus": 1}]), cfg)
-    assert final["results"] == []
+    assert final.get("results", []) == []
 
 
 def test_audit_failure_fails_closed(tmp_path):
@@ -138,3 +138,60 @@ def test_invalid_args_are_denied_not_crashed(tmp_path):
     graph, _, _ = make(tmp_path, [BADARGS, PASSIVE])
     _, out = run(graph)
     assert out["decisions"]["b"]["type"] == "DENY" and len(out["results"]) == 1
+
+
+def test_duplicate_action_ids_fail_closed(tmp_path):
+    graph, _, _ = make(tmp_path, [ACTIVE, ACTIVE])
+    with pytest.raises(ValueError):
+        run(graph)
+
+
+def test_approval_expiring_before_dispatch_blocks(tmp_path):
+    graph, holder, deps = make(tmp_path, [ACTIVE])
+    cfg, _ = run(graph)
+    orig = deps.now
+    calls = {"n": 0}
+
+    def clock():
+        calls["n"] += 1
+        return NOW + timedelta(hours=2) if calls["n"] > 1 else orig()
+
+    deps.now = clock
+    out = answer(graph, cfg)
+    assert out.get("results", []) == []
+
+
+def test_concurrent_resume_cannot_double_execute(tmp_path):
+    import threading
+
+    graph, _, deps = make(tmp_path, [ACTIVE])
+    cfg, _ = run(graph)
+    snap = graph.get_state(cfg)
+    pend = snap.tasks[0].interrupts[0].value["pending"][0]
+    item = {"pending_approval_id": pend["id"], "decision": "ALLOW", "approver": "a",
+            "action_hash": pend["action_hash"], "timestamp": NOW.isoformat()}
+    outs = []
+
+    def go():
+        try:
+            outs.append(graph.invoke(Command(resume=[item]), cfg))
+        except Exception as exc:  # noqa: BLE001
+            outs.append(exc)
+
+    ts = [threading.Thread(target=go) for _ in range(2)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    dispatches = [e for e in events(deps.audit.path) if e == "tool_dry_run"]
+    assert len(dispatches) <= 1
+
+
+def test_stub_failure_records_run_failed_and_status(tmp_path, monkeypatch):
+    from viper.execution import executor as ex
+
+    def boom(self, action):
+        raise RuntimeError("stub exploded")
+
+    monkeypatch.setattr(ex.DryRunExecutor, "run", boom)
+    graph, _, deps = make(tmp_path, [PASSIVE])
+    _, out = run(graph)
+    assert out["status"] == "FAILED" and "run_failed" in events(deps.audit.path)
