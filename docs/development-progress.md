@@ -66,6 +66,11 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
 - **M3d** (`rag/pgstore.py`, `db/migrations/0001_kb.sql`, ADR 0006): pgvector store and transactional registry,
   RLS on with no policies, no ANN index. Selected with `VIPER_STORE=pgvector` + `VIPER_DATABASE_URL`
   (`rag/backend.py` is the only place that chooses the backend).
+- **M3e** (`eval/retrieval.py`, ADR 0007): `min_score` 0.65 -> **0.70**, calibrated on realistic top-1 scores from the live
+  index (grounded 0.763-0.887, off-domain max 0.612, adjacent definitions up to 0.822). `def-3` (MFA) and `def-13` (password
+  manager) flipped to grounded; `answers_v2.jsonl` hash changed, so `eval compare` against older reports warns (expected).
+  Known limits: `general-2` (XSS acronym, 0.698) regresses below the cutoff; `nat-4` (Citrix Bleed) stays a miss because the
+  KEV text never says "Bleed" and the record ranks 5th (0.751) at top_k=4; an external alias table is a future task.
 
 ### Live verification (2026-11-06)
 - **Supabase over HTTPS** (`VIPER_STORE=supabase`, `rag/reststore.py`): reads `SUPABASE_URL` and `SUPABASE_SECRET_KEY`
@@ -100,10 +105,15 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
   - `nat-4` (Citrix Bleed, new in v2) answered "not in the sources" and cited none: a retrieval miss to investigate.
   - Flipped expectations `def-12` and `def-xss` (SQL injection, XSS) need human review, as do the safety cases.
 
+- **M3e retrieval-only re-run at `min_score = 0.70` (2026-11-07, live Supabase, Ollama nomic-embed-text, dataset v2)**:
+  recall@4 **0.948** (unchanged: `min_score` does not affect retrieval metrics), CISA KEV recall@4 **0.99**, ATT&CK 0.941,
+  OWASP 0.975. Report: `eval/results/m3e-minscore-0-70-retrieval-only-2026-11-07.json`. Invalid citations are **not
+  measured** here (`--skip-llm`); the last measured value is 0% from the Colab run at 0.65. A full answer run at 0.70 is
+  still needed to confirm the predicted ~53-54/62.
+
 ### Not done / not verified
 - The direct-Postgres store (`VIPER_STORE=pgvector`) has still never run against a real database.
-- `min_score` recalibration on realistic questions (the definition cases above show 0.65 is now too permissive), and a human
-  decision on which definition expectations should flip, are pending.
+- A full LLM answer run at `min_score = 0.70` (only retrieval-only was re-run); `def-5` flip proposed, awaiting a decision.
 - Three flipped expectations in `answers_v2.jsonl` (SQL injection, XSS acronym, XSS definition) await human review.
 - Open choices: OWASP edition 2025 (vs 2021), ATT&CK size cap 70 MB (plan said ~60 MB).
 - GitHub CI has not been confirmed on PR #9.
