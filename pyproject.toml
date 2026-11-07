@@ -17,6 +17,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.ruff]
+extend-exclude = ["notebooks"]  # Colab notebooks use shell magics
 line-length = 110
 src = ["src", "tests"]
 
