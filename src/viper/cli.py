@@ -173,22 +173,28 @@ def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
 def cmd_agent(settings: Settings, args: argparse.Namespace) -> int:
     from viper.agents import runner
 
-    scope = runner.load_scope(Path(args.scope))
-    actions = runner.load_plan(Path(args.plan))
+    scope_path = Path(args.scope)
     try:
         if args.agent_cmd == "run":
-            out = runner.run(settings, scope, actions, args.request, args.thread)
+            actions = runner.load_plan(Path(args.plan))
+            out = runner.run(settings, scope_path, actions, args.request, args.thread)
         else:
-            out = runner.resume(settings, scope, actions, args.thread, args.decision)
+            # Show exactly what is being decided, read from the saved checkpoint.
+            for p in runner.pending_details(settings, scope_path, args.thread):
+                act = p.get("action") or {}
+                print(f"{args.decision} -> action {p['action_id']}: tool={act.get('tool_name')} "
+                      f"args={json.dumps(act.get('args'), sort_keys=True)} "
+                      f"hash={p['action_hash'][:12]} expires={p['expires_at']}")
+            out = runner.resume(settings, scope_path, args.thread, args.decision)
     except Exception as exc:  # noqa: BLE001 - report class only; never echo details
         print(f"agent error: {type(exc).__name__}")
         return 1
     if out.get("__interrupt__"):
         print("PAUSED: approval needed. Resume with: "
-              f"viper agent resume --thread {args.thread} --decision ALLOW|DENY (plus --scope/--plan)")
+              f"viper agent resume --scope <file> --thread {args.thread} --decision ALLOW|DENY")
         return 0
     print(out.get("report", out.get("status", "")))
-    return 0
+    return 1 if out.get("status") == "FAILED" else 0
 
 
 def cmd_audit(settings: Settings, args: argparse.Namespace) -> int:
@@ -237,9 +243,9 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("run", "resume"):
         p = asub.add_parser(name)
         p.add_argument("--scope", required=True, help="scope YAML file")
-        p.add_argument("--plan", required=True, help="JSON list of proposed actions (planner stand-in)")
         p.add_argument("--thread", required=True)
         if name == "run":
+            p.add_argument("--plan", required=True, help="JSON list of proposed actions (planner stand-in)")
             p.add_argument("--request", default="")
         else:
             p.add_argument("--decision", choices=("ALLOW", "DENY"), required=True)

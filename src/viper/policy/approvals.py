@@ -60,6 +60,22 @@ def make_pending(
     )
 
 
+def revalidate(
+    pending: PendingApproval, action: Action, tool: ToolInfo, *, now: datetime,
+    project_id: str, thread_id: str, scope_revision: str,
+) -> str | None:
+    """Re-check a consumed approval against what is about to be dispatched. None = still valid."""
+    if pending.project_id != project_id or pending.thread_id != thread_id:
+        return "approval belongs to another project or thread"
+    if pending.action_id != action.action_id or pending.action_hash != action_hash(action, tool):
+        return "action changed since approval"
+    if pending.scope_revision != scope_revision:
+        return "scope changed since approval"
+    if now >= pending.expires_at:
+        return "approval expired before dispatch"
+    return None
+
+
 def consume(
     pending: PendingApproval, payload: ResumePayload, *, now: datetime,
     thread_id: str, scope_revision: str,

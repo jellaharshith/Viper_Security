@@ -17,9 +17,17 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
 from viper.agents.audit import AuditError, AuditLog
+from viper.agents.claims import ClaimStore, MemoryClaims
 from viper.config import Settings
 from viper.execution.executor import DryRunExecutor
-from viper.policy.approvals import PendingApproval, ResumePayload, action_hash, consume, make_pending
+from viper.policy.approvals import (
+    PendingApproval,
+    ResumePayload,
+    action_hash,
+    consume,
+    make_pending,
+    revalidate,
+)
 from viper.policy.engine import evaluate
 from viper.policy.models import Action, Decision, DecisionType, Scope
 from viper.tools.registry import ToolRegistry, default_registry
@@ -48,8 +56,13 @@ class Deps:
     scope_provider: Callable[[], Scope | None]
     audit: AuditLog
     registry: ToolRegistry = field(default_factory=lambda: default_registry)
+    claims: ClaimStore = field(default_factory=MemoryClaims)
     now: Callable[[], datetime] = lambda: datetime.now(UTC)
     approval_ttl: timedelta = timedelta(minutes=15)
+
+
+def _deny(action: Action, reason: str) -> Decision:
+    return Decision(action_id=action.action_id, type=DecisionType.DENY, reason=reason)
 
 
 def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledStateGraph[Any, Any, Any, Any]:
@@ -61,8 +74,7 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
             try:
                 tool.validate_args(action.args)
             except (ValueError, TypeError):
-                return Decision(action_id=action.action_id, type=DecisionType.DENY,
-                                reason="arguments rejected by tool schema")
+                return _deny(action, "arguments rejected by tool schema")
         info = deps.registry.get_info(action.tool_name)
         return evaluate(action, info, deps.scope_provider(), deps.settings)
 
@@ -71,6 +83,9 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
 
     def plan(state: AgentState) -> dict[str, Any]:
         actions = deps.planner(state["request"])  # untrusted proposals
+        ids = [a.action_id for a in actions]
+        if any(not i.strip() for i in ids) or len(set(ids)) != len(ids):
+            raise ValueError("plan has empty or duplicate action ids")  # fail closed
         audit(state, "plan_proposed", "agent", detail={"count": len(actions)})
         return {"actions": [a.model_dump(mode="json") for a in actions], "status": "DRAFT_PLAN"}
 
@@ -115,6 +130,7 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         scope = deps.scope_provider()
         decisions = dict(state["decisions"])
         updated = dict(state["pending"])
+        rejected = False
         for pid, raw in waiting.items():
             record = PendingApproval.model_validate(raw)
             payload = by_id.get(pid)
@@ -123,6 +139,8 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                 new, reason = record, "no human decision received"
             elif scope is None:
                 new, reason = record, "no scope loaded"
+            elif not deps.claims.claim(f"approval:{state['thread_id']}:{pid}"):
+                new, reason = record, "approval already claimed"  # concurrent or replayed resume
             else:
                 new, reason = consume(record, payload, now=deps.now(), thread_id=state["thread_id"],
                                       scope_revision=scope.revision)
@@ -132,42 +150,65 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                       detail={"pending_approval_id": pid, "approver": payload.approver})
                 audit(state, "approval_consumed", "policy", detail={"pending_approval_id": pid})
             else:
+                rejected = True
                 event = "approval_expired" if reason == "approval expired" else "approval_denied"
                 audit(state, event, "human" if payload else "policy",
                       detail={"pending_approval_id": pid, "reason": reason})
                 d = decisions[record.action_id]
                 decisions[record.action_id] = {**d, "type": "DENY", "reason": reason}
-        return {"pending": updated, "decisions": decisions, "status": "RUNNING"}
+        # Any refused approval halts the whole run: nothing executes after a human "no".
+        return {"pending": updated, "decisions": decisions,
+                "status": "REJECTED" if rejected else "RUNNING"}
+
+    def route_after_approval(state: AgentState) -> str:
+        return "report" if state.get("status") == "REJECTED" else "execute"
 
     def execute(state: AgentState) -> dict[str, Any]:
         results: list[dict[str, Any]] = []
-        approved = {
-            PendingApproval.model_validate(v).action_id
-            for v in state.get("pending", {}).values()
-            if v["consumed"] and state["decisions"][v["action_id"]]["type"] != "DENY"
-        }
+        scope = deps.scope_provider()
+        approvals = {PendingApproval.model_validate(v).action_id: PendingApproval.model_validate(v)
+                     for v in state.get("pending", {}).values() if v["consumed"]}
+        decisions = dict(state["decisions"])
         for raw in state["actions"]:
             action = Action.model_validate(raw)
-            if state["decisions"][action.action_id]["type"] == "DENY":
+            if decisions[action.action_id]["type"] == "DENY":
                 continue
             current = decide(action)  # second enforcement point: current scope and settings
-            allowed = current.type is DecisionType.ALLOW or (
-                current.type is DecisionType.REQUIRE_APPROVAL and action.action_id in approved
-            )
             info = deps.registry.get_info(action.tool_name)
             ahash = action_hash(action, info) if info else None
-            if not allowed:
+            reason: str | None = None
+            if current.type is DecisionType.DENY:
+                reason = current.reason
+            elif current.type is DecisionType.REQUIRE_APPROVAL:
+                record = approvals.get(action.action_id)
+                if record is None or info is None or scope is None:
+                    reason = "approval missing at dispatch"
+                else:  # the whole binding must still hold for what is dispatched right now
+                    reason = revalidate(record, action, info, now=deps.now(),
+                                        project_id=state["project_id"], thread_id=state["thread_id"],
+                                        scope_revision=scope.revision)
+            if reason is None and not deps.claims.claim(f"dispatch:{state['thread_id']}:{action.action_id}"):
+                reason = "dispatch already claimed; refusing to replay"
+            if reason is not None:
+                decisions[action.action_id] = _deny(action, reason).model_dump(mode="json")
                 audit(state, "policy_decision", "policy", action_hash=ahash, decision="DENY",
-                      detail={"action_id": action.action_id, "reason": current.reason})
+                      detail={"action_id": action.action_id, "reason": reason})
                 continue
             try:  # audit first: no committed evidence, no dispatch
                 audit(state, "tool_dry_run", "agent", action_hash=ahash,
                       detail={"action_id": action.action_id, "tool": action.tool_name})
+                results.append(executor.run(action).model_dump(mode="json"))
             except AuditError:
-                return {"status": "FAILED", "results": results}
-            results.append(executor.run(action).model_dump(mode="json"))
+                return {"status": "FAILED", "results": results, "decisions": decisions}
+            except Exception as exc:  # noqa: BLE001 - record the class only, then stop the run
+                try:
+                    audit(state, "run_failed", "agent",
+                          detail={"action_id": action.action_id, "error": type(exc).__name__})
+                except AuditError:
+                    pass
+                return {"status": "FAILED", "results": results, "decisions": decisions}
         audit(state, "run_completed", "agent", detail={"count": len(results)})
-        return {"results": results, "status": "COMPLETED"}
+        return {"results": results, "decisions": decisions, "status": "COMPLETED"}
 
     def report(state: AgentState) -> dict[str, Any]:
         denied = [k for k, v in state.get("decisions", {}).items() if v["type"] == "DENY"]
@@ -184,7 +225,7 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
     g.add_edge(START, "plan")
     g.add_edge("plan", "policy_gate")
     g.add_conditional_edges("policy_gate", route_after_gate, ["approval", "execute"])
-    g.add_edge("approval", "execute")
+    g.add_conditional_edges("approval", route_after_approval, ["execute", "report"])
     g.add_edge("execute", "report")
     g.add_edge("report", END)
     return g.compile(checkpointer=checkpointer)

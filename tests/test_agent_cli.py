@@ -24,9 +24,10 @@ def files(tmp_path, monkeypatch):
 
 
 def test_run_pause_resume_verify(files, capsys, tmp_path):
+    resume_args = [files[0], files[1], files[4], files[5]]
     assert cli.main(["agent", "run", *files]) == 0
     assert "PAUSED" in capsys.readouterr().out
-    assert cli.main(["agent", "resume", *files, "--decision", "ALLOW"]) == 0
+    assert cli.main(["agent", "resume", *resume_args, "--decision", "ALLOW"]) == 0
     assert "executed=2 denied=1" in capsys.readouterr().out
     assert cli.main(["audit", "verify", "--project", "demo"]) == 0
     assert "OK" in capsys.readouterr().out
@@ -38,12 +39,35 @@ def test_run_pause_resume_verify(files, capsys, tmp_path):
 
 def test_unknown_key_in_scope_is_rejected(files, tmp_path, capsys):
     (tmp_path / "scope.yaml").write_text(SCOPE + "typo_key: 1\n")
-    with pytest.raises(Exception):  # noqa: B017 - strict scope schema rejects unknown keys
-        cli.main(["agent", "run", *files])
+    assert cli.main(["agent", "run", *files]) == 1
+    assert "ValidationError" in capsys.readouterr().out
 
 
-def test_resume_denied_executes_only_safe_action(files, capsys):
+def test_resume_denied_halts_the_whole_run(files, capsys):
+    resume_args = [files[0], files[1], files[4], files[5]]
     cli.main(["agent", "run", *files])
     capsys.readouterr()
-    cli.main(["agent", "resume", *files, "--decision", "DENY"])
-    assert "executed=1" in capsys.readouterr().out
+    cli.main(["agent", "resume", *resume_args, "--decision", "DENY"])
+    assert "status=REJECTED executed=0" in capsys.readouterr().out
+
+
+def test_resume_ignores_a_swapped_plan_and_shows_saved_action(files, capsys, tmp_path):
+    cli.main(["agent", "run", *files])
+    capsys.readouterr()
+    resume_args = [files[0], files[1], files[4], files[5]]
+    cli.main(["agent", "resume", *resume_args, "--decision", "ALLOW"])
+    out = capsys.readouterr().out
+    assert "tool=active_probe_stub" in out and "example.com" in out
+    # there is no --plan option on resume any more
+    with pytest.raises(SystemExit):
+        cli.main(["agent", "resume", *files, "--decision", "ALLOW"])
+
+
+def test_scope_edit_during_pause_blocks_execution(files, capsys, tmp_path):
+    cli.main(["agent", "run", *files])
+    capsys.readouterr()
+    (tmp_path / "scope.yaml").write_text(SCOPE.replace("example.com]", "example.com, extra.test]"))
+    resume_args = [files[0], files[1], files[4], files[5]]
+    cli.main(["agent", "resume", *resume_args, "--decision", "ALLOW"])
+    assert "executed=" in capsys.readouterr().out
+    assert cli.main(["audit", "verify", "--project", "demo"]) == 0
