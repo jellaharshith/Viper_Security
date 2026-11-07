@@ -1,6 +1,8 @@
-# M5 Agent & Policy Engine: Open Design Decisions
+# M5 Agent & Policy Engine: Design Decisions (Approved)
 
-This document presents the 5 open design questions for milestone **M5 (LangGraph agents + deterministic policy engine)**. Each question outlines the context, the available options, our recommended choice, and the associated trade-offs in plain language to guide user decision-making.
+Status: Decided (2026-11-07; User Decision: "go with recommendations")
+
+This document records the 5 core design decisions for milestone **M5 (LangGraph agents + deterministic policy engine)**. Each section outlines the context, available options, trade-offs, and the approved decision.
 
 ---
 
@@ -14,12 +16,12 @@ When the agent encounters an action requiring human authorization, LangGraph pau
 - **Option B: In-memory only (`InMemorySaver`).** Paused thread states exist only in the RAM of the running Python process.
 - **Option C: Flat JSON files per thread.** Paused thread states are dumped as individual JSON files under `data/threads/`.
 
-### Recommendation
-**Option A (`SqliteSaver` for CLI, `InMemorySaver` for unit tests).**
+### Recommendation & Decision
+**Approved: Option A (Local SQLite database `SqliteSaver` for CLI, `InMemorySaver` for unit tests).**
 This enables a true command-line workflow: an operator can start an agent run, pause for human approval, close the terminal or log off, and resume later from another terminal. In-memory checkpoints are retained as the fast, zero-footprint option for automated pytest suites.
 
 ### Trade-offs
-| Consideration | Option A: SQLite (Recommended) | Option B: In-Memory | Option C: Flat JSON Files |
+| Consideration | Option A: SQLite (Approved) | Option B: In-Memory | Option C: Flat JSON Files |
 |---|---|---|---|
 | **CLI Usability** | High: pause in one process, resume in another | Low: requires continuous interactive session | Medium: human-readable files |
 | **Dependencies** | Requires `langgraph-checkpoint-sqlite` | Zero dependencies (`langgraph-checkpoint`) | Zero dependencies |
@@ -38,12 +40,12 @@ When an operator grants or denies an approval checkpoint (`viper agent resume --
 - **Option B: Explicit CLI flag (`--approver <name>`).** The operator supplies a free-form name or email address, with fallback to the OS username if omitted.
 - **Option C: Mandatory interactive confirmation prompt.** The CLI stops and interactively asks: *"Enter your name / operator ID:"*.
 
-### Recommendation
-**Option A (Automatic local OS user).**
+### Recommendation & Decision
+**Approved: Option A (Automatic local OS username via `getpass.getuser()`).**
 Capturing `getpass.getuser()` provides reliable, non-spoofable local metadata with zero operator friction. In M5, this is audit metadata, not cryptographically verified authentication. Operators can optionally pass an optional `--reason` or `--ticket` flag to document organizational change-ticket references.
 
 ### Trade-offs
-| Consideration | Option A: OS User (Recommended) | Option B: CLI Flag | Option C: Interactive Prompt |
+| Consideration | Option A: OS User (Approved) | Option B: CLI Flag | Option C: Interactive Prompt |
 |---|---|---|---|
 | **Operator Friction** | Zero: command runs immediately | Low: optional flag | High: pauses every CLI resume |
 | **Shared Machines** | Shows workstation account (e.g. `secops`) | Allows individual names | Allows individual names |
@@ -58,21 +60,21 @@ Capturing `getpass.getuser()` provides reliable, non-spoofable local metadata wi
 Every security testing project requires a defined scope document specifying in-scope targets (hosts, domains, CIDR ranges), exclusions (which always override inclusions), allowed/forbidden testing techniques, rate limits, and permission evidence. The policy engine evaluates proposed actions against this document.
 
 ### Options
-- **Option A (Recommended): YAML file per project (`projects/{project_id}/scope.yaml`).** Strict Pydantic schema validation with inline comments enabled.
+- **Option A (Recommended): YAML file per project (`projects/{project_id}/scope.yaml`).** Strict Pydantic schema validation rejecting unknown keys, with inline comments enabled.
 - **Option B: JSON file per project (`projects/{project_id}/scope.json`).** Strict schema validation, standard library parser, no comments.
 - **Option C: Command-line flags only (`--in-scope`, `--out-of-scope`).** Scope passed dynamically as CLI arguments on each invocation.
 
-### Recommendation
-**Option A (YAML per project with strict schema).**
-Security scope files are human-authored and benefit greatly from comments explaining *why* specific systems are out of scope (e.g. `# Production payment gateway - testing strictly forbidden by client`). The file is parsed into a Pydantic model and hashed into a canonical JSON SHA-256 digest (`scope_revision`) to detect any mid-engagement scope modifications.
+### Recommendation & Decision
+**Approved: Option A (YAML per project with strict schema rejecting unknown keys).**
+Security scope files are human-authored and benefit greatly from comments explaining *why* specific systems are out of scope (e.g. `# Production payment gateway - testing strictly forbidden by client`). The file is parsed into a strict Pydantic model (rejecting unknown keys to prevent typos from weakening scope) and hashed into a canonical JSON SHA-256 digest (`scope_revision`) to detect any mid-engagement scope modifications.
 
 ### Trade-offs
-| Consideration | Option A: YAML (Recommended) | Option B: JSON | Option C: CLI Flags |
+| Consideration | Option A: YAML (Approved) | Option B: JSON | Option C: CLI Flags |
 |---|---|---|---|
 | **Human Readability** | High: clean syntax, supports comments | Medium: rigid syntax, no comments | Low: unwieldy for multi-domain targets |
-| **Risk of Human Error** | Indentation errors caught by validator | Missing comma / quote errors | Easy to omit exclusions on command line |
+| **Risk of Human Error** | Unknown keys rejected by Pydantic validator | Missing comma / quote errors | Easy to omit exclusions on command line |
 | **Integrity & Hashing** | Converted to canonical JSON for hashing | Directly hashable | Difficult to track revision history |
-| **Dependencies** | Requires PyYAML (already standard in Python) | Standard library only | None |
+| **Dependencies** | Requires PyYAML (standard in Python environments) | Standard library only | None |
 
 ---
 
@@ -90,12 +92,12 @@ The policy engine categorizes actions into four risk tiers:
 - **Option B: Require human approval for both `PASSIVE` and `ACTIVE` actions.** Only local `READ` actions are automated.
 - **Option C: Configurable threshold per project scope (`approval_level: PASSIVE | ACTIVE`).**
 
-### Recommendation
-**Option A (Approval required for `ACTIVE` actions only).**
-Auto-allowing `READ` and verified in-scope `PASSIVE` actions allows the agent to formulate plans and perform dry-run feasibility checks without human interruption. Human review is reserved for the point of consequence (when an active action is about to be staged). In M5, active actions are denied by default (`allow_active_testing=False`), and approval mechanics are exercised safely using approval-required test stubs.
+### Recommendation & Decision
+**Approved: Option A (Approval required for `ACTIVE` actions only; `PASSIVE` needs no approval).**
+Auto-allowing `READ` and verified in-scope `PASSIVE` actions allows the agent to formulate plans and perform dry-run feasibility checks without human interruption. Human review is reserved for the point of consequence (when an active action is staged). In M5, active actions are denied by default (`allow_active_testing=False`), and approval mechanics are exercised safely using approval-required test stubs.
 
 ### Trade-offs
-| Consideration | Option A: ACTIVE Only (Recommended) | Option B: PASSIVE + ACTIVE | Option C: Configurable Threshold |
+| Consideration | Option A: ACTIVE Only (Approved) | Option B: PASSIVE + ACTIVE | Option C: Configurable Threshold |
 |---|---|---|---|
 | **Operator Fatigue** | Low: approval requested only before active actions | High: agent pauses after every basic query | Variable based on configuration |
 | **Agent Autonomy** | High: agent can research and draft complete plans | Minimal: operator must micromanage planning | Configurable |
@@ -114,12 +116,12 @@ All agent decisions, policy gate results, human approvals, and tool executions m
 - **Option B: Inside each project folder (`projects/{project_id}/audit.jsonl`).** Audit log stored alongside project scope and plan files.
 - **Option C: Single global monolithic file (`data/audit.jsonl`).** All events from all projects interleaved into a single log file.
 
-### Recommendation
-**Option A (Centralized `data/audit/{project_id}.jsonl`).**
+### Recommendation & Decision
+**Approved: Option A (Centralized `data/audit/{project_id}.jsonl` with configurable base path, default git-ignored).**
 Per-project files isolate hash chains, preventing lock contention between concurrent projects and ensuring that an issue in one project's chain does not affect another. Keeping them in `data/audit/` ensures runtime telemetry is cleanly separated from tracked repository assets and easily redirected to dedicated secure storage.
 
 ### Trade-offs
-| Consideration | Option A: Central data/audit/ (Recommended) | Option B: In Project Folder | Option C: Global Monolithic File |
+| Consideration | Option A: Central data/audit/ (Approved) | Option B: In Project Folder | Option C: Global Monolithic File |
 |---|---|---|---|
 | **Git Safety** | High: entire `data/` folder is git-ignored | Risk of accidentally committing target logs | High: `data/` is git-ignored |
 | **Chain Isolation** | Each project has an independent hash chain | Each project has an independent chain | Single chain: corruption breaks all projects |
@@ -128,10 +130,10 @@ Per-project files isolate hash chains, preventing lock contention between concur
 
 ---
 
-## Summary of Recommendations
+## Summary of Approved Decisions
 
-1. **Checkpoints:** Local SQLite database (`SqliteSaver`) for persistent CLI pause/resume; in-memory for unit tests.
-2. **Approver Identity:** Local operating system username (`getpass.getuser()`) recorded as non-spoofable audit metadata.
-3. **Scope Format:** YAML file per project with strict Pydantic validation and canonical JSON SHA-256 revision hash.
-4. **Approval Threshold:** Human approval required for `ACTIVE` actions; `READ` and verified in-scope `PASSIVE` actions automated.
-5. **Audit Storage:** Centralized, git-ignored `data/audit/{project_id}.jsonl` with configurable base path.
+1. **Checkpoints:** Local SQLite database (`SqliteSaver` in `data/checkpoints.db`) for persistent CLI pause/resume; in-memory for unit tests.
+2. **Approver Identity:** Local operating system username (`getpass.getuser()`) recorded as non-spoofable audit metadata on the trusted local CLI boundary.
+3. **Scope Format:** YAML file per project (`projects/{project_id}/scope.yaml`) with strict Pydantic validation (rejecting unknown keys) and canonical JSON SHA-256 revision hash.
+4. **Approval Threshold:** Human approval required only for `ACTIVE` actions; `READ` and verified in-scope `PASSIVE` actions execute without approval.
+5. **Audit Storage:** Centralized, git-ignored `data/audit/{project_id}.jsonl` with configurable base path via `Settings.audit_dir`.

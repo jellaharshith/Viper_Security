@@ -1,6 +1,6 @@
 # M5 specification: LangGraph agents + deterministic policy engine
 
-Status: Draft (revised 2026-11-07 after codex-m3 Round 2 review). Docs only. Cost: $0. No live targets.
+Status: Approved Draft (revised 2026-11-07 with user decisions). Docs only. Cost: $0. No live targets.
 Roadmap definition of done: approval checkpoints and an audit log work with no live targets.
 
 ## 1. Scope and runtime contracts
@@ -130,10 +130,10 @@ Graph state strictly separates authoritative inputs from untrusted LLM outputs:
 5. **M5-5:** Approval checkpoint node (`interrupt`/`resume`), `PendingApproval` cryptographic binding, atomic single-use consumption, restart idempotency, and CLI resume handler.
 6. **M5-6:** CLI integration (`viper agent run|resume`, `viper audit verify` in dry-run mode); ADR 0008 marked Accepted.
 
-## 9. Open questions for the user
-Detailed options, recommendations, and trade-offs are documented in `docs/plans/m5-open-questions.md`:
-1. **Checkpoint persistence:** Use `SqliteSaver` in M5 for durable CLI pause/resume across terminal sessions (recommended), or keep in-memory only until M6?
-2. **Approver identity:** Local OS user (`getpass.getuser()`) recorded as audit metadata on the trusted local CLI boundary (recommended; remote auth deferred to M6).
-3. **Scope format:** YAML per project (`projects/{project_id}/scope.yaml`) with strict Pydantic schema and SHA-256 revision hash (recommended) or JSON?
-4. **Approval threshold:** Require approval for `ACTIVE` actions only (recommended; `READ` and in-scope `PASSIVE` auto-allowed), or for both `PASSIVE` and `ACTIVE`?
-5. **Audit file location:** Git-ignored centralized `data/audit/{project_id}.jsonl` with configurable base path in `Settings` (recommended) or per-project folders?
+## 9. Resolved design decisions
+User decisions resolved and approved on 2026-11-07 (full trade-off analysis in `docs/plans/m5-open-questions.md`):
+1. **Checkpoint persistence:** `SqliteSaver` in SQLite (durable storage in `data/checkpoints.db`) for CLI pause/resume across terminal sessions; `InMemorySaver` for automated pytest suites.
+2. **Approver identity:** Local OS username (`getpass.getuser()`) recorded as non-spoofable audit metadata on the trusted local CLI boundary.
+3. **Scope format:** YAML file per project (`projects/{project_id}/scope.yaml`) with strict Pydantic validation rejecting unknown keys, hashed into canonical JSON SHA-256 `scope_revision`.
+4. **Approval threshold:** Human approval required only for `ACTIVE` actions; `READ` and verified in-scope `PASSIVE` dry-run actions execute without approval. Real active execution remains denied by default via `allow_active_testing=False`.
+5. **Audit log storage:** Centralized, git-ignored `data/audit/{project_id}.jsonl` with configurable base path via `Settings.audit_dir`.
