@@ -131,7 +131,9 @@ Graph state strictly separates authoritative inputs from untrusted LLM outputs:
 6. **M5-6:** CLI integration (`viper agent run|resume`, `viper audit verify` in dry-run mode); ADR 0008 marked Accepted.
 
 ## 9. Open questions for the user
+Detailed options, recommendations, and trade-offs are documented in `docs/plans/m5-open-questions.md`:
 1. **Checkpoint persistence:** Use `SqliteSaver` in M5 for durable CLI pause/resume across terminal sessions (recommended), or keep in-memory only until M6?
 2. **Approver identity:** Local OS user (`getpass.getuser()`) recorded as audit metadata on the trusted local CLI boundary (recommended; remote auth deferred to M6).
-3. **Scope format:** YAML per project (`projects/{project_id}/scope.yaml`) with strict Pydantic schema and SHA-256 revision hash.
-4. **Audit file location:** Git-ignored `data/audit/{project_id}.jsonl` with configurable base path in `Settings`.
+3. **Scope format:** YAML per project (`projects/{project_id}/scope.yaml`) with strict Pydantic schema and SHA-256 revision hash (recommended) or JSON?
+4. **Approval threshold:** Require approval for `ACTIVE` actions only (recommended; `READ` and in-scope `PASSIVE` auto-allowed), or for both `PASSIVE` and `ACTIVE`?
+5. **Audit file location:** Git-ignored centralized `data/audit/{project_id}.jsonl` with configurable base path in `Settings` (recommended) or per-project folders?
