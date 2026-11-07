@@ -35,3 +35,6 @@ ADR 0005 deferred recalibration until the index held KEV, ATT&CK and OWASP toget
 - Predicted end-to-end score 53/62 (was 51/62); to be confirmed by a full answer eval.
 - `answers_v2.jsonl` changed, so its dataset hash changed; `eval compare` against older runs warns, as expected.
 - Higher cutoffs (0.72-0.76) were rejected: they trade margin for matching stale expectations.
+
+## Addendum (2026-11-07)
+`def-5` (OWASP Top 10 categories) flipped to grounded: at 0.70 it attaches on-topic OWASP records (top-1 0.728, `owasp-top10:2025:A06:scenarios`). `def-7` and `def-10` stay unverified: their top-1 scores (0.662, 0.664) fall below the cutoff.
