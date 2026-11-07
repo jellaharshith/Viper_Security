@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     kb_min_recall_at_4: float = 0.95  # promotion gate: absolute floor on the frozen retrieval set
     kb_max_shrink: float = 0.10  # reject an update that drops more than this fraction of records
     retrieval_top_k: int = 4
-    min_score: float = 0.65  # below this, no sources are attached (calibrated in M2)
+    min_score: float = 0.70  # below this, no sources are attached (recalibrated in M3e, ADR 0007)
 
     # --- Execution plane: cloud Kali VM (empty until provisioned) ---
     exec_api_url: str = ""
