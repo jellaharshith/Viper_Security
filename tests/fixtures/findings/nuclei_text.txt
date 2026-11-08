@@ -1,0 +1,4 @@
+[2026-11-08 10:05:01] [http-missing-security-headers:x-frame-options] [http] [info] http://scanme.nmap.org/
+[apache-detect] [http] [info] http://scanme.nmap.org/ [Apache/2.4.7 (Ubuntu)]
+[CVE-2017-15715] [http] [high] http://scanme.nmap.org/upload.php
+this line is not a finding
