@@ -26,6 +26,8 @@ from viper.tools.registry import DryRunResult, ToolRegistry, default_registry
 
 # Terminal job states per the SHARED CONTRACT (Exec API v1). "running"/"paused" are not terminal.
 TERMINAL_STATES = frozenset({"done", "killed", "failed"})
+# Hard cap on captured stdout kept in memory/checkpoints; excess is truncated, never an error.
+MAX_OUTPUT_BYTES = 1024 * 1024
 
 
 @runtime_checkable
@@ -98,7 +100,45 @@ class RemoteExecutor:
             raise DispatchAlreadyClaimed(action.action_id)
         job = self._dispatch(action, target)
         state, exit_code = self._poll(str(job["job_id"]))
-        return self._result_for(action, state, exit_code)
+        output = self._fetch_output(str(job["job_id"])) if state == "done" else ""
+        return self._result_for(action, state, exit_code, output)
+
+    def _fetch_output(self, job_id: str) -> str:
+        """Replay the SSE stream of a finished job (same TLS client + bearer auth).
+
+        Returns the ``data:`` payload lines joined by newlines, truncated at
+        ``MAX_OUTPUT_BYTES`` (never raises for size). Any failure to read it raises
+        ``RemoteJobError``: a finished job must not become success-with-missing-output.
+        """
+        lines: list[str] = []
+        size = 0
+        try:
+            with self._get_client().stream(
+                "GET", f"/jobs/{job_id}/stream", headers=self._auth
+            ) as resp:
+                if resp.status_code == 401:
+                    raise RemoteAuthError(f"Exec API rejected the bearer token on stream {job_id}")
+                if resp.status_code != 200:
+                    raise RemoteJobError(f"GET /jobs/{job_id}/stream returned {resp.status_code}")
+                for raw in resp.iter_lines():
+                    if not raw.startswith("data:"):
+                        continue
+                    payload = raw[5:]
+                    if payload.startswith(" "):
+                        payload = payload[1:]
+                    room = MAX_OUTPUT_BYTES - size - (1 if lines else 0)
+                    if room <= 0:
+                        break
+                    encoded = payload.encode()
+                    if len(encoded) > room:
+                        payload = encoded[:room].decode(errors="ignore")
+                        lines.append(payload)
+                        break
+                    size += len(encoded) + (1 if lines else 0)
+                    lines.append(payload)
+        except httpx.HTTPError as exc:
+            raise RemoteJobError(f"stream for job {job_id} failed: {exc.__class__.__name__}") from exc
+        return "\n".join(lines)
 
     def _check_egress(self, target: Any) -> str:
         allow = getattr(self._settings, "exec_egress_allowlist", []) or []
@@ -136,7 +176,9 @@ class RemoteExecutor:
             time.sleep(self._poll_interval)
         raise RemoteJobError(f"job {job_id} did not reach a terminal state in {self._max_polls} polls")
 
-    def _result_for(self, action: Action, state: str, exit_code: int | None) -> DryRunResult:
+    def _result_for(
+        self, action: Action, state: str, exit_code: int | None, output: str = ""
+    ) -> DryRunResult:
         """Map a terminal job ``state`` to the result handed back to ``graph.execute``.
 
         The returned value MUST be a ``registry.DryRunResult`` carrying ``tool``, ``args`` and
@@ -156,4 +198,5 @@ class RemoteExecutor:
             args=dict(action.args),
             summary=f"{action.tool_name} on {target!r} completed: done (exit_code={exit_code})",
             simulated=False,
+            output=output,
         )
