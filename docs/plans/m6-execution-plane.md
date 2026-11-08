@@ -362,7 +362,7 @@ Follow the steps in `docs/plans/m6-gcloud-vm-setup.md`:
 1. Provision spot VM in GCP with `--no-address`.
 2. Start IAP tunnel locally.
 3. Configure `.env` with short-lived token and local cert.
-4. Execute `viper agent run --scope projects/lab-scanme/scope.yaml --plan plans/scanme.json --thread lab1`.
+4. Execute `viper agent run --scope projects/lab-scanme/scope.yaml --plan projects/lab-scanme/plan.json --thread lab1`.
 5. Execute `viper agent resume ... --decision ALLOW`.
 6. Stream scan output with `viper exec watch --thread lab1`.
 7. Verify job cancellation with `viper exec stop --thread lab1`.
