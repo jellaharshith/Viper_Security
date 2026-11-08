@@ -1,8 +1,8 @@
 """Render schema-v1 findings without interpreting tool evidence as Markdown.
 
 The caller enforces asset scope and supplies parser-produced findings. Citations
-resolve only within the requested thread/action; this renderer does not verify
-the audit chain or authenticate the provenance of a Finding.
+resolve only to real tool results within the requested thread/action/tool;
+this renderer does not verify the audit chain or evidence digest itself.
 """
 
 from __future__ import annotations
@@ -13,10 +13,26 @@ from typing import Any
 
 from viper.findings.models import Finding
 
+_DIRECTIONAL = frozenset({0x061C, 0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x2070)})
+
+
+def _visible(text: str) -> str:
+    """Expose control bytes and Unicode direction changes instead of executing them."""
+    parts = []
+    for char in text:
+        code = ord(char)
+        if code < 32 or 127 <= code <= 159:
+            parts.append(f"\\x{code:02x}")
+        elif code in _DIRECTIONAL:
+            parts.append(f"\\u{code:04x}")
+        else:
+            parts.append(char)
+    return "".join(parts)
+
 
 def _plain(text: str) -> str:
-    escaped = html.escape(text, quote=True)
-    return re.sub(r"([\\`*_{}\[\]()#+!|>~])", r"\\\1", escaped).replace("\n", " ").replace("\r", " ")
+    escaped = html.escape(_visible(text), quote=True)
+    return re.sub(r"([\\`*_{}\[\]()#+!|>~])", r"\\\1", escaped)
 
 
 def render_report(
@@ -50,7 +66,11 @@ def render_report(
                 lines += [f"{label}: {_plain(value)}", ""]
             # Indented blocks cannot be terminated by attacker-controlled fences.
             lines += ["Evidence (raw excerpt):", ""]
-            lines += ["    " + html.escape(line) for line in finding.evidence.splitlines()]
+            # Preserve evidence line layout while showing each original LF visibly.
+            evidence_lines = finding.evidence.split("\n")
+            for index, line in enumerate(evidence_lines):
+                suffix = r"\x0a" if index < len(evidence_lines) - 1 else ""
+                lines += ["    " + html.escape(_visible(line) + suffix)]
             lines += ["", "References:", ""]
             lines += [f"- {_plain(ref)}" for ref in finding.references] or ["- None supplied."]
             lines += ["", "Audit citations:", ""]
@@ -59,9 +79,12 @@ def render_report(
                 event = matches[0] if len(matches) == 1 else {}
                 detail = event.get("detail")
                 if (not re.fullmatch(r"[a-f0-9]{64}", ref)
+                        or event.get("event") != "tool_result"
                         or event.get("thread_id") != thread_id
                         or not isinstance(detail, dict)
-                        or detail.get("action_id") != finding.source_action_id):
+                        or detail.get("action_id") != finding.source_action_id
+                        or detail.get("tool") != finding.source_tool
+                        or detail.get("simulated") is not False):
                     lines += [f"- Unresolved audit reference: {_plain(ref)}"]
                     continue
                 number = len(citations) + 1
