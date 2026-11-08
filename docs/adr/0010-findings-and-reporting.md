@@ -64,7 +64,8 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
    - Resolving ADR 0009 deferral, `viper.agents.anchor` implements cryptographic anchoring adapters (mock, RFC 3161 TSA, Sigstore Rekor).
    - **Documented M7 Limitation:** CLI anchoring (`viper audit anchor --project <id>`) is **MOCK ONLY for now**, appending receipts to `data/audit/<project>.anchors.jsonl`.
    - While TSA and Rekor HTTP submission adapters exist, real external receipts remain `UNVERIFIED` during `viper audit verify` because no offline cryptographic verifier (for TSA PKCS#7 or Rekor inclusion proofs) is integrated yet.
-   - `anchor_verdict` evaluates receipts during verification: missing heads return `MISMATCH` (fails verification), while in-chain receipts return `UNVERIFIED` pending an open user trust decision.
+   - `anchor_verdict` evaluates receipts during verification: missing heads return `MISMATCH` (fails verification), tampered mock receipts return `TAMPERED` (fails verification), valid mock receipts return `CONSISTENT_ONLY` (passes verification), verified external receipts return `VERIFIED` (passes verification), and unverified external receipts return `UNVERIFIED` (advisory, does not fail verification).
+   - In addition, reports list refused actions and policy reasons in a sanitized `## Denied actions` section.
 
 ---
 
@@ -74,8 +75,9 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
   - **Zero Hallucinated Confirmations:** Model imagination cannot contaminate the confirmed findings list.
   - **Audit Provenance:** Every reported issue is linked directly to raw execution evidence and immutable audit hashes.
   - **Memory & Storage Safety:** 1 MiB stream ceiling and thread token validation prevent resource exhaustion and file overwrite attacks.
-  - **Offline Safety:** Automated test suite runs 100% offline (353 tests green).
+  - **Offline Safety:** Automated test suite runs 100% offline (364 tests green).
   - **Honest Telemetry:** Separate `tool_executed` vs `tool_dry_run` events ensure compliance reviews can distinguish real network actions from dry-runs.
+  - **Transparent Enforcement:** Refused actions are clearly recorded with policy justification in `## Denied actions`.
 
 - **Trade-offs & Limitations:**
   - **Mock Anchoring Only in CLI:** External TSA and Rekor receipts cannot be verified offline until trusted verifier libraries are added.
@@ -83,15 +85,14 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
 
 ---
 
-## Open design decisions
+## Resolved anchor verdict trust policy
 
-1. **Anchor Verdict Trust Levels (`src/viper/agents/anchor_check.py`):**
-   - Non-matching anchor heads return `("MISMATCH", True)` (verification failure).
-   - In-chain receipts return `("UNVERIFIED", False)` for all other cases.
-   - **Pending User Decision:** Defining the exact trust policy:
-     - Does a valid mock token (`mock + token_ok`) pass verification, or remain a warning?
-     - Does an external token without an offline verifier (`external + not token_ok`) fail verification or stay advisory?
-     - Does an invalid mock token (`mock + not token_ok`) trigger a verification failure?
+1. **Anchor Verdict Matrix (`src/viper/agents/anchor_check.py`):**
+   - Non-matching anchor heads return `("MISMATCH", True)` (verification failure: head missing from local log).
+   - Corrupted mock tokens return `("TAMPERED", True)` (verification failure: token tampered or malformed).
+   - Valid mock tokens return `("CONSISTENT_ONLY", False)` (passes verification, indicating internal consistency only).
+   - Offline-verified external receipts return `("VERIFIED", False)` (passes verification).
+   - Unverified external receipts return `("UNVERIFIED", False)` (non-fatal warning: external receipt without wired verifier).
 
 ---
 
