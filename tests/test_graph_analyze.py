@@ -1,0 +1,142 @@
+"""M7: execute -> analyze -> report. Real parsers + report on fake executor output; offline."""
+
+import hashlib
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
+
+from viper.agents.audit import AuditError, AuditLog
+from viper.agents.graph import Deps, build_graph
+from viper.config import Settings
+from viper.policy.models import Action, Scope
+from viper.tools.registry import DryRunResult, default_registry
+
+FIX = Path(__file__).parent / "fixtures" / "findings"
+NOW = datetime(2026, 1, 1, tzinfo=UTC)
+SCOPE = Scope(project_id="lab", in_scope=("scanme.nmap.org",))
+NMAP = Action(action_id="n1", tool_name="nmap",
+              args={"target": "scanme.nmap.org", "ports": "22,80", "service_detection": True})
+
+
+class FakeExec:
+    def __init__(self, output: str, simulated: bool = False) -> None:
+        self.output, self.simulated = output, simulated
+
+    def run(self, action: Action) -> DryRunResult:
+        return DryRunResult(tool=action.tool_name, args=dict(action.args), summary="ok",
+                            simulated=self.simulated, output=self.output)
+
+
+def build(tmp_path: Path, executor=None, actions=(NMAP,)):
+    settings = Settings(_env_file=None, audit_dir=tmp_path, allow_active_testing=True)
+    deps = Deps(planner=lambda _r: list(actions), settings=settings, scope_provider=lambda: SCOPE,
+                audit=AuditLog(settings, "lab"), registry=default_registry, executor=executor,
+                now=lambda: NOW)
+    return build_graph(deps, InMemorySaver()), deps
+
+
+def run_approved(graph, tid="t1"):
+    cfg = {"configurable": {"thread_id": tid}}
+    graph.invoke({"project_id": "lab", "thread_id": tid, "request": "scan"}, cfg)
+    pend = graph.get_state(cfg).tasks[0].interrupts[0].value["pending"]
+    answers = [{"pending_approval_id": p["id"], "decision": "ALLOW", "approver": "alice",
+                "action_hash": p["action_hash"], "timestamp": NOW.isoformat()} for p in pend]
+    return graph.invoke(Command(resume=answers), cfg)
+
+
+def events(deps: Deps) -> list[str]:
+    return [e["event"] for e in deps.audit.events("t1")]
+
+
+def test_real_output_becomes_findings_and_a_traceable_report(tmp_path):
+    graph, deps = build(tmp_path, FakeExec((FIX / "nmap_scanme.txt").read_text()))
+    out = run_approved(graph)
+    assert out["status"] == "COMPLETED"
+    confirmed = [f for f in out["findings"] if f["confidence"] == "confirmed"]
+    assert confirmed and all(f["source_action_id"] == "n1" for f in out["findings"])
+    # every finding cites the audit event that backs it, and that event really exists
+    hashes = {e["hash"] for e in deps.audit.events("t1")}
+    assert all(f["audit_refs"] and set(f["audit_refs"]) <= hashes for f in out["findings"])
+    assert "# Viper assessment report" in out["report"]
+    assert all(h in out["report"] for f in out["findings"] for h in f["audit_refs"])
+
+
+def test_real_dispatch_writes_intent_then_a_result_event_with_a_digest(tmp_path):
+    out_text = (FIX / "nmap_scanme.txt").read_text()
+    graph, deps = build(tmp_path, FakeExec(out_text))
+    out = run_approved(graph)
+    seen = events(deps)
+    assert "tool_dispatch" in seen and "tool_result" in seen and "tool_dry_run" not in seen
+    assert (seen.index("tool_dispatch") < seen.index("tool_result")
+            < seen.index("findings_generated") < seen.index("report_generated"))
+    result_ev = next(e for e in deps.audit.events("t1") if e["event"] == "tool_result")
+    assert result_ev["detail"]["digest"] == hashlib.sha256(out_text.encode()).hexdigest()
+    assert result_ev["detail"]["simulated"] is False
+    assert out["results"][0]["audit_hash"] == result_ev["hash"]  # citations point at the RESULT
+
+
+def test_dry_run_plane_yields_no_findings_and_keeps_dry_run_event(tmp_path):
+    graph, deps = build(tmp_path, executor=None)  # default DryRunExecutor
+    out = run_approved(graph)
+    assert out["status"] == "COMPLETED" and out["findings"] == []
+    assert "tool_dry_run" in events(deps) and "tool_dispatch" not in events(deps)
+    assert "No confirmed findings" in out["report"] or "no confirmed" in out["report"].lower()
+
+
+def test_unparseable_output_does_not_invent_findings(tmp_path):
+    graph, _ = build(tmp_path, FakeExec("garbage \x00 not nmap output"))
+    out = run_approved(graph)
+    assert out["status"] == "COMPLETED" and out["findings"] == []
+
+
+def test_tampered_audit_log_refuses_to_produce_a_report(tmp_path):
+    graph, deps = build(tmp_path, FakeExec((FIX / "nmap_scanme.txt").read_text()))
+    cfg = {"configurable": {"thread_id": "t1"}}
+    graph.invoke({"project_id": "lab", "thread_id": "t1", "request": "scan"}, cfg)
+    raw = deps.audit.path.read_bytes().replace(b'"actor":"agent"', b'"actor":"human"', 1)
+    deps.audit.path.write_bytes(raw)
+    pend = graph.get_state(cfg).tasks[0].interrupts[0].value["pending"]
+    answers = [{"pending_approval_id": p["id"], "decision": "ALLOW", "approver": "alice",
+                "action_hash": p["action_hash"], "timestamp": NOW.isoformat()} for p in pend]
+    with pytest.raises(AuditError):  # the approval audit append already trips on the broken chain
+        graph.invoke(Command(resume=answers), cfg)
+
+
+def test_report_lists_denied_actions_with_their_reasons(tmp_path):
+    settings = Settings(_env_file=None, audit_dir=tmp_path, allow_active_testing=False)
+    deps = Deps(planner=lambda _r: [NMAP], settings=settings, scope_provider=lambda: SCOPE,
+                audit=AuditLog(settings, "lab"), registry=default_registry, now=lambda: NOW)
+    graph = build_graph(deps, InMemorySaver())
+    out = graph.invoke({"project_id": "lab", "thread_id": "t1", "request": "scan"},
+                       {"configurable": {"thread_id": "t1"}})
+    assert "## Denied actions" in out["report"]
+    assert "n1" in out["report"] and "nmap" in out["report"]
+    assert "active testing is disabled" in out["report"]
+
+
+def test_hostile_action_ids_are_rejected_before_anything_runs(tmp_path):  # codex R4
+    esc = chr(27)
+    for bad in (f"x{esc}]52;c;AAAA", "x`](http://evil)", "a b", "", "x" * 200):
+        nasty = Action(action_id=bad, tool_name="nmap", args={"target": "evil.com"})
+        settings = Settings(_env_file=None, audit_dir=tmp_path, allow_active_testing=True)
+        deps = Deps(planner=lambda _r, n=nasty: [n], settings=settings, scope_provider=lambda: SCOPE,
+                    audit=AuditLog(settings, "lab"), registry=default_registry, now=lambda: NOW)
+        with pytest.raises(ValueError, match="action id"):
+            build_graph(deps, InMemorySaver()).invoke(
+                {"project_id": "lab", "thread_id": "t1", "request": "scan"},
+                {"configurable": {"thread_id": "t1"}})
+
+
+def test_analysis_warnings_surface_in_the_report_when_output_is_truncated(tmp_path):
+    class Truncating(FakeExec):
+        def run(self, action):
+            r = super().run(action)
+            return DryRunResult(**{**r.model_dump(), "truncated": True})
+
+    graph, _ = build(tmp_path, Truncating((FIX / "nmap_scanme.txt").read_text()))
+    out = run_approved(graph)
+    assert "## Analysis warnings" in out["report"] and "truncated" in out["report"]
+    assert "incomplete" in out["report"].lower()

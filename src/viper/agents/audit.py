@@ -26,10 +26,13 @@ _EVENTS = frozenset({
     "plan_proposed", "policy_decision", "approval_requested", "approval_granted",
     "approval_denied", "approval_expired", "approval_consumed", "tool_dry_run",
     "run_completed", "run_failed",
+    # M7: real dispatch (vs. simulated), finding analysis, report output, external anchoring.
+    "tool_dispatch", "tool_result", "findings_generated", "report_generated", "audit_anchored",
 })
 _DETAIL_KEYS = frozenset({
     "action_id", "tool", "tool_name", "args", "summary", "reason", "error", "status",
     "count", "scope_revision", "pending_approval_id", "approver", "results", "message",
+    "digest", "simulated", "truncated",
 })
 _FIELDS = frozenset({
     "seq", "ts", "thread_id", "event", "actor", "action_hash", "decision", "detail",
@@ -196,3 +199,33 @@ class AuditLog:
                 return record
         except (OSError, ValueError, TypeError, RecursionError):
             raise AuditError("Audit event could not be committed") from None
+
+    def _records(self) -> list[dict[str, Any]]:
+        """All committed records. Refuses to read a broken chain; a missing file is empty."""
+        if not self.path.exists():
+            return []
+        try:
+            with _locked(self.path):
+                broken, _ = _scan(self.path)
+                if broken is not None:
+                    raise AuditError(f"Broken audit chain at sequence {broken}")
+                return [json.loads(line) for line in self.path.read_bytes().splitlines()]
+        except (OSError, ValueError):
+            raise AuditError("Audit log could not be read") from None
+
+    def events(self, thread_id: str) -> list[dict[str, Any]]:
+        """Committed events for one thread, in order. A report cites these hashes, so it is
+        never built from a tampered log."""
+        return [r for r in self._records() if r.get("thread_id") == thread_id]
+
+    def index(self) -> dict[str, int]:
+        """Record hash -> sequence number, for judging how much of the chain an anchor covers."""
+        return {str(r["hash"]): int(r["seq"]) for r in self._records()}
+
+    def hashes(self) -> set[str]:
+        return set(self.index())
+
+    def head(self) -> str | None:
+        """Hash of the newest record (what an external anchor timestamps), or None if empty."""
+        records = self._records()
+        return str(records[-1]["hash"]) if records else None

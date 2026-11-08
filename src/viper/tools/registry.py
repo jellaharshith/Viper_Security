@@ -25,6 +25,8 @@ class DryRunResult(BaseModel):
     args: dict[str, Any] = Field(default_factory=dict)
     summary: str
     simulated: bool = True
+    truncated: bool = False  # True when captured output was cut by a client-side limit
+    output: str = ""  # captured tool stdout (real execution only); stubs leave it empty
 
 
 def create_tool_info(name: str, risk: RiskLevel, *, dry_run_only: bool = True) -> ToolInfo:

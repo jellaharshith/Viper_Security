@@ -1,0 +1,3 @@
+{"template-id":"CVE-2014-6271","info":{"name":"Shellshock RCE","severity":"critical","description":"Bash env var injection.","reference":["https://nvd.nist.gov/vuln/detail/CVE-2014-6271"],"remediation":"Upgrade bash."},"type":"http","host":"http://scanme.nmap.org","matched-at":"http://scanme.nmap.org/cgi-bin/test.sh","timestamp":"2026-11-08T10:05:02Z"}
+{"template-id":"tech-detect","info":{"name":"Wappalyzer Technology Detection","severity":"unknown"},"type":"http","host":"http://scanme.nmap.org","matched-at":"http://scanme.nmap.org/"}
+not json {

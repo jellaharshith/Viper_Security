@@ -182,3 +182,49 @@ authorized target `scanme.nmap.org`, then tore everything down (total cost a few
 - **Teardown:** VM + NAT + router + firewall deleted; `.env` reset to `VIPER_ALLOW_ACTIVE_TESTING=false`.
 - Follow-ups unchanged: noVNC desktop take-over (deferred); real-exec audit event is still named
   `tool_dry_run`; external audit-head anchoring still open.
+
+## M7 BUILD — 2026-11-08 (offline definition of done met; live run pending)
+Three-agent herdr crew on branch `m7/pentest-copilot` (claude-m7 parsers + stream capture, codex-m7
+report + anchoring + security review, agy-m7 docs; coordinator wiring). 465 tests, ruff + mypy clean.
+- **Findings** (`viper.findings`): Finding schema v1; deterministic nmap/nuclei parsers. `confirmed` only
+  from parser evidence, never from LLM text. Bounded, control/bidi-neutralised, shell-quoted repro.
+- **LLM planner** (`agents/planner.py`): opt-in `agent run --llm`; strict fail-closed parsing, size and
+  decode budgets, plain-token action ids. Verified against the real Foundation-Sec-1.1-8B model
+  (61 s, no egress): it proposed nmap + kb_answer; policy denied the ACTIVE scan (active testing off).
+- **Evidence model** (`agents/evidence.py`): real dispatch writes `tool_dispatch` (intent) then
+  `tool_result` (SHA-256 output digest, simulated/truncated flags). Findings are re-derived from the
+  AUDITED results only; missing/duplicated/edited/unaudited checkpoint results become report
+  warnings, never a clean report. Closes the M6 follow-up on real-exec event naming.
+- **Report**: traceable Markdown with audit-hash citations, Analysis warnings and Denied actions;
+  saved to `data/reports/<thread>.md` (exclusive create; thread ids cannot be reused).
+- **Anchoring**: `viper audit anchor` (mock) + `audit verify` anchor verdicts (CONSISTENT_ONLY,
+  VERIFIED, UNVERIFIED, TAMPERED, MALFORMED, MISMATCH) with chain coverage. Real TSA/Rekor receipts stay
+  UNVERIFIED until a trusted offline verifier is wired in (documented limitation).
+- **Security review**: codex reviewed `376c255..HEAD` (10 medium findings), all fixed; re-review found
+  7 fixed / 3 partial + 4 residuals, all fixed in round 5.
+- **Not done**: noVNC takeover and multi-job dispatch stay deferred (see live validation below for the run).
+
+## M7 LIVE VALIDATION - 2026-11-08 (definition of done met)
+Re-provisioned the execution plane per the runbook, ran the full copilot workflow against the authorized
+lab host `scanme.nmap.org` only, then deleted everything (total cost: minutes of one spot e2-medium).
+- **Infra:** spot `e2-medium` Ubuntu 22.04 (`--no-address`), Cloud Router + NAT, IAP-only SSH firewall,
+  `vmapi` under systemd on 127.0.0.1:8443 (TLS + bearer token), reached by an SSH port-forward over IAP.
+  The pre-existing `kali-vm` in the project was not touched.
+- **Workflow:** `agent run` (plan) paused at the approval checkpoint; `agent resume --decision ALLOW`
+  dispatched `nmap -sT -sV -p 22,80,443 scanme.nmap.org`; output was captured from the job stream,
+  digest-committed, parsed, and rendered. Result: `COMPLETED executed=1`.
+- **Traceable report:** 2 confirmed findings (22/tcp ssh OpenSSH 6.6.1p1; 80/tcp http Apache 2.4.7), each with
+  the raw nmap line as evidence and a citation to the `tool_result` audit event (seq 32) bound to that exact
+  action. 443/tcp was not open, so no finding was produced for it.
+- **Audit:** chain `plan_proposed -> policy REQUIRE_APPROVAL -> approval_requested -> approval_granted ->
+  approval_consumed -> tool_dispatch -> tool_result(digest) -> run_completed -> findings_generated ->
+  report_generated`; `viper audit verify` OK; mock anchor `CONSISTENT_ONLY` covering seq 0-35.
+- **Runbook bugs found and fixed:** (1) the systemd unit ran `uvicorn app:app` but `app.py` imports
+  `vmapi.auth`, so it must run from `/opt/viper` as `vmapi.app:app`; (2) the VM env var is
+  `VIPER_EXEC_EGRESS_ALLOWLIST`, not `...TARGET_ALLOWLIST` (an empty allowlist makes every job a 422);
+  (3) the port-forward must use PuTTY-only flags on Windows; (4) Step 8 CLI invocations were wrong.
+  First attempt failed closed (`RemoteJobError`, nothing reached the target) and was recorded in the audit log.
+- **Teardown verified:** tunnel process stopped, VM + NAT + router + firewall rule deleted, `.env` restored
+  with `VIPER_ALLOW_ACTIVE_TESTING` unset, cert and token deleted. Only the user's own `kali-vm` remains.
+- **Follow-ups:** external TSA/Rekor anchoring needs a trusted offline verifier; noVNC takeover; nuclei is
+  not installed on the Ubuntu image (apt has no nuclei), so only nmap was exercised live.
