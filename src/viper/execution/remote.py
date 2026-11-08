@@ -26,6 +26,17 @@ from viper.tools.registry import DryRunResult, ToolRegistry, default_registry
 
 # Terminal job states per the SHARED CONTRACT (Exec API v1). "running"/"paused" are not terminal.
 TERMINAL_STATES = frozenset({"done", "killed", "failed"})
+# Hard cap on captured stdout kept in memory/checkpoints; excess is truncated, never an error.
+MAX_OUTPUT_BYTES = 1024 * 1024
+# Independent bounds on what the client will *read* from a stream, ignored SSE fields included.
+MAX_WIRE_BYTES = 4 * 1024 * 1024
+MAX_LINE_BYTES = 64 * 1024
+MAX_STREAM_SECONDS = 120.0
+STREAM_READ_TIMEOUT = 10.0  # per network read (connect/read/write/pool)
+
+
+def _now() -> float:
+    return time.monotonic()
 
 
 @runtime_checkable
@@ -98,7 +109,87 @@ class RemoteExecutor:
             raise DispatchAlreadyClaimed(action.action_id)
         job = self._dispatch(action, target)
         state, exit_code = self._poll(str(job["job_id"]))
-        return self._result_for(action, state, exit_code)
+        output, truncated = self._fetch_output(str(job["job_id"])) if state == "done" else ("", False)
+        return self._result_for(action, state, exit_code, output, truncated)
+
+    def _fetch_output(self, job_id: str) -> tuple[str, bool]:
+        """Replay the SSE stream of a finished job (same TLS client + bearer auth).
+
+        Reads bounded byte chunks into a bounded line buffer, so memory and time are limited
+        no matter what the server sends (including oversized or unterminated lines and ignored
+        SSE fields). Returns ``(output, truncated)``: ``data:`` payloads joined by newlines,
+        capped at ``MAX_OUTPUT_BYTES``. After the capture cap is hit the stream keeps being
+        drained (discarding) up to ``MAX_WIRE_BYTES``/``MAX_STREAM_SECONDS`` so a later stream
+        failure is still observed. Hitting any limit sets ``truncated`` and never raises; a
+        401, non-200 or transport failure raises, so a finished job can never become
+        success-with-missing-output.
+        """
+        lines: list[bytes] = []
+        size = 0
+        truncated = False
+        wire = 0
+        buf = bytearray()
+        overflow = False  # current line already exceeded MAX_LINE_BYTES; discard until newline
+
+        def take(line: bytes) -> None:
+            nonlocal size, truncated
+            if not line.startswith(b"data:"):
+                return
+            payload = line[5:]
+            if payload.startswith(b" "):
+                payload = payload[1:]
+            room = MAX_OUTPUT_BYTES - size - (1 if lines else 0)
+            if room <= 0:
+                truncated = True
+                return
+            if len(payload) > room:
+                payload = payload[:room]
+                truncated = True
+            size += len(payload) + (1 if lines else 0)
+            lines.append(payload)
+
+        try:
+            start = _now()
+            with self._get_client().stream(
+                "GET",
+                f"/jobs/{job_id}/stream",
+                # identity only: decompression would happen before our byte accounting.
+                headers={**self._auth, "Accept-Encoding": "identity"},
+                timeout=httpx.Timeout(STREAM_READ_TIMEOUT),  # a stalled peer can't hold us
+            ) as resp:
+                if resp.status_code == 401:
+                    raise RemoteAuthError(f"Exec API rejected the bearer token on stream {job_id}")
+                if resp.status_code != 200:
+                    raise RemoteJobError(f"GET /jobs/{job_id}/stream returned {resp.status_code}")
+                encoding = resp.headers.get("content-encoding", "identity").strip().lower()
+                if encoding not in ("", "identity"):
+                    raise RemoteJobError(f"stream for job {job_id} is encoded ({encoding!r})")
+                # iter_raw: no decoding; chunk_size=None yields each network read as it
+                # arrives so the byte budget and deadline are checked after every one.
+                for chunk in resp.iter_raw():
+                    wire += len(chunk)
+                    parts = chunk.split(b"\n")
+                    for i, part in enumerate(parts):
+                        if not overflow:
+                            buf += part
+                            if len(buf) > MAX_LINE_BYTES:
+                                del buf[MAX_LINE_BYTES:]
+                                overflow = True
+                                truncated = True
+                        if i < len(parts) - 1:  # a newline ended this line
+                            if not overflow or buf.startswith(b"data:"):
+                                take(bytes(buf).rstrip(b"\r"))
+                            buf.clear()
+                            overflow = False
+                    if wire >= MAX_WIRE_BYTES or _now() - start > MAX_STREAM_SECONDS:
+                        truncated = True
+                        break
+                else:
+                    if buf and not overflow:
+                        take(bytes(buf).rstrip(b"\r"))
+        except httpx.HTTPError as exc:
+            raise RemoteJobError(f"stream for job {job_id} failed: {exc.__class__.__name__}") from exc
+        return b"\n".join(lines).decode("utf-8", errors="replace"), truncated
 
     def _check_egress(self, target: Any) -> str:
         allow = getattr(self._settings, "exec_egress_allowlist", []) or []
@@ -136,7 +227,14 @@ class RemoteExecutor:
             time.sleep(self._poll_interval)
         raise RemoteJobError(f"job {job_id} did not reach a terminal state in {self._max_polls} polls")
 
-    def _result_for(self, action: Action, state: str, exit_code: int | None) -> DryRunResult:
+    def _result_for(
+        self,
+        action: Action,
+        state: str,
+        exit_code: int | None,
+        output: str = "",
+        truncated: bool = False,
+    ) -> DryRunResult:
         """Map a terminal job ``state`` to the result handed back to ``graph.execute``.
 
         The returned value MUST be a ``registry.DryRunResult`` carrying ``tool``, ``args`` and
@@ -156,4 +254,6 @@ class RemoteExecutor:
             args=dict(action.args),
             summary=f"{action.tool_name} on {target!r} completed: done (exit_code={exit_code})",
             simulated=False,
+            output=output,
+            truncated=truncated,
         )

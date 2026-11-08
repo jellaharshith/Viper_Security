@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import getpass
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,10 +19,43 @@ from pydantic import SecretStr
 from viper.agents.audit import AuditLog
 from viper.agents.claims import SqliteClaims
 from viper.agents.graph import Deps, build_graph
+from viper.agents.planner import LLMPlanner
 from viper.config import Settings
 from viper.execution.control import ControlLock
 from viper.execution.factory import make_executor
+from viper.llm.client import OllamaClient
 from viper.policy.models import Action, Scope
+from viper.tools.registry import default_registry
+
+_THREAD = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
+def valid_thread(thread: str) -> str:
+    """Thread ids become file names (reports), so only a plain token is accepted."""
+    if not _THREAD.fullmatch(thread):
+        raise ValueError("invalid thread id")
+    return thread
+
+
+def report_path(settings: Settings, thread: str) -> Path:
+    return settings.report_dir / f"{valid_thread(thread)}.md"
+
+
+def _save_report(settings: Settings, thread: str, out: dict[str, Any]) -> None:
+    """Persist the finished report (not a paused run); the path is derived, never supplied."""
+    if out.get("__interrupt__") or not out.get("report"):
+        return
+    path = report_path(settings, thread)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # "x" = exclusive create: never overwrites a report and never follows a planted symlink.
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        handle.write(str(out["report"]))
+
+
+def llm_planner(settings: Settings, scope_path: Path) -> LLMPlanner:
+    """Ollama-backed planner. Opt-in only; the JSON plan file remains the deterministic path."""
+    client = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
+    return LLMPlanner(client.chat, default_registry, lambda: load_scope(scope_path))
 
 
 @dataclass
@@ -86,14 +120,23 @@ def _connect(settings: Settings) -> sqlite3.Connection:
 
 
 def run(
-    settings: Settings, scope_path: Path, actions: list[Action], request: str, thread: str,
+    settings: Settings, scope_path: Path, actions: list[Action] | Any, request: str, thread: str,
 ) -> dict[str, Any]:
+    """``actions`` is a fixed plan (list) or a planner callable (the LLM planner, M7)."""
+    valid_thread(thread)
+    if report_path(settings, thread).exists():
+        raise ValueError("a report already exists for this thread id")
     project_id = load_scope(scope_path).project_id
+    planner = (lambda _r: actions) if isinstance(actions, list) else actions
     conn = _connect(settings)
     try:
-        graph = _graph(settings, scope_path, project_id, lambda _r: actions, conn)
+        graph = _graph(settings, scope_path, project_id, planner, conn)
+        if graph.get_state({"configurable": {"thread_id": thread}}).values:
+            # Checkpoints are keyed by thread only; reusing one would inherit another run's state.
+            raise ValueError("thread id already used; start a new thread or resume it")
         state = {"project_id": project_id, "thread_id": thread, "request": request}
         out: dict[str, Any] = graph.invoke(state, {"configurable": {"thread_id": thread}})
+        _save_report(settings, thread, out)
         return out
     finally:
         conn.close()
@@ -117,6 +160,7 @@ def pending_details(settings: Settings, scope_path: Path, thread: str) -> list[d
 
 def resume(settings: Settings, scope_path: Path, thread: str, decision: str) -> dict[str, Any]:
     """Answer every pending approval on a paused thread. The approver is the local OS user."""
+    valid_thread(thread)
     details = pending_details(settings, scope_path, thread)
     if not details:
         raise ValueError("thread has no pending approval")
@@ -129,6 +173,7 @@ def resume(settings: Settings, scope_path: Path, thread: str, decision: str) -> 
         graph = _graph(settings, scope_path, project_id, _no_planner, conn)
         out: dict[str, Any] = graph.invoke(Command(resume=answers),
                                            {"configurable": {"thread_id": thread}})
+        _save_report(settings, thread, out)
         return out
     finally:
         conn.close()

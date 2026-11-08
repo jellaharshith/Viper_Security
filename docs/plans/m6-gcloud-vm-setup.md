@@ -169,7 +169,7 @@ echo "=============================================="
 # Write restricted environment file
 sudo bash -c "cat <<EOF > /etc/viper/vmapi.env
 VIPER_EXEC_API_TOKEN=${TOKEN}
-VIPER_EXEC_TARGET_ALLOWLIST=scanme.nmap.org
+VIPER_EXEC_EGRESS_ALLOWLIST=scanme.nmap.org
 EOF"
 
 sudo chmod 600 /etc/viper/vmapi.env
@@ -186,12 +186,12 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/viper/vmapi
+WorkingDirectory=/opt/viper
 EnvironmentFile=/etc/viper/vmapi.env
-ExecStart=/opt/viper/vmapi/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8443 --ssl-keyfile /etc/viper/certs/vmapi-key.pem --ssl-certfile /etc/viper/certs/vmapi-cert.pem
+ExecStart=/opt/viper/vmapi/.venv/bin/uvicorn vmapi.app:app --host 127.0.0.1 --port 8443 --ssl-keyfile /etc/viper/certs/vmapi-key.pem --ssl-certfile /etc/viper/certs/vmapi-cert.pem
 Restart=always
 RestartSec=3
-KillMode=mixed
+KillMode=control-group
 PrivateTmp=true
 
 [Install]
@@ -248,7 +248,10 @@ VIPER_ALLOW_ACTIVE_TESTING=true
 Run the IAP tunnel in a dedicated terminal window on your local workstation:
 
 ```powershell
-gcloud compute start-iap-tunnel viper-kali-lab 8443 --local-host-port=localhost:8443
+# vmapi binds 127.0.0.1 by design, so forward over an IAP-tunnelled SSH session. (start-iap-tunnel
+# targets the NIC, not loopback, and does NOT reach vmapi.) gcloud on Windows drives PuTTY, so use
+# only PuTTY flags here (-N, -L); OpenSSH-style -o options make putty.exe exit 1.
+gcloud compute ssh viper-kali-lab --zone us-central1-a --tunnel-through-iap -- -N -L 8443:localhost:8443
 ```
 Keep this terminal open while executing commands.
 
@@ -270,19 +273,19 @@ Execute the lab workflow using the authorized scope file:
 ```powershell
 # 1. Start agent thread with lab-scanme scope
 $env:PYTHONPATH="src"
-.venv\Scripts\python -m viper cli agent run --scope projects/lab-scanme/scope.yaml --plan plans/scanme.json --thread lab1
+.venv\Scripts\python -m viper.cli agent run --scope projects/lab-scanme/scope.yaml --plan plans/scanme.json --thread lab1
 
 # 2. Review the pending active action, then resume
-.venv\Scripts\python -m viper cli agent resume --scope projects/lab-scanme/scope.yaml --thread lab1 --decision ALLOW
+.venv\Scripts\python -m viper.cli agent resume --scope projects/lab-scanme/scope.yaml --thread lab1 --decision ALLOW
 
 # 3. Stream live scan stdout
-.venv\Scripts\python -m viper cli exec watch --thread lab1
+.venv\Scripts\python -m viper.cli exec watch --job nmap-scanme-1
 
 # 4. If emergency stop is needed:
-.venv\Scripts\python -m viper cli exec stop --thread lab1
+.venv\Scripts\python -m viper.cli exec stop --job nmap-scanme-1
 
 # 5. Verify the audit log integrity
-.venv\Scripts\python -m viper cli audit verify --project lab-scanme
+.venv\Scripts\python -m viper.cli audit verify --project lab-scanme
 ```
 
 ---
@@ -326,3 +329,13 @@ Verify in GCP that no instances remain:
 ```bash
 gcloud compute instances list
 ```
+
+---
+
+## 5. Lessons from the M7 live run (2026-11-08)
+
+- **Action ids are single-use.** The executor burns `dispatch:<action_id>` even when the VM rejects the
+  request (for example a 422), so after any failed attempt use a new action id and thread id.
+- **Teardown order:** stop the SSH port-forward process first, then delete the VM, the NAT, the router
+  and the `allow-iap-ssh` rule. Verify with `compute instances/routers/firewall-rules/disks list`.
+- **Never reuse a pre-existing VM** in the project for this; create `viper-kali-lab` and delete it after.

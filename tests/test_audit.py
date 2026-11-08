@@ -160,3 +160,36 @@ def test_arbitrary_objects_are_not_formatted(tmp_path: Path) -> None:
     log = log_at(tmp_path)
     append(log, detail={"summary": Unsafe()})
     assert json.loads(log.path.read_text())["detail"]["summary"] == "[REDACTED]"
+
+
+def test_m7_event_types_are_accepted(tmp_path: Path) -> None:
+    log = log_at(tmp_path)
+    for event in ("tool_dispatch", "tool_result", "findings_generated", "report_generated", "audit_anchored"):
+        record = log.append(thread_id="thread", event=event, actor="agent")
+        assert record["event"] == event
+    assert audit.verify(log.path) is None
+
+
+def test_events_returns_only_the_requested_thread_in_order(tmp_path: Path) -> None:
+    log = log_at(tmp_path)
+    log.append(thread_id="a", event="plan_proposed", actor="agent")
+    log.append(thread_id="b", event="plan_proposed", actor="agent")
+    log.append(thread_id="a", event="run_completed", actor="agent")
+    got = log.events("a")
+    assert [e["event"] for e in got] == ["plan_proposed", "run_completed"]
+    assert all(e["thread_id"] == "a" for e in got)
+    assert log.events("missing") == []
+
+
+def test_events_on_missing_file_is_empty(tmp_path: Path) -> None:
+    assert log_at(tmp_path).events("any") == []
+
+
+def test_events_refuses_a_broken_chain(tmp_path: Path) -> None:
+    log = log_at(tmp_path)
+    append(log)
+    append(log)
+    raw = log.path.read_bytes().replace(b'"actor":"agent"', b'"actor":"human"', 1)
+    log.path.write_bytes(raw)
+    with pytest.raises(audit.AuditError):
+        log.events("thread")

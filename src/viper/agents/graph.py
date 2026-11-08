@@ -6,6 +6,7 @@ The model only proposes actions. Policy, approvals and audit are deterministic c
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -18,6 +19,7 @@ from langgraph.types import interrupt
 
 from viper.agents.audit import AuditError, AuditLog
 from viper.agents.claims import ClaimStore, MemoryClaims
+from viper.agents.evidence import digest, rederive
 from viper.config import Settings
 from viper.execution.control import AGENT, ControlLock
 from viper.execution.executor import DryRunExecutor
@@ -32,9 +34,19 @@ from viper.policy.approvals import (
 )
 from viper.policy.engine import evaluate
 from viper.policy.models import Action, Decision, DecisionType, Scope
+from viper.report.generator import render_report
 from viper.tools.registry import ToolRegistry, default_registry
 
 Planner = Callable[[str], list[Action]]
+
+_ACTION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+_UNSAFE = re.compile(r"[^A-Za-z0-9 _.,=()@-]")
+
+
+def _safe(text: object) -> str:
+    """Model-supplied ids and names reach the report, so strip anything that could form Markdown,
+    a link, or a heading (no brackets, backticks, slashes, colons or newlines survive)."""
+    return _UNSAFE.sub("?", str(text))[:80]
 
 
 class AgentState(TypedDict, total=False):
@@ -47,6 +59,8 @@ class AgentState(TypedDict, total=False):
     decisions: dict[str, dict[str, Any]]
     pending: dict[str, dict[str, Any]]
     results: list[dict[str, Any]]
+    findings: list[dict[str, Any]]
+    analysis_warnings: list[str]
     status: str
     report: str
 
@@ -83,13 +97,20 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         info = deps.registry.get_info(action.tool_name)
         return evaluate(action, info, deps.scope_provider(), deps.settings)
 
-    def audit(state: AgentState, event: str, actor: str, **kw: Any) -> None:
-        deps.audit.append(thread_id=state["thread_id"], event=event, actor=actor, **kw)
+    def audit(state: AgentState, event: str, actor: str, **kw: Any) -> dict[str, Any]:
+        return deps.audit.append(thread_id=state["thread_id"], event=event, actor=actor, **kw)
+
+    # M7: a simulated run keeps one "tool_dry_run" event. Real dispatch writes an INTENT event
+    # before the call and a RESULT event (with an output digest) after it; only the result is evidence.
+    real = not isinstance(executor, DryRunExecutor)
+    dispatch_event = "tool_dispatch" if real else "tool_dry_run"
 
     def plan(state: AgentState) -> dict[str, Any]:
         actions = deps.planner(state["request"])  # untrusted proposals
         ids = [a.action_id for a in actions]
-        if any(not i.strip() for i in ids) or len(set(ids)) != len(ids):
+        if any(not _ACTION_ID.fullmatch(i) for i in ids):  # ids reach terminals and reports
+            raise ValueError("plan has an invalid action id")  # fail closed
+        if len(set(ids)) != len(ids):
             raise ValueError("plan has empty or duplicate action ids")  # fail closed
         audit(state, "plan_proposed", "agent", detail={"count": len(actions)})
         return {"actions": [a.model_dump(mode="json") for a in actions], "status": "DRAFT_PLAN"}
@@ -210,9 +231,17 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                       detail={"action_id": action.action_id, "reason": reason})
                 continue
             try:  # audit first: no committed evidence, no dispatch
-                audit(state, "tool_dry_run", "agent", action_hash=ahash,
-                      detail={"action_id": action.action_id, "tool": action.tool_name})
-                results.append(executor.run(action).model_dump(mode="json"))
+                entry = audit(state, dispatch_event, "agent", action_hash=ahash,
+                               detail={"action_id": action.action_id, "tool": action.tool_name})
+                raw = executor.run(action).model_dump(mode="json")
+                cite = entry["hash"]
+                if real:  # evidence = what came back, committed by digest AFTER the call
+                    cite = audit(state, "tool_result", "agent", action_hash=ahash,
+                                 detail={"action_id": action.action_id, "tool": action.tool_name,
+                                         "digest": digest(str(raw.get("output", ""))),
+                                         "simulated": bool(raw.get("simulated", True)),
+                                         "truncated": bool(raw.get("truncated", False))})["hash"]
+                results.append({**raw, "action_id": action.action_id, "audit_hash": cite})
             except AuditError:
                 return {"status": "FAILED", "results": results, "decisions": decisions}
             except Exception as exc:  # noqa: BLE001 - record the class only, then stop the run
@@ -225,22 +254,64 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         audit(state, "run_completed", "agent", detail={"count": len(results)})
         return {"results": results, "decisions": decisions, "status": "COMPLETED"}
 
+    def bind(raw: dict[str, Any]) -> str | None:
+        """Recompute the policy hash of a checkpointed action to detect edits to it."""
+        action = Action.model_validate(raw)
+        info = deps.registry.get_info(action.tool_name)
+        return action_hash(action, info) if info else None
+
+    def analyze(state: AgentState) -> dict[str, Any]:
+        """Deterministic only: findings come from digest-verified tool output, never the LLM."""
+        try:
+            findings, warnings = rederive(state.get("results", []),
+                                          deps.audit.events(state["thread_id"]),
+                                          actions=state.get("actions", []), bind=bind)
+        except AuditError:
+            return {"status": "FAILED", "findings": [],
+                    "analysis_warnings": ["audit log failed verification; analysis not possible"]}
+        audit(state, "findings_generated", "agent", detail={"count": len(findings)})
+        return {"findings": [f.model_dump(mode="json") for f in findings],
+                "analysis_warnings": warnings}
+
     def report(state: AgentState) -> dict[str, Any]:
         denied = [k for k, v in state.get("decisions", {}).items() if v["type"] == "DENY"]
-        text = (f"status={state.get('status')} executed={len(state.get('results', []))} "
-                f"denied={len(denied)}")
-        return {"report": text}
+        summary = (f"status={state.get('status')} executed={len(state.get('results', []))} "
+                   f"denied={len(denied)}")
+        try:  # a report cites audit hashes, so it is only built from a verified chain
+            events = deps.audit.events(state["thread_id"])
+            # Re-derive again from the latest checkpointed results: stored findings are not trusted.
+            findings, warnings = rederive(state.get("results", []), events,
+                                          actions=state.get("actions", []), bind=bind)
+            warnings = list(dict.fromkeys([*state.get("analysis_warnings", []), *warnings]))
+            text = render_report(findings, events, project_id=state["project_id"],
+                                 thread_id=state["thread_id"])
+            audit(state, "report_generated", "agent", detail={"count": len(findings)})
+        except AuditError:
+            return {"status": "FAILED", "report": f"report unavailable: audit log failed ({summary})"}
+        names = {a["action_id"]: a["tool_name"] for a in state.get("actions", [])}
+        lines = [f"- {_safe(k)} ({_safe(names.get(k, '?'))}): {_safe(v.get('reason', ''))}"
+                 for k, v in state.get("decisions", {}).items() if v["type"] == "DENY"]
+        if warnings:  # absence of findings must never read as "clean" when analysis was impaired
+            text += ("\n\n" + "## Analysis warnings" + "\n\n"
+                     + "Analysis is INCOMPLETE; do not read missing findings as a clean result."
+                     + "\n\n" + "\n".join(f"- {_safe(w)}" for w in warnings))
+        if lines:  # a reader of the report must see what was refused and why, not just a count
+            text += "\n\n" + "## Denied actions" + "\n\n" + "\n".join(lines)
+        return {"report": text + "\n\n" + "---" + "\n" + "Run summary: " + summary + "\n",
+                "findings": [f.model_dump(mode="json") for f in findings]}
 
     g = StateGraph(AgentState)
     g.add_node("plan", plan)
     g.add_node("policy_gate", policy_gate)
     g.add_node("approval", approval)
     g.add_node("execute", execute)
+    g.add_node("analyze", analyze)
     g.add_node("report", report)
     g.add_edge(START, "plan")
     g.add_edge("plan", "policy_gate")
     g.add_conditional_edges("policy_gate", route_after_gate, ["approval", "execute"])
     g.add_conditional_edges("approval", route_after_approval, ["execute", "report"])
-    g.add_edge("execute", "report")
+    g.add_edge("execute", "analyze")
+    g.add_edge("analyze", "report")
     g.add_edge("report", END)
     return g.compile(checkpointer=checkpointer)
