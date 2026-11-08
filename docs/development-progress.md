@@ -182,3 +182,25 @@ authorized target `scanme.nmap.org`, then tore everything down (total cost a few
 - **Teardown:** VM + NAT + router + firewall deleted; `.env` reset to `VIPER_ALLOW_ACTIVE_TESTING=false`.
 - Follow-ups unchanged: noVNC desktop take-over (deferred); real-exec audit event is still named
   `tool_dry_run`; external audit-head anchoring still open.
+
+## M7 BUILD — 2026-11-08 (offline definition of done met; live run pending)
+Three-agent herdr crew on branch `m7/pentest-copilot` (claude-m7 parsers + stream capture, codex-m7
+report + anchoring + security review, agy-m7 docs; coordinator wiring). 465 tests, ruff + mypy clean.
+- **Findings** (`viper.findings`): Finding schema v1; deterministic nmap/nuclei parsers. `confirmed` only
+  from parser evidence, never from LLM text. Bounded, control/bidi-neutralised, shell-quoted repro.
+- **LLM planner** (`agents/planner.py`): opt-in `agent run --llm`; strict fail-closed parsing, size and
+  decode budgets, plain-token action ids. Verified against the real Foundation-Sec-1.1-8B model
+  (61 s, no egress): it proposed nmap + kb_answer; policy denied the ACTIVE scan (active testing off).
+- **Evidence model** (`agents/evidence.py`): real dispatch writes `tool_dispatch` (intent) then
+  `tool_result` (SHA-256 output digest, simulated/truncated flags). Findings are re-derived from the
+  AUDITED results only; missing/duplicated/edited/unaudited checkpoint results become report
+  warnings, never a clean report. Closes the M6 follow-up on real-exec event naming.
+- **Report**: traceable Markdown with audit-hash citations, Analysis warnings and Denied actions;
+  saved to `data/reports/<thread>.md` (exclusive create; thread ids cannot be reused).
+- **Anchoring**: `viper audit anchor` (mock) + `audit verify` anchor verdicts (CONSISTENT_ONLY,
+  VERIFIED, UNVERIFIED, TAMPERED, MALFORMED, MISMATCH) with chain coverage. Real TSA/Rekor receipts stay
+  UNVERIFIED until a trusted offline verifier is wired in (documented limitation).
+- **Security review**: codex reviewed `376c255..HEAD` (10 medium findings), all fixed; re-review found
+  7 fixed / 3 partial + 4 residuals, all fixed in round 5.
+- **Not done**: the gated live run against scanme (needs the runbook infra re-provisioned: the M6 plane
+  was torn down); noVNC takeover and multi-job dispatch stay deferred.
