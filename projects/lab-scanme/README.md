@@ -30,7 +30,7 @@ This directory defines the authoritative engagement scope for testing Viper agai
 
 ```bash
 # 1. Propose and run a test plan (deterministic JSON or opt-in LLM planner)
-viper agent run --scope projects/lab-scanme/scope.yaml --thread lab1 --plan plans/scanme.json
+viper agent run --scope projects/lab-scanme/scope.yaml --thread lab1 --plan projects/lab-scanme/plan.json
 # OR with the opt-in LLM planner (requires non-empty request, max 8 actions):
 viper agent run --scope projects/lab-scanme/scope.yaml --thread lab1 --llm --request "scan scanme.nmap.org for open web ports"
 

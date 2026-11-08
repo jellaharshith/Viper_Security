@@ -1,6 +1,6 @@
 # Architecture (Hybrid, v1.1)
 
-Source of truth for requirements: `../cybersecurity_ai_agent_architecture_v1 - Copy.md`.
+Source of truth for requirements: `../docs/requirements.md`.
 This document refines it into a **three-plane hybrid** plus an independent knowledge pipeline.
 
 ## Planes
