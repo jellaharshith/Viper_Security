@@ -273,3 +273,87 @@ def test_dry_run_stubs_have_empty_output() -> None:
     tool = default_registry.get("plan_scan")
     assert tool is not None
     assert tool.dry_run({"target": TARGET}).output == ""
+
+
+# ------------------------------------------------- ROUND 4: bounded stream reading (#6)
+
+
+class _Chunks(httpx.SyncByteStream):
+    """A stream that yields given chunks, counts bytes pulled, optionally fails at the end."""
+
+    def __init__(self, chunks: Any, fail: bool = False) -> None:
+        self._chunks = chunks
+        self._fail = fail
+        self.pulled = 0
+
+    def __iter__(self) -> Any:
+        for c in self._chunks:
+            self.pulled += len(c)
+            yield c
+        if self._fail:
+            raise httpx.ReadError("late failure")
+
+
+def _stream_resp(stream: _Chunks) -> httpx.Response:
+    return httpx.Response(200, stream=stream, headers={"content-type": "text/event-stream"})
+
+
+def test_chunk_boundaries_do_not_corrupt_lines() -> None:
+    body = b"data: alpha\n\ndata: beta\r\n\n: comment\ndata:gamma\n\n"
+    chunks = [body[i : i + 3] for i in range(0, len(body), 3)]
+    r = _executor(_job_handler(_stream_resp(_Chunks(chunks)))).run(_action())
+    assert r.output == "alpha\nbeta\ngamma"
+    assert r.truncated is False
+
+
+def test_unterminated_giant_line_is_bounded_and_truncated() -> None:
+    from viper.execution import remote
+
+    s = _Chunks([b"data: " + b"A" * 8192] + [b"A" * 8192] * 2000)  # ~16 MiB, no newline
+    r = _executor(_job_handler(_stream_resp(s))).run(_action())
+    assert r.truncated is True
+    assert len(r.output.encode()) <= remote.MAX_OUTPUT_BYTES
+    assert s.pulled <= remote.MAX_WIRE_BYTES + 65536  # stopped reading at the wire cap
+
+
+def test_ignored_sse_fields_count_against_wire_cap() -> None:
+    from viper.execution import remote
+
+    s = _Chunks([b": keepalive " + b"x" * 4000 + b"\n"] * 5000)  # ~20 MB of ignored comments
+    r = _executor(_job_handler(_stream_resp(s))).run(_action())
+    assert r.output == ""
+    assert r.truncated is True
+    assert s.pulled <= remote.MAX_WIRE_BYTES + 65536
+
+
+def test_capture_cap_sets_truncated_and_keeps_draining_to_observe_failure() -> None:
+    from viper.execution.remote import RemoteJobError
+
+    line = b"data: " + b"y" * 1000 + b"\n\n"
+    chunks = [line] * 1500  # ~1.5 MB: past the 1 MiB capture cap, under the wire cap
+    ok = _executor(_job_handler(_stream_resp(_Chunks(chunks)))).run(_action())
+    assert ok.truncated is True and len(ok.output.encode()) <= 1024 * 1024
+    with pytest.raises(RemoteJobError):  # failure AFTER the cap must still be seen
+        _executor(_job_handler(_stream_resp(_Chunks(chunks, fail=True)))).run(_action())
+
+
+def test_small_output_is_not_truncated() -> None:
+    r = _executor(_job_handler(_sse(["a", "b"]))).run(_action())
+    assert r.truncated is False
+
+
+def test_stream_time_limit_stops_reading_and_marks_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
+    from viper.execution import remote
+
+    ticks = iter(range(0, 10_000, 100))
+    monkeypatch.setattr(remote, "_now", lambda: float(next(ticks)))
+    s = _Chunks([b"data: " + b"x" * 8000 + b"\n\n"] * 1000)
+    r = _executor(_job_handler(_stream_resp(s))).run(_action())
+    assert r.truncated is True
+    assert s.pulled < 8008 * 100  # stopped long before the 1000 chunks were pulled
+
+
+def test_dry_run_result_truncated_defaults_false() -> None:
+    from viper.tools.registry import DryRunResult
+
+    assert DryRunResult(tool="t", summary="s").truncated is False

@@ -126,3 +126,156 @@ def test_nuclei_strips_ansi_and_empty_is_empty() -> None:
 def test_nuclei_unknown_severity_text_is_info() -> None:
     (f,) = parse_nuclei("[x-tpl] [http] [unknown] http://scanme.nmap.org/\n", **_kw())  # type: ignore[arg-type]
     assert f.severity == "info"
+
+
+# ---------------------------------------------------------------- ROUND 4 hostile input
+import json  # noqa: E402
+
+from viper.findings.parsers import MAX_FINDINGS, parse_nmap_ex, parse_nuclei_ex  # noqa: E402
+
+
+def _nj(**over: object) -> str:
+    rec: dict[str, object] = {
+        "template-id": "tpl-x",
+        "info": {"name": "N", "severity": "high"},
+        "matched-at": "http://scanme.nmap.org/a",
+    }
+    rec.update(over)
+    return json.dumps(rec)
+
+
+def test_nuclei_record_without_match_location_is_not_a_finding() -> None:
+    out = '{"template-id":"test","info":{"severity":"critical"}}\n'
+    assert parse_nuclei(out, **_kw()) == []  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("status", [False, "false", "False"])
+def test_nuclei_matcher_status_false_is_not_a_finding(status: object) -> None:
+    assert parse_nuclei(_nj(**{"matcher-status": status}), **_kw()) == []  # type: ignore[arg-type]
+
+
+def test_nuclei_matcher_status_true_still_confirmed() -> None:
+    (f,) = parse_nuclei(_nj(**{"matcher-status": True}), **_kw())  # type: ignore[arg-type]
+    assert f.confidence == "confirmed"
+
+
+def test_nuclei_foreign_host_is_hypothesis_not_confirmed() -> None:
+    (f,) = parse_nuclei(_nj(**{"matched-at": "http://evil.example/x"}), **_kw())  # type: ignore[arg-type]
+    assert f.confidence == "hypothesis"
+    assert f.severity == "info"
+    assert "evil.example" in f.severity_rationale
+    assert "Foreign" in f.title
+    (t,) = parse_nuclei("[tpl-x] [http] [critical] http://evil.example/x\n", **_kw())  # type: ignore[arg-type]
+    assert t.confidence == "hypothesis"
+
+
+def test_nuclei_lookalike_host_is_foreign() -> None:
+    (f,) = parse_nuclei(
+        _nj(**{"matched-at": "http://scanme.nmap.org.evil.example/"}), **_kw()  # type: ignore[arg-type]
+    )
+    assert f.confidence == "hypothesis"
+
+
+@pytest.mark.parametrize(
+    "loc", ["javascript:alert(1)", "http://", "http://a b/", "http://x:99999/", "ftp2://scanme.nmap.org"]
+)
+def test_nuclei_unusable_location_skipped(loc: str) -> None:
+    assert parse_nuclei(_nj(**{"matched-at": loc}), **_kw()) == []  # type: ignore[arg-type]
+
+
+def test_deep_json_does_not_discard_earlier_findings() -> None:
+    good = _nj()
+    bad = '{"x":' + "[" * 5000
+    bad2 = '{"x":' + "[" * 2000 + "]" * 2000 + "}"
+    fs, skipped = parse_nuclei_ex(f"{good}\n{bad}\n{bad2}\n", **_kw())  # type: ignore[arg-type]
+    assert len(fs) == 1
+    assert skipped == 2
+
+
+def test_recursion_error_is_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
+    import viper.findings.parsers as p
+
+    def boom(s: str) -> object:
+        raise RecursionError
+
+    monkeypatch.setattr(p.json, "loads", boom)
+    fs, skipped = p.parse_nuclei_ex(
+        "[tpl-x] [http] [info] http://scanme.nmap.org/\n" + _nj() + "\n", **_kw()  # type: ignore[arg-type]
+    )
+    assert len(fs) == 1 and skipped == 1
+
+
+def test_ex_variants_count_skipped_and_wrappers_match() -> None:
+    out = "22/tcp open ssh\n99999/tcp open bogus\nnoise\n"
+    fs, skipped = parse_nmap_ex(out, **_kw())  # type: ignore[arg-type]
+    assert len(fs) == 1 and skipped == 1
+    assert parse_nmap(out, **_kw()) == fs  # type: ignore[arg-type]
+    nout = "[a-tpl] [http] [bogus] http://scanme.nmap.org/\n" + _nj() + "\n"
+    nf, ns = parse_nuclei_ex(nout, **_kw())  # type: ignore[arg-type]
+    assert len(nf) == 1 and ns == 1
+    assert parse_nuclei(nout, **_kw()) == nf  # type: ignore[arg-type]
+
+
+def test_overlong_line_skipped_not_fatal() -> None:
+    long_line = "[t] [http] [info] http://scanme.nmap.org/" + "a" * 100_000
+    fs, skipped = parse_nuclei_ex(long_line + "\n" + _nj() + "\n", **_kw())  # type: ignore[arg-type]
+    assert len(fs) == 1 and skipped == 1
+
+
+def test_finding_count_is_capped() -> None:
+    out = "\n".join(f"[tpl-{i}] [http] [info] http://scanme.nmap.org/{i}" for i in range(MAX_FINDINGS + 50))
+    fs, skipped = parse_nuclei_ex(out, **_kw())  # type: ignore[arg-type]
+    assert len(fs) == MAX_FINDINGS and skipped == 50
+    nout = "\n".join(f"{p}/tcp open svc" for p in range(1, MAX_FINDINGS + 21))
+    nf, ns = parse_nmap_ex(nout, **_kw())  # type: ignore[arg-type]
+    assert len(nf) == MAX_FINDINGS and ns == 20
+
+
+def test_template_id_length_and_charset_bounded() -> None:
+    assert parse_nuclei(_nj(**{"template-id": "a" * 129}), **_kw()) == []  # type: ignore[arg-type]
+    assert parse_nuclei(_nj(**{"template-id": "x;id"}), **_kw()) == []  # type: ignore[arg-type]
+    assert len(parse_nuclei(_nj(**{"template-id": "a" * 128}), **_kw())) == 1  # type: ignore[arg-type]
+
+
+def test_cve_reference_flood_is_bounded_and_ordered() -> None:
+    tpl = "-".join(f"CVE-2026-{n:04d}" for n in range(1000, 1040))[:128]
+    (f,) = parse_nuclei(_nj(**{"template-id": tpl}), **_kw())  # type: ignore[arg-type]
+    assert len(f.references) <= 20
+    assert len(set(f.references)) == len(f.references)
+    assert f.references[0].endswith("CVE-2026-1000")
+
+
+def test_control_and_osc_sequences_neutralised_everywhere() -> None:
+    osc = "\x1b]8;;http://evil/\x07click\x1b]8;;\x07"
+    clip = "\x1b]52;c;ZXZpbA==\x07"
+    line = f"[tpl-x] [http] [info] http://scanme.nmap.org/{osc}{clip}\x07\x08\u202e\x9b31m"
+    (f,) = parse_nuclei(line + "\n", **_kw())  # type: ignore[arg-type]
+    blob = "\n".join([f.evidence, f.title, f.reproducibility, f.severity_rationale, f.remediation])
+    for bad in ("\x1b", "\x07", "\x08", "\u202e", "\x9b", "ZXZpbA"):
+        assert bad not in blob
+    nm = "22/tcp open ssh\u202e\x1b]52;c;ZXZpbA==\x07 Open\x00SSH\n"
+    (n,) = parse_nmap(nm, **_kw())  # type: ignore[arg-type]
+    assert "\x1b" not in n.evidence and "\u202e" not in n.evidence
+    assert "\x00" not in n.evidence and r"\x00" in n.evidence
+    assert r"\u202e" in n.evidence
+
+
+def test_bidi_in_json_escape_is_neutralised_after_decode() -> None:
+    rec = _nj(info={"name": "a\u202eb", "severity": "low", "remediation": "fix\u2066it"})
+    (f,) = parse_nuclei(json.dumps(json.loads(rec), ensure_ascii=True) + "\n", **_kw())  # type: ignore[arg-type]
+    assert "\u202e" not in f.title and "\u2066" not in f.remediation
+    assert r"\u202e" in f.title
+
+
+def test_reproduction_is_quoted_and_labelled_posix() -> None:
+    import shlex
+
+    hostile = "http://scanme.nmap.org/;id;#$(touch${IFS}x)`y`'z"
+    (f,) = parse_nuclei(f"[tpl-x] [http] [info] {hostile}\n", **_kw())  # type: ignore[arg-type]
+    assert f.reproducibility.startswith("POSIX shell: ")
+    argv = shlex.split(f.reproducibility.removeprefix("POSIX shell: "))
+    assert argv == ["nuclei", "-u", hostile, "-id", "tpl-x"]  # one argument, no injection
+    (n,) = parse_nmap("22/tcp open ssh\n", **_kw(target="scanme.nmap.org; id"))  # type: ignore[arg-type]
+    assert shlex.split(n.reproducibility.removeprefix("POSIX shell: ")) == [
+        "nmap", "-p", "22", "scanme.nmap.org; id"
+    ]
