@@ -72,6 +72,11 @@ Audit citations:
 - <a id="audit-1"></a>[audit-1]: `{{ audit_event_hash }}`; event {{ event_type }}; sequence {{ seq }}; action {{ action_id }}
 - <a id="audit-2"></a>[audit-2]: `{{ audit_event_hash }}`; event {{ event_type }}; sequence {{ seq }}; action {{ action_id }}
 
+## Denied actions
+
+<!-- Appended if any actions were denied by policy or approval -->
+- {{ action_id }} ({{ tool_name }}): {{ policy_reason }}
+
 ---
 Run summary: status={{ status }} executed={{ executed_count }} denied={{ denied_count }}
 ```
