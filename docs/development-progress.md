@@ -160,3 +160,25 @@ Kali VM and the one live scan are a gated on-demand step** (see `docs/plans/m6-g
   `scanme.nmap.org` (`projects/lab-scanme/scope.yaml`), reached over a gcloud IAP tunnel (no public port).
 - Not done: the live VM run itself (gated on user go), noVNC desktop take-over (deferred), external
   audit-head anchoring (still open), real-execution audit event naming (reuses `tool_dry_run` for now).
+
+## M6 LIVE VALIDATION — 2026-11-08 (definition of done met)
+Provisioned a real headless GCP execution plane and ran the five verbs end-to-end against the
+authorized target `scanme.nmap.org`, then tore everything down (total cost a few cents).
+- **Infra:** spot `e2-medium` Ubuntu 22.04 VM (`--no-address`, no public IP), Cloud NAT for egress-only
+  internet, IAP-SSH-only firewall; `vmapi` under systemd bound to `127.0.0.1:8443` (TLS + bearer token);
+  reached from the workstation via an **SSH port-forward over IAP** (`-L 8443:localhost:8443`) — the
+  `start-iap-tunnel` method fails here because the server binds loopback by design.
+- **Pre-deploy gate:** codex's 3 Linux-only process-tree-kill tests (plus the rest) — **30 passed on the VM**.
+- **The five verbs, live:**
+  1. *Approve* — `nmap` (ACTIVE) paused at the approval checkpoint; `agent resume --decision ALLOW`.
+  2. *Watch* — `viper exec watch` streamed real nmap output: `scanme.nmap.org (45.33.32.156)` 22/tcp ssh,
+     80/tcp http open, scanned in 7.53s; run reported `COMPLETED executed=1`.
+  3. *Take over* — `viper exec takeover` → the agent's next run returned `REJECTED executed=0`.
+  4. *Pause* — a running scan went `running → paused` (SIGSTOP).
+  5. *Emergency-stop* — `viper exec stop` → `killed, exit_code -9` (SIGKILL whole process group, verified).
+- **Audit:** `viper audit verify --project lab-scanme` → `audit log OK` (intact hash chain:
+  plan_proposed → policy REQUIRE_APPROVAL → approval_requested → approval_granted → approval_consumed →
+  tool_dry_run → run_completed).
+- **Teardown:** VM + NAT + router + firewall deleted; `.env` reset to `VIPER_ALLOW_ACTIVE_TESTING=false`.
+- Follow-ups unchanged: noVNC desktop take-over (deferred); real-exec audit event is still named
+  `tool_dry_run`; external audit-head anchoring still open.
