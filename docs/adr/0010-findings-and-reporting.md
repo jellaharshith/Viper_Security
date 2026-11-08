@@ -1,6 +1,6 @@
-# ADR 0010: Finding model, deterministic confidence classification, and external audit anchoring
+# ADR 0010: Finding model, deterministic confidence classification, report persistence, and audit anchoring
 
-Status: Proposed (2026-11-08)
+Status: Accepted / As-Built (2026-11-08)
 
 ## Context
 
@@ -10,6 +10,7 @@ In Phase 4 of the Viper architecture, the agent transitions from an execution ha
 - **Hallucinated Vulnerabilities:** LLMs frequently mistake software version banners for confirmed vulnerabilities, fabricate CVE associations, or exaggerate severity without verifying exploitability.
 - **Unverified Inferences:** Presenting speculative model hypotheses alongside verified scanner findings creates dangerous noise, potentially causing unauthorized client actions or discredited security reports.
 - **Broken Provenance:** Stakeholders and bug bounty triage teams require incontrovertible proof that reported findings were produced by authorized scans against in-scope assets, backed by exact raw evidence and execution timestamps.
+- **Output Truncation & Memory Exhaustion:** High-volume scanner outputs (such as extensive port scans or verbose HTTP probes) can exhaust system memory or corrupt database checkpoints if not bounded.
 - **Tamper Vulnerability of Local Audit Logs:** ADR 0009 deferred external audit-head anchoring to M7. While the local SHA-256 hash chain (`data/audit/{project_id}.jsonl`) detects file tampering or truncation by unprivileged users, it cannot protect against an attacker with host or root privileges rewriting the log file and recomputing hashes.
 
 See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and `docs/adr/0009-execution-plane.md`.
@@ -32,24 +33,38 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
    - `confidence="hypothesis"` is assigned to ambiguous scanner states (e.g. Nmap `open|filtered`) and any lead, observation, or attack path synthesized by an LLM.
    - The LLM is structurally prohibited from creating or escalating a finding to `"confirmed"` status.
 
-3. **Deterministic Output Parsers (No LLM in the Parser Path):**
+3. **Tool Output Capture with 1 MiB Ceiling:**
+   `RemoteExecutor` captures job stdout by streaming `GET /jobs/{id}/stream` over verified TLS with bearer auth once the job reaches terminal `state == "done"`. Lines are collected, joined with newlines, hard-capped at 1 MiB (`MAX_OUTPUT_BYTES = 1024 * 1024`, truncating cleanly without error), and returned in `DryRunResult.output: str`. Stubs leave `output = ""`. Stream errors on finished jobs fail closed by raising `RemoteJobError`.
+
+4. **Deterministic Output Parsers (No LLM in the Parser Path):**
    Tool output parsing (`viper.findings.parsers`) is implemented as pure, deterministic functions (`parse_nmap`, `parse_nuclei`) using strict regex and JSON schema matching. Anything not matching expected scanner formats (such as arbitrary prose, injected attacker prompts, or error noise) is discarded. ANSI control codes are stripped.
 
-4. **Traceable Markdown Report Generation:**
-   `viper.report.generator.render_report` compiles findings and audit events into a standardized Markdown report:
-   - Sections are partitioned into `## Confirmed findings` and `## Hypotheses`.
-   - When no verified vulnerabilities or open ports exist, the report explicitly states `No confirmed findings`.
-   - Every finding cross-references its backing audit record via `[audit-N]` footnote markers linking to an Audit Trail Citation table. Events from mismatched threads or unrecognized hashes resolve as `Unresolved`.
-   - Raw evidence is enclosed in indented code blocks and HTML entities are escaped to prevent Markdown breakout or prompt-injection formatting attacks.
+5. **Traceable Markdown Report Generation & Persistent Storage:**
+   - `viper.report.generator.render_report` compiles findings and audit events into a standardized Markdown report:
+     - Partitions into `## Confirmed findings` and `## Hypotheses`.
+     - When no verified vulnerabilities exist, explicitly prints `No confirmed findings.`
+     - Resolves audit citations to `[audit-N]` footnote markers. Mismatched threads or action IDs resolve to `Unresolved`.
+     - Indents raw evidence inside four-space code blocks and escapes HTML entities.
+   - Reports are automatically saved to `Settings.report_dir / f"{valid_thread(thread)}.md"` (default `data/reports/<thread>.md`).
+   - Thread IDs are strictly validated (`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`), blocking directory traversal.
+   - The CLI exposes `viper report --thread <thread>` to read and display saved reports.
 
-5. **External Audit-Head Anchoring (RFC 3161 TSA / Sigstore Rekor):**
-   Resolving the deferral in ADR 0009, Viper implements `viper.agents.anchor` to cryptographically notarize the terminal SHA-256 hash (`prev_hash` of the final event) of the audit chain:
-   - **Mock Provider (Default):** Offline CI and unit tests use `provider="mock"`, generating deterministic, local-only receipts with `externally_verified=False` and zero network calls.
-   - **External Providers (Opt-in):** In live engagements, operators opt into external notarization (`allow_network=True`) via RFC 3161 Time-Stamp Authorities (TSA) or the Sigstore Rekor public transparency log.
-   - Receipts are stored in `data/audit/{project_id}.anchor.json` and verified by `viper audit verify`. Network failures fail closed and redact provider credentials.
+6. **Honest Audit Logging Taxonomy:**
+   Audit event types clearly delineate real target interaction from simulated dry-runs:
+   - Real tool execution commits `tool_executed`.
+   - Simulated execution commits `tool_dry_run`.
+   - Lifecycle additions: `plan_proposed`, `findings_generated`, `report_generated`, `audit_anchored`, `run_failed`, `run_completed`.
 
-6. **Planner Proposes, Policy Decides:**
-   The LLM test planner (`viper.agents.planner`) acts strictly as a recommender, translating high-level objectives into `list[Action]`. The policy engine (`viper.policy.engine`) evaluates every action against authoritative scope. The planner has no authority to execute actions, bypass approvals, or alter findings.
+7. **Opt-In, Fail-Closed LLM Planner:**
+   - The LLM planner (`viper.agents.planner.LLMPlanner`) is opt-in via `viper agent run --llm --request <text>`, mutually exclusive with `--plan <file>`.
+   - Enforces `MAX_ACTIONS = 8` to bound blast radius.
+   - Validates proposals strictly against `Action.model_validate` and registry tool schemas; fails closed with `PlannerError` on syntax errors, duplicate IDs, or unknown tools.
+
+8. **Audit Anchoring M7 Implementation & Limitation:**
+   - Resolving ADR 0009 deferral, `viper.agents.anchor` implements cryptographic anchoring adapters (mock, RFC 3161 TSA, Sigstore Rekor).
+   - **Documented M7 Limitation:** CLI anchoring (`viper audit anchor --project <id>`) is **MOCK ONLY for now**, appending receipts to `data/audit/<project>.anchors.jsonl`.
+   - While TSA and Rekor HTTP submission adapters exist, real external receipts remain `UNVERIFIED` during `viper audit verify` because no offline cryptographic verifier (for TSA PKCS#7 or Rekor inclusion proofs) is integrated yet.
+   - `anchor_verdict` evaluates receipts during verification: missing heads return `MISMATCH` (fails verification), while in-chain receipts return `UNVERIFIED` pending an open user trust decision.
 
 ---
 
@@ -58,14 +73,25 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
 - **Positive:**
   - **Zero Hallucinated Confirmations:** Model imagination cannot contaminate the confirmed findings list.
   - **Audit Provenance:** Every reported issue is linked directly to raw execution evidence and immutable audit hashes.
-  - **External Non-Repudiation:** Anchoring the audit head to an external TSA or transparency log guarantees that logs cannot be rewritten after the fact without detection.
-  - **Offline Safety:** Default test suites and CI runs execute 100% offline using mock receipts and captured tool fixtures.
-  - **Clear Stakeholder Communication:** Reports distinguish actionable, proven risks from speculative investigation leads.
+  - **Memory & Storage Safety:** 1 MiB stream ceiling and thread token validation prevent resource exhaustion and file overwrite attacks.
+  - **Offline Safety:** Automated test suite runs 100% offline (353 tests green).
+  - **Honest Telemetry:** Separate `tool_executed` vs `tool_dry_run` events ensure compliance reviews can distinguish real network actions from dry-runs.
 
 - **Trade-offs & Limitations:**
-  - Ambiguous or subtle vulnerabilities that scanners detect as potential issues remain categorized as `"hypothesis"` until an explicit confirmation tool or human verification is provided.
-  - External anchoring requires internet connectivity and access to an RFC 3161 TSA or Rekor service during the anchoring step.
-  - Scanner output formats that deviate from expected regex/JSON schemas will be ignored until dedicated parser patterns are added.
+  - **Mock Anchoring Only in CLI:** External TSA and Rekor receipts cannot be verified offline until trusted verifier libraries are added.
+  - **Output Truncation:** Scans generating more than 1 MiB of output are truncated at the boundary, which may omit lower-priority trailing scanner lines.
+
+---
+
+## Open design decisions
+
+1. **Anchor Verdict Trust Levels (`src/viper/agents/anchor_check.py`):**
+   - Non-matching anchor heads return `("MISMATCH", True)` (verification failure).
+   - In-chain receipts return `("UNVERIFIED", False)` for all other cases.
+   - **Pending User Decision:** Defining the exact trust policy:
+     - Does a valid mock token (`mock + token_ok`) pass verification, or remain a warning?
+     - Does an external token without an offline verifier (`external + not token_ok`) fail verification or stay advisory?
+     - Does an invalid mock token (`mock + not token_ok`) trigger a verification failure?
 
 ---
 
@@ -75,10 +101,7 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
   *Rejected:* Allowing the LLM to assign "confirmed" based on text reasoning introduces substantial hallucination risks and violates Phase 4 core requirements.
 
 - **Per-Event External Anchoring:**
-  *Rejected:* Submitting an external timestamp or Rekor entry for every individual audit event introduces severe network latency and rate-limiting issues. Because the audit log is a cryptographic SHA-256 hash chain, anchoring only the terminal head hash mathematically proves the integrity and sequence of all preceding events in the chain.
+  *Rejected:* Submitting an external timestamp or Rekor entry for every individual audit event introduces severe network latency. Anchoring the chain head covers the entire history.
 
-- **PDF or HTML Report Generation:**
-  *Rejected:* Markdown provides a human-readable, diffable, version-controllable format that can be directly converted to PDF/HTML via pandoc or corporate documentation pipelines while minimizing runtime dependencies.
-
-- **Single Unpartitioned Finding List:**
-  *Rejected:* Presenting hypotheses and confirmed findings in a single merged table invites stakeholder confusion and false-positive escalation.
+- **Dynamic Plan Size Without Limit:**
+  *Rejected:* Unbounded plans invite runaway execution and approval fatigue; capped at 8 actions.

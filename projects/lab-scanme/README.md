@@ -19,4 +19,30 @@ This directory defines the authoritative engagement scope for testing Viper agai
    - Standard open ports (e.g. 22/tcp OpenSSH, 80/tcp Apache) parsed from Nmap output are classified as `confidence="confirmed"` with severity `info`.
    - Cleartext services (if any) escalate to severity `low`.
    - Ambiguous scanner states (`open|filtered`) or speculative model deductions are classified as `confidence="hypothesis"`.
-4. **Audit Traceability:** All executed actions are recorded in `data/audit/lab-scanme.jsonl` with SHA-256 hash chains and notarized via `viper audit anchor`.
+4. **Tool Output Capture:** `RemoteExecutor` captures raw scanner stdout from the remote VM stream endpoint up to a 1 MiB safety ceiling (`DryRunResult.output`).
+5. **Audit Traceability & Anchoring:**
+   - Real tool dispatches are logged as `tool_executed` in `data/audit/lab-scanme.jsonl`.
+   - Completed findings emit `findings_generated`, and final report generation emits `report_generated`.
+   - CLI audit anchoring (`viper audit anchor --project lab-scanme`) records mock receipts in `data/audit/lab-scanme.anchors.jsonl` with event `audit_anchored`. Note: M7 CLI anchoring is mock-only.
+
+## Operator Execution Workflow
+
+```bash
+# 1. Propose and run a test plan (deterministic JSON or opt-in LLM planner)
+viper agent run --scope projects/lab-scanme/scope.yaml --thread lab1 --plan plans/scanme.json
+# OR with the opt-in LLM planner (requires non-empty request, max 8 actions):
+viper agent run --scope projects/lab-scanme/scope.yaml --thread lab1 --llm --request "scan scanme.nmap.org for open web ports"
+
+# 2. Inspect pending action and resume at approval checkpoint
+viper agent resume --scope projects/lab-scanme/scope.yaml --thread lab1 --decision ALLOW
+
+# 3. View the persisted Markdown report
+viper report --thread lab1
+# (Saved to data/reports/lab1.md)
+
+# 4. Anchor the audit log head (mock provider)
+viper audit anchor --project lab-scanme
+
+# 5. Verify audit log integrity and anchor receipts
+viper audit verify --project lab-scanme
+```
