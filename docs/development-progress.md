@@ -149,6 +149,10 @@ Kali VM and the one live scan are a gated on-demand step** (see `docs/plans/m6-g
 - **Exclusive control** (`src/viper/execution/control.py`): one holder per project on SQLite; a human
   `takeover()` preempts the agent, which then refuses to dispatch (`graph.execute` acquires `agent`
   first). Reentrant for the agent, race-free (the INSERT is the compare-and-set).
+- **Real tools** (`src/viper/tools/real.py`): `nmap` and `nuclei` registered as `ACTIVE`,
+  `dry_run_only=False`, with parameter schemas mirroring the vmapi allowlist. The policy engine
+  therefore DENIES them unless `allow_active_testing` is on, and REQUIRES human approval when it is.
+  Verified end-to-end: a disarmed `nmap` scan of `scanme.nmap.org` is denied with an intact audit chain.
 - **CLI**: `viper exec watch|pause|stop` (VM-backed) and `viper exec takeover|release` (control lock).
 - **Config**: `exec_api_ca_cert`, `exec_egress_allowlist` (+ `egress_hosts()`); `exec_api_url`,
   `exec_api_token`, `allow_active_testing` already existed. Default config stays fully dry-run.

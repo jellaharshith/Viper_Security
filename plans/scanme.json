@@ -1,0 +1,7 @@
+[
+  {
+    "action_id": "nmap-scanme-1",
+    "tool_name": "nmap",
+    "args": {"target": "scanme.nmap.org", "ports": "22,80,443", "service_detection": true}
+  }
+]
