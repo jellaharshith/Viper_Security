@@ -27,19 +27,19 @@ Source action: {{ source_action_id }}
 Severity: {{ severity }}
 Severity rationale: {{ severity_rationale }}
 Confidence: confirmed
-Reproducibility: {{ reproducibility }}
+Reproducibility: POSIX shell: nuclei -u {{ target }} -id {{ template_id }}
 Remediation: {{ remediation }}
 
 Evidence (raw excerpt):
 
-    {{ indented_raw_evidence_line_1 }}
+    {{ indented_raw_evidence_line_1 }}\x0a
     {{ indented_raw_evidence_line_2 }}
 
 References:
 - {{ reference_url_or_id }}
 
 Audit citations:
-- [audit-1](#audit-1): `{{ audit_event_hash }}`
+- [audit-1](#audit-1): `{{ tool_result_audit_hash }}`
 
 ## Hypotheses
 
@@ -54,7 +54,7 @@ Source action: {{ source_action_id }}
 Severity: {{ severity }}
 Severity rationale: {{ severity_rationale }}
 Confidence: hypothesis
-Reproducibility: {{ reproducibility }}
+Reproducibility: POSIX shell: nuclei -u {{ foreign_host }} -id {{ template_id }}
 Remediation: {{ remediation }}
 
 Evidence (raw excerpt):
@@ -65,16 +65,25 @@ References:
 - None supplied.
 
 Audit citations:
-- [audit-2](#audit-2): `{{ audit_event_hash }}`
+- [audit-2](#audit-2): `{{ tool_result_audit_hash }}`
 
 ## Audit event index
 
-- <a id="audit-1"></a>[audit-1]: `{{ audit_event_hash }}`; event {{ event_type }}; sequence {{ seq }}; action {{ action_id }}
-- <a id="audit-2"></a>[audit-2]: `{{ audit_event_hash }}`; event {{ event_type }}; sequence {{ seq }}; action {{ action_id }}
+<!-- Citations resolve strictly to real tool_result events with detail.simulated is False -->
+- <a id="audit-1"></a>[audit-1]: `{{ tool_result_audit_hash }}`; event tool_result; sequence {{ seq }}; action {{ action_id }}
+- <a id="audit-2"></a>[audit-2]: `{{ tool_result_audit_hash }}`; event tool_result; sequence {{ seq }}; action {{ action_id }}
+
+## Analysis warnings
+
+<!-- Appended whenever output was truncated, malformed records were skipped, or digests mismatched -->
+Analysis is INCOMPLETE; do not read missing findings as a clean result.
+
+- {{ action_id }}: output truncated; analysis is incomplete
+- {{ action_id }}: {{ skipped_count }} record(s) skipped as malformed; analysis is incomplete
 
 ## Denied actions
 
-<!-- Appended if any actions were denied by policy or approval -->
+<!-- Appended if any actions were denied by policy or approval; IDs and reasons are sanitized -->
 - {{ action_id }} ({{ tool_name }}): {{ policy_reason }}
 
 ---
@@ -85,19 +94,27 @@ Run summary: status={{ status }} executed={{ executed_count }} denied={{ denied_
 
 ## Report Generation & Storage Lifecycle
 
-1. **Deterministic Analysis:**
-   - Raw scanner stdout captured by `RemoteExecutor` from `/jobs/{id}/stream` (capped at 1 MiB) is parsed by `viper.findings.parsers` without LLM intervention.
-   - Verified open ports and template matches are labeled `confidence="confirmed"`; ambiguous scanner results are labeled `confidence="hypothesis"`.
-2. **Audit Binding:**
-   - Each finding records `audit_refs=[r["audit_hash"]]`, linking the finding to the `tool_executed` (or `tool_dry_run`) audit event.
+1. **Evidence Events v2 Auditing:**
+   - Real dispatch commits `tool_dispatch` before execution (intent only, never a citation target).
+   - Real dispatch commits `tool_result` after execution, recording `digest = sha256(output)` and `simulated = False`.
+   - Simulated stub runs commit `tool_dry_run`. The legacy event `tool_executed` does not exist.
+2. **Re-Derivation of Findings:**
+   - Stored findings in checkpoints are treated as untrusted.
+   - `evidence.rederive()` verifies that tool stdout matches the audited `tool_result` digest before running deterministic parsers (`parse_nmap_ex`, `parse_nuclei_ex`).
 3. **Escaping & Breakout Protection:**
-   - Raw scanner evidence is indented by four spaces inside indented code blocks, ensuring external servers cannot break out of markdown fences or inject markdown headers.
-   - Text metadata is sanitized using HTML escaping and backslash escaping for special characters.
-4. **Automatic Persistence:**
-   - Reports are automatically saved upon run completion to `Settings.report_dir / f"{valid_thread(thread)}.md"` (default: `data/reports/<thread>.md`).
-   - Thread IDs are strictly validated with regex `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` to prevent filesystem path traversal.
-5. **Retrieval CLI:**
+   - Raw scanner evidence is indented by four spaces inside indented code blocks.
+   - Control bytes (C0/C1/DEL) are rendered visibly as `\xNN` and Unicode directional formatting as `\uNNNN`.
+   - Markdown and HTML characters are escaped to prevent breakout attacks.
+4. **Analysis Warnings:**
+   - If output was truncated (`DryRunResult.truncated is True`), malformed records were skipped, or an output digest mismatched, an explicit warning section is appended.
+5. **Denied Actions:**
+   - Refused actions are listed with policy reasons, sanitized via `_safe` to prevent formatting or link injection.
+6. **Exclusive Persistence & Thread Safety:**
+   - Reports are automatically saved to `Settings.report_dir / f"{valid_thread(thread)}.md"` (default: `data/reports/<thread>.md`) using mode `"x"` (exclusive creation).
+   - Thread IDs cannot be reused for new runs.
+7. **Terminal-Safe Retrieval CLI:**
    - Operators display saved reports using:
      ```bash
      viper report --thread <thread>
      ```
+   - `terminal_safe()` strips non-printable control characters and Unicode bidi overrides prior to terminal display.

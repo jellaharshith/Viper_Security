@@ -18,10 +18,11 @@ This directory defines the authoritative engagement scope for testing Viper agai
 3. **Confirmed vs. Hypothesis Findings:**
    - Standard open ports (e.g. 22/tcp OpenSSH, 80/tcp Apache) parsed from Nmap output are classified as `confidence="confirmed"` with severity `info`.
    - Cleartext services (if any) escalate to severity `low`.
-   - Ambiguous scanner states (`open|filtered`) or speculative model deductions are classified as `confidence="hypothesis"`.
-4. **Tool Output Capture:** `RemoteExecutor` captures raw scanner stdout from the remote VM stream endpoint up to a 1 MiB safety ceiling (`DryRunResult.output`).
-5. **Audit Traceability & Anchoring:**
-   - Real tool dispatches are logged as `tool_executed` in `data/audit/lab-scanme.jsonl`.
+   - Ambiguous scanner states (`open|filtered`), model deductions, or foreign-host matches are classified as `confidence="hypothesis"`.
+4. **Tool Output Capture:** `RemoteExecutor` captures raw scanner stdout from the remote VM stream endpoint up to a 1 MiB safety ceiling (`DryRunResult.output`, `DryRunResult.truncated`).
+5. **Audit Traceability & Anchoring (Evidence Events v2):**
+   - Real tool dispatches log operational intent as `tool_dispatch` before execution, and execution outcome with an output SHA-256 digest as `tool_result` after execution. The legacy event `tool_executed` does not exist.
+   - Findings are re-derived at analysis and report time from digest-verified output.
    - Completed findings emit `findings_generated`, and final report generation emits `report_generated`.
    - CLI audit anchoring (`viper audit anchor --project lab-scanme`) records mock receipts in `data/audit/lab-scanme.anchors.jsonl` with event `audit_anchored`. Note: M7 CLI anchoring is mock-only.
 
@@ -36,13 +37,13 @@ viper agent run --scope projects/lab-scanme/scope.yaml --thread lab1 --llm --req
 # 2. Inspect pending action and resume at approval checkpoint
 viper agent resume --scope projects/lab-scanme/scope.yaml --thread lab1 --decision ALLOW
 
-# 3. View the persisted Markdown report
+# 3. View the persisted Markdown report (exclusive creation, terminal-safe)
 viper report --thread lab1
 # (Saved to data/reports/lab1.md)
 
 # 4. Anchor the audit log head (mock provider)
 viper audit anchor --project lab-scanme
 
-# 5. Verify audit log integrity and anchor receipts
+# 5. Verify audit log integrity, anchor coverage, and anchor verdicts
 viper audit verify --project lab-scanme
 ```
