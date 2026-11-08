@@ -1,0 +1,328 @@
+# M6 Operator Runbook: Headless GCP Kali Execution Plane
+
+This runbook provides step-by-step instructions for provisioning, configuring, operating, and tearing down an on-demand, headless Kali Linux execution VM on Google Cloud Platform (GCP).
+
+---
+
+## 1. Safety & Architecture Guarantees
+
+- **Headless-First:** No graphical environment, VNC, or X11 desktop. Operations occur strictly through the headless Exec API (`vmapi`).
+- **Zero Public Ingress:** The VM has **no external IP address** (`--no-address`). Communication with the VM API is routed exclusively through Google Cloud Identity-Aware Proxy (IAP) encrypted SSH tunneling.
+- **Localhost Binding:** The `vmapi` service on the VM binds strictly to `127.0.0.1:8443`. It is never exposed on external or broadcast network interfaces.
+- **Cost Capped (<$50/mo):** Provisioned as an `e2-medium` SPOT instance with automatic stop on preemption. Stopping the VM when idle drops compute charges to $0.
+- **Strict Scope:** Authorized exclusively for `scanme.nmap.org` (Nmap's official scan-test host).
+
+---
+
+## 2. Prerequisites
+
+The operator must have:
+1. An active Google Cloud Platform account with billing enabled.
+2. The `gcloud` CLI installed and authenticated on the local workstation:
+   ```bash
+   gcloud auth login
+   ```
+3. Permissions to manage Compute Engine instances and IAP tunnels (`roles/compute.instanceAdmin.v1` and `roles/iap.tunnelResourceAccessor`).
+
+---
+
+## 3. Step-by-Step Setup Guide
+
+### Step 1: Set Project Defaults and Enable Required APIs
+Set your active GCP project and default zone, then enable the Compute Engine and Identity-Aware Proxy APIs.
+
+```bash
+# Set your GCP project ID
+gcloud config set project YOUR_GCP_PROJECT_ID
+
+# Set target region and zone (choose a region physically close to you)
+gcloud config set compute/region us-central1
+gcloud config set compute/zone us-central1-a
+
+# Enable Compute Engine and Identity-Aware Proxy services
+gcloud services enable compute.googleapis.com iap.googleapis.com
+```
+
+---
+
+### Step 2: Configure Firewall Rules (IAP SSH Ingress Only)
+Create a firewall rule permitting ingress on TCP port 22 strictly from Google's IAP netblock (`35.235.240.0/20`). **Do not open port 8443 or any other port to the public internet.**
+
+```bash
+gcloud compute firewall-rules create allow-iap-ssh \
+  --direction=INGRESS \
+  --priority=1000 \
+  --network=default \
+  --action=ALLOW \
+  --rules=tcp:22 \
+  --source-ranges=35.235.240.0/20 \
+  --description="Allow SSH exclusively through Google Cloud IAP"
+```
+
+---
+
+### Step 3: Provision the Headless Spot Kali VM
+Create the VM with `--no-address` (no external IP) and SPOT provisioning.
+
+```bash
+gcloud compute instances create viper-kali-lab \
+  --image-family=kali-rolling \
+  --image-project=kali-linux \
+  --machine-type=e2-medium \
+  --boot-disk-size=30GB \
+  --boot-disk-type=pd-balanced \
+  --no-address \
+  --provisioning-model=SPOT \
+  --instance-termination-action=STOP \
+  --shielded-secure-boot \
+  --shielded-vtpm \
+  --metadata=enable-oslogin=TRUE \
+  --tags=viper-execution-node
+```
+
+> [!NOTE]
+> If the `kali-linux` image family requires marketplace license acceptance or is unavailable in your organization, use Ubuntu 22.04 LTS:
+> ```bash
+> gcloud compute instances create viper-kali-lab \
+>   --image-family=ubuntu-2204-lts \
+>   --image-project=ubuntu-os-cloud \
+>   --machine-type=e2-medium \
+>   --boot-disk-size=30GB \
+>   --boot-disk-type=pd-balanced \
+>   --no-address \
+>   --provisioning-model=SPOT \
+>   --instance-termination-action=STOP \
+>   --shielded-secure-boot \
+>   --shielded-vtpm \
+>   --metadata=enable-oslogin=TRUE
+> ```
+
+---
+
+### Step 4: Connect via IAP and Verify Scanner Tools
+Establish an initial SSH session via the IAP tunnel to verify connectivity and tool availability:
+
+```bash
+gcloud compute ssh viper-kali-lab --tunnel-through-iap
+```
+
+Inside the VM terminal, verify tool installation:
+```bash
+# If using Kali:
+which nmap nuclei
+nmap --version | head -n 1
+
+# If using Ubuntu (install tools if not present):
+sudo apt-get update && sudo apt-get install -y nmap nuclei python3-pip python3-venv
+```
+
+---
+
+### Step 5: Deploy `vmapi` Under systemd
+
+#### 1. Prepare Directory Structure on VM
+While connected to the VM:
+```bash
+sudo mkdir -p /opt/viper/vmapi /etc/viper/certs
+sudo chown -R $USER:$USER /opt/viper/vmapi
+```
+
+#### 2. Copy `vmapi` Code from Local Workstation
+From a **local workstation** terminal in `C:\Users\STSC\Desktop\Viper`:
+```bash
+gcloud compute scp --recurse --tunnel-through-iap vmapi viper-kali-lab:/tmp/vmapi-upload
+```
+
+#### 3. Install Application and Virtual Environment on VM
+Back in the **VM SSH session**:
+```bash
+cp -r /tmp/vmapi-upload/* /opt/viper/vmapi/
+rm -rf /tmp/vmapi-upload
+
+# Create dedicated virtualenv
+python3 -m venv /opt/viper/vmapi/.venv
+/opt/viper/vmapi/.venv/bin/pip install --upgrade pip
+/opt/viper/vmapi/.venv/bin/pip install -r /opt/viper/vmapi/requirements.txt
+```
+
+#### 4. Generate TLS Certificate and Key on VM
+Generate a self-signed certificate bound to `localhost` and `127.0.0.1`:
+```bash
+sudo openssl req -x509 -newkey rsa:4096 -sha256 -days 90 -nodes \
+  -keyout /etc/viper/certs/vmapi-key.pem \
+  -out /etc/viper/certs/vmapi-cert.pem \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+
+sudo chmod 600 /etc/viper/certs/vmapi-key.pem
+sudo chmod 644 /etc/viper/certs/vmapi-cert.pem
+```
+
+#### 5. Generate Bearer Token and Secret Environment File
+```bash
+# Generate high-entropy bearer token
+TOKEN=$(openssl rand -hex 32)
+echo "=== YOUR TOKEN (COPY THIS FOR LOCAL .env): ==="
+echo "$TOKEN"
+echo "=============================================="
+
+# Write restricted environment file
+sudo bash -c "cat <<EOF > /etc/viper/vmapi.env
+VIPER_EXEC_API_TOKEN=${TOKEN}
+VIPER_EXEC_TARGET_ALLOWLIST=scanme.nmap.org
+EOF"
+
+sudo chmod 600 /etc/viper/vmapi.env
+```
+
+#### 6. Configure systemd Service
+Create `/etc/systemd/system/viper-vmapi.service`:
+```bash
+sudo bash -c 'cat <<EOF > /etc/systemd/system/viper-vmapi.service
+[Unit]
+Description=Viper Headless Remote Execution API Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/viper/vmapi
+EnvironmentFile=/etc/viper/vmapi.env
+ExecStart=/opt/viper/vmapi/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8443 --ssl-keyfile /etc/viper/certs/vmapi-key.pem --ssl-certfile /etc/viper/certs/vmapi-cert.pem
+Restart=always
+RestartSec=3
+KillMode=mixed
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+```
+
+#### 7. Enable and Start the Service
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now viper-vmapi.service
+
+# Verify service is running
+sudo systemctl status viper-vmapi.service --no-pager
+```
+
+#### 8. Verify Local Health Endpoint on VM
+```bash
+curl --cacert /etc/viper/certs/vmapi-cert.pem \
+  -H "Authorization: Bearer ${TOKEN}" \
+  https://127.0.0.1:8443/health
+```
+Expected output:
+```json
+{"status":"ok","tools":["nmap","nuclei"]}
+```
+
+Exit the VM SSH session (`exit`).
+
+---
+
+### Step 6: Fetch Certificate and Configure Local Workstation
+
+#### 1. Download VM Certificate to Local Workstation
+From the local Windows PowerShell terminal:
+```powershell
+New-Item -ItemType Directory -Force -Path secrets
+gcloud compute scp --tunnel-through-iap viper-kali-lab:/etc/viper/certs/vmapi-cert.pem secrets/vm-ca.pem
+```
+
+#### 2. Configure Local `.env`
+Add the following configuration lines to your git-ignored `.env` file in the Viper project root:
+```ini
+VIPER_EXEC_API_URL=https://localhost:8443
+VIPER_EXEC_API_TOKEN=<THE_TOKEN_GENERATED_IN_STEP_5>
+VIPER_EXEC_API_CA_CERT=./secrets/vm-ca.pem
+VIPER_EXEC_EGRESS_ALLOWLIST=scanme.nmap.org
+VIPER_ALLOW_ACTIVE_TESTING=true
+```
+
+---
+
+### Step 7: Open Local IAP Tunnel
+Run the IAP tunnel in a dedicated terminal window on your local workstation:
+
+```powershell
+gcloud compute start-iap-tunnel viper-kali-lab 8443 --local-host-port=localhost:8443
+```
+Keep this terminal open while executing commands.
+
+In another terminal, test connectivity through the local tunnel:
+```powershell
+curl.exe --cacert ./secrets/vm-ca.pem -H "Authorization: Bearer <TOKEN>" https://localhost:8443/health
+```
+Expected response:
+```json
+{"status":"ok","tools":["nmap","nuclei"]}
+```
+
+---
+
+### Step 8: Gated Live Execution against `scanme.nmap.org`
+
+Execute the lab workflow using the authorized scope file:
+
+```powershell
+# 1. Start agent thread with lab-scanme scope
+$env:PYTHONPATH="src"
+.venv\Scripts\python -m viper cli agent run --scope projects/lab-scanme/scope.yaml --plan plans/scanme.json --thread lab1
+
+# 2. Review the pending active action, then resume
+.venv\Scripts\python -m viper cli agent resume --scope projects/lab-scanme/scope.yaml --thread lab1 --decision ALLOW
+
+# 3. Stream live scan stdout
+.venv\Scripts\python -m viper cli exec watch --thread lab1
+
+# 4. If emergency stop is needed:
+.venv\Scripts\python -m viper cli exec stop --thread lab1
+
+# 5. Verify the audit log integrity
+.venv\Scripts\python -m viper cli audit verify --project lab-scanme
+```
+
+---
+
+## 4. Cost Control & Teardown Guide
+
+### Stop VM (Compute Paused, Disk Retained)
+When testing is paused, stop the VM immediately. Compute billing drops to **$0/hour**; you only incur nominal persistent disk storage charges (~$1.50/month for 30GB).
+
+```bash
+gcloud compute instances stop viper-kali-lab
+```
+
+To resume testing later:
+```bash
+gcloud compute instances start viper-kali-lab
+```
+
+---
+
+### Complete Teardown (Zero Recurring Cost)
+When M6 evaluation is complete, remove all cloud resources to ensure zero ongoing billing:
+
+```bash
+# 1. Delete the execution VM
+gcloud compute instances delete viper-kali-lab --quiet
+
+# 2. Delete the IAP firewall rule
+gcloud compute firewall-rules delete allow-iap-ssh --quiet
+
+# 3. Remove local certificate copy and reset active testing flag
+Remove-Item -Force secrets/vm-ca.pem
+```
+
+In `.env`, reset active testing:
+```ini
+VIPER_ALLOW_ACTIVE_TESTING=false
+```
+
+Verify in GCP that no instances remain:
+```bash
+gcloud compute instances list
+```
