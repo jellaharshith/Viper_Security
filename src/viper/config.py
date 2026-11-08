@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     allow_active_testing: bool = False
     audit_dir: Path = Path("data/audit")
     checkpoint_db: Path = Path("data/checkpoints.db")  # SQLite checkpoints for paused agent runs
+    report_dir: Path = Path("data/reports")  # M7: one Markdown report per finished thread
 
     def egress_hosts(self) -> list[str]:
         """Allowlisted target hosts, lowercased. Empty means no target is permitted."""
