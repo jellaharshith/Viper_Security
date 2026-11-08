@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import logging
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from viper import __version__
 from viper.config import Settings, get_settings
@@ -210,6 +212,68 @@ def cmd_audit(settings: Settings, args: argparse.Namespace) -> int:
     return 0 if broken is None else 2
 
 
+def _control_lock(settings: Settings, project: str) -> Any:
+    from viper.execution.control import ControlLock
+
+    return ControlLock(settings.checkpoint_db.with_suffix(".control.db"), project)
+
+
+def _exec_client(settings: Settings) -> tuple[Any, dict[str, str]]:
+    """An authed httpx client for the VM Exec API, verifying the VM's CA when configured."""
+    import ssl
+
+    import httpx
+
+    if not settings.exec_api_url:
+        raise RuntimeError("exec API not configured (set VIPER_EXEC_API_URL)")
+    verify: Any = True
+    if settings.exec_api_ca_cert:
+        verify = ssl.create_default_context(cafile=str(settings.exec_api_ca_cert))
+    client = httpx.Client(base_url=settings.exec_api_url, verify=verify, timeout=30.0)
+    headers = {"Authorization": f"Bearer {settings.exec_api_token.get_secret_value()}"}
+    return client, headers
+
+
+def cmd_exec(settings: Settings, args: argparse.Namespace) -> int:
+    # Offline, control-lock verbs: a human taking/releasing exclusive control of the VM.
+    if args.exec_cmd in ("takeover", "release"):
+        who = f"human:{getpass.getuser()}"
+        lock = _control_lock(settings, args.project)
+        if args.exec_cmd == "takeover":
+            lock.takeover(who)
+            print(f"exclusive control held by {who} for {args.project}; the agent will not dispatch")
+            return 0
+        print("released" if lock.release(who) else f"{who} does not hold the lock")
+        return 0
+    # VM-backed verbs: stream (watch), pause, or emergency stop a running job.
+    try:
+        client, headers = _exec_client(settings)
+    except RuntimeError as exc:
+        print(f"exec error: {exc}")
+        return 1
+    try:
+        if args.exec_cmd == "watch":
+            with client.stream("GET", f"/jobs/{args.job}/stream", headers=headers) as resp:
+                if resp.status_code != 200:
+                    print(f"watch error: HTTP {resp.status_code}")
+                    return 1
+                for line in resp.iter_lines():
+                    if line.startswith("data:"):
+                        print(line[5:].strip())
+            return 0
+        resp = client.post(f"/jobs/{args.job}/{args.exec_cmd}", headers=headers)
+        if resp.status_code != 200:
+            print(f"{args.exec_cmd} error: HTTP {resp.status_code}")
+            return 1
+        print(json.dumps(resp.json()))
+        return 0
+    except Exception as exc:  # noqa: BLE001 - report the class only; never echo details
+        print(f"exec error: {type(exc).__name__}")
+        return 1
+    finally:
+        client.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="viper")
     parser.add_argument("--health", action="store_true", help="print redacted config and exit")
@@ -253,6 +317,16 @@ def main(argv: list[str] | None = None) -> int:
     usub = p_audit.add_subparsers(dest="audit_cmd", required=True)
     p_ver = usub.add_parser("verify", help="check the hash chain of a project log")
     p_ver.add_argument("--project", required=True)
+    p_exec = sub.add_parser("exec", help="drive the execution plane: watch/pause/stop/takeover (M6)")
+    xsub = p_exec.add_subparsers(dest="exec_cmd", required=True)
+    for name in ("takeover", "release"):
+        px = xsub.add_parser(name, help=f"{name} exclusive control of a project's VM")
+        px.add_argument("--project", required=True)
+    for name, helptext in (("watch", "stream a job's output"),
+                           ("pause", "pause a running job"),
+                           ("stop", "emergency-stop a job (kill its process tree)")):
+        px = xsub.add_parser(name, help=helptext)
+        px.add_argument("--job", required=True)
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -272,6 +346,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_agent(settings, args)
     if args.command == "audit":
         return cmd_audit(settings, args)
+    if args.command == "exec":
+        return cmd_exec(settings, args)
     if args.command == "chat":
         return cmd_ask(settings, args.question)
     parser.print_help()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import getpass
 import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -12,12 +13,40 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
+from pydantic import SecretStr
 
 from viper.agents.audit import AuditLog
 from viper.agents.claims import SqliteClaims
 from viper.agents.graph import Deps, build_graph
 from viper.config import Settings
+from viper.execution.control import ControlLock
+from viper.execution.factory import make_executor
 from viper.policy.models import Action, Scope
+
+
+@dataclass
+class _ExecConfig:
+    """The subset of ``Settings`` the exec client reads, satisfying ``remote.ExecSettings``.
+
+    Settings stores the egress allowlist as a comma-separated string; the client's Protocol
+    wants ``list[str]``, so we materialize it here with ``Settings.egress_hosts()``.
+    """
+
+    allow_active_testing: bool
+    exec_api_url: str
+    exec_api_token: SecretStr
+    exec_api_ca_cert: Path
+    exec_egress_allowlist: list[str]
+
+
+def _exec_settings(settings: Settings) -> _ExecConfig:
+    return _ExecConfig(
+        allow_active_testing=settings.allow_active_testing,
+        exec_api_url=settings.exec_api_url,
+        exec_api_token=settings.exec_api_token,
+        exec_api_ca_cert=settings.exec_api_ca_cert or Path(""),  # "" is not a file -> stays dry-run
+        exec_egress_allowlist=settings.egress_hosts(),
+    )
 
 
 def load_scope(path: Path) -> Scope:
@@ -45,6 +74,8 @@ def _graph(settings: Settings, scope_path: Path, project_id: str,
         planner=planner, settings=settings, scope_provider=lambda: load_scope(scope_path),
         audit=AuditLog(settings, project_id),
         claims=SqliteClaims(settings.checkpoint_db.with_suffix(".claims.db")),
+        executor=make_executor(_exec_settings(settings)),
+        control=ControlLock(settings.checkpoint_db.with_suffix(".control.db"), project_id),
     )
     return build_graph(deps, SqliteSaver(conn))
 
