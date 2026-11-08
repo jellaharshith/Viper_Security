@@ -197,9 +197,10 @@ def cmd_agent(settings: Settings, args: argparse.Namespace) -> int:
             # Show exactly what is being decided, read from the saved checkpoint.
             for p in runner.pending_details(settings, scope_path, args.thread):
                 act = p.get("action") or {}
-                print(f"{args.decision} -> action {p['action_id']}: tool={act.get('tool_name')} "
-                      f"args={json.dumps(act.get('args'), sort_keys=True)} "
-                      f"hash={p['action_hash'][:12]} expires={p['expires_at']}")
+                print(terminal_safe(
+                    f"{args.decision} -> action {p['action_id']}: tool={act.get('tool_name')} "
+                    f"args={json.dumps(act.get('args'), sort_keys=True)} "
+                    f"hash={p['action_hash'][:12]} expires={p['expires_at']}"))
             out = runner.resume(settings, scope_path, args.thread, args.decision)
     except Exception as exc:  # noqa: BLE001 - report class only; never echo details
         print(f"agent error: {type(exc).__name__}")
