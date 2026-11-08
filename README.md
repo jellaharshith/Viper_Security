@@ -11,7 +11,6 @@ validated findings, and writes a report where every claim traces back to a tampe
 [![Security](https://github.com/jellaharshith/Viper_Security/actions/workflows/security.yml/badge.svg)](https://github.com/jellaharshith/Viper_Security/actions/workflows/security.yml)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-green)](LICENSE)
-![Status](https://img.shields.io/badge/status-M7%20complete-brightgreen)
 
 </div>
 
