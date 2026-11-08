@@ -32,7 +32,7 @@ MAX_OUTPUT_BYTES = 1024 * 1024
 MAX_WIRE_BYTES = 4 * 1024 * 1024
 MAX_LINE_BYTES = 64 * 1024
 MAX_STREAM_SECONDS = 120.0
-STREAM_CHUNK_BYTES = 8192
+STREAM_READ_TIMEOUT = 10.0  # per network read (connect/read/write/pool)
 
 
 def _now() -> float:
@@ -151,13 +151,22 @@ class RemoteExecutor:
         try:
             start = _now()
             with self._get_client().stream(
-                "GET", f"/jobs/{job_id}/stream", headers=self._auth
+                "GET",
+                f"/jobs/{job_id}/stream",
+                # identity only: decompression would happen before our byte accounting.
+                headers={**self._auth, "Accept-Encoding": "identity"},
+                timeout=httpx.Timeout(STREAM_READ_TIMEOUT),  # a stalled peer can't hold us
             ) as resp:
                 if resp.status_code == 401:
                     raise RemoteAuthError(f"Exec API rejected the bearer token on stream {job_id}")
                 if resp.status_code != 200:
                     raise RemoteJobError(f"GET /jobs/{job_id}/stream returned {resp.status_code}")
-                for chunk in resp.iter_bytes(chunk_size=STREAM_CHUNK_BYTES):
+                encoding = resp.headers.get("content-encoding", "identity").strip().lower()
+                if encoding not in ("", "identity"):
+                    raise RemoteJobError(f"stream for job {job_id} is encoded ({encoding!r})")
+                # iter_raw: no decoding; chunk_size=None yields each network read as it
+                # arrives so the byte budget and deadline are checked after every one.
+                for chunk in resp.iter_raw():
                     wire += len(chunk)
                     parts = chunk.split(b"\n")
                     for i, part in enumerate(parts):

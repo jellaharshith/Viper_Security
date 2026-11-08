@@ -143,6 +143,8 @@ def test_duplicate_dispatch_is_claimed_once_and_makes_no_second_post() -> None:
         if req.method == "POST":
             posts.append(req)
             return httpx.Response(201, json={"job_id": "act-1", "state": "running"})
+        if req.url.path.endswith("/stream"):
+            return _sse(["x"])
         return httpx.Response(200, json={"job_id": "act-1", "state": "done", "exit_code": 0})
 
     claims = MemoryClaims()
@@ -199,7 +201,9 @@ def test_happy_path_posts_polls_and_returns_result() -> None:
 
 def _sse(lines: list[str]) -> httpx.Response:
     body = "".join(f"data: {ln}\n\n" for ln in lines)
-    return httpx.Response(200, content=body.encode(), headers={"content-type": "text/event-stream"})
+    return httpx.Response(
+        200, stream=_Chunks([body.encode()]), headers={"content-type": "text/event-stream"}
+    )
 
 
 def _job_handler(stream: Any, state: str = "done", seen: list[httpx.Request] | None = None) -> Any:
@@ -357,3 +361,51 @@ def test_dry_run_result_truncated_defaults_false() -> None:
     from viper.tools.registry import DryRunResult
 
     assert DryRunResult(tool="t", summary="s").truncated is False
+
+
+# ------------------------------------------- ROUND 5: stream limits cannot be bypassed
+
+
+def test_stream_request_demands_identity_and_short_read_timeout() -> None:
+    seen: list[httpx.Request] = []
+    _executor(_job_handler(_sse(["a"]), seen=seen)).run(_action())
+    (req,) = [r for r in seen if r.url.path.endswith("/stream")]
+    assert req.headers["Accept-Encoding"] == "identity"
+    assert req.extensions["timeout"]["read"] <= 10
+
+
+@pytest.mark.parametrize("enc", ["gzip", "br", "deflate", "gzip, identity"])
+def test_compressed_stream_response_is_refused(enc: str) -> None:
+    import gzip
+
+    from viper.execution.remote import RemoteJobError
+
+    body = gzip.compress(b"data: bomb\n\n")
+    resp = httpx.Response(
+        200, stream=_Chunks([body]), headers={"content-encoding": enc, "content-type": "text/event-stream"}
+    )
+    with pytest.raises(RemoteJobError):
+        _executor(_job_handler(resp)).run(_action())
+
+
+def test_identity_content_encoding_is_accepted() -> None:
+    resp = httpx.Response(
+        200, stream=_Chunks([b"data: ok\n\n"]), headers={"content-encoding": "identity"}
+    )
+    assert _executor(_job_handler(resp)).run(_action()).output == "ok"
+
+
+def test_slow_drip_stream_stops_at_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    from viper.execution import remote
+
+    clock = {"t": 0.0}
+
+    def now() -> float:
+        clock["t"] += 50.0  # every observation costs 50 s of fake time
+        return clock["t"]
+
+    monkeypatch.setattr(remote, "_now", now)
+    s = _Chunks([b"d"] * 10_000)  # one byte per network read
+    r = _executor(_job_handler(_stream_resp(s))).run(_action())
+    assert r.truncated is True
+    assert s.pulled <= 5  # deadline enforced after every received chunk, not every 8 KiB
