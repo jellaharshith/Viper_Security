@@ -11,7 +11,7 @@ Rules: one milestone at a time; tests green before moving on; explicit approval 
 | M4 | Colab QLoRA (gated by M2) | Candidate beats baseline without general regression; human approves | Colab free or ~$10/mo |
 | M5 | LangGraph agents + policy engine (**built, dry-run only**) | Approval checkpoints and audit log work with no live targets | $0 |
 | M6 | Cloud Kali execution plane (**DONE — live-validated on a GCP Kali VM 2026-11-08**) | Approve a lab task, watch it, take over, pause, emergency stop | On-demand, <$50/mo |
-| M7 | Pentest copilot + bug bounty workflow (**built and security-reviewed offline; live scanme run pending approval**) | Traceable report from an authorized/lab target | On-demand |
+| M7 | Pentest copilot + bug bounty workflow (**DONE - live-validated on a GCP VM 2026-11-08**) | Traceable report from an authorized/lab target | On-demand |
 
 ## Dependencies
 M2 needs M1. M4 needs M2 (baseline) and a verified model license. M5 needs M1. M6 needs M5's policy engine. M7 needs M5 + M6.
