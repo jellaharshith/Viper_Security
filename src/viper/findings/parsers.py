@@ -149,7 +149,25 @@ _NMAP_PORT = re.compile(
     r"^(?P<port>\d{1,5})/(?P<proto>tcp|udp|sctp)\s+(?P<state>open\|filtered|open)\s+"
     r"(?P<service>\S{1,64})(?:\s+(?P<version>.*))?$"
 )
-_NMAP_LOOSE = re.compile(r"^\d{1,10}/(tcp|udp|sctp)\s")
+_NMAP_LOOSE = re.compile(r"^(?P<port>\d{1,10})/(?:tcp|udp|sctp)(?:\s+(?P<state>\S+))?")
+_NMAP_STATES = frozenset(
+    {"open", "closed", "filtered", "unfiltered", "open|filtered", "closed|filtered"}
+)
+
+
+def _nmap_row_is_garbled(line: str) -> bool:
+    """A port-row-shaped line that should have parsed but is unusable.
+
+    Normal rows (closed/filtered/unfiltered ports) are NOT garbled: they are healthy scan
+    output that simply is not a finding.
+    """
+    m = _NMAP_LOOSE.match(line)
+    if not m:
+        return False
+    state = m["state"]
+    if state is None or state not in _NMAP_STATES or int(m["port"]) > 65535:
+        return True
+    return state in {"open", "open|filtered"}  # strict parse failed: e.g. no service column
 # Services whose protocol sends credentials/data unencrypted.
 _CLEARTEXT = {"telnet", "ftp", "rlogin", "rsh", "rexec", "tftp"}
 
@@ -204,7 +222,7 @@ def parse_nmap_ex(
         except Exception:  # noqa: BLE001 - isolate any malformed record
             f = None
         if f is None:
-            if _NMAP_LOOSE.match(line):
+            if _nmap_row_is_garbled(line):
                 skipped += 1
             continue
         if f.id not in seen:
@@ -325,6 +343,10 @@ def _nuclei_text(line: str, action_id: str, target: str, audit_refs: list[str]) 
     )
 
 
+class _NotAMatch(Exception):  # noqa: N818 - control-flow marker, not an error
+    """A well-formed record that nuclei itself says did not match (not counted as skipped)."""
+
+
 def _nuclei_json(line: str, action_id: str, target: str, audit_refs: list[str]) -> Finding | None:
     if not _json_depth_ok(line):
         return None
@@ -337,7 +359,7 @@ def _nuclei_json(line: str, action_id: str, target: str, audit_refs: list[str]) 
         return None
     status = d.get("matcher-status")
     if status is False or (isinstance(status, str) and status.strip().lower() == "false"):
-        return None  # nuclei explicitly reports the matcher did not match
+        raise _NotAMatch  # nuclei explicitly reports no match: normal, not malformed
     location = d.get("matched-at") or d.get("host")
     if not isinstance(location, str):
         return None
@@ -376,6 +398,8 @@ def parse_nuclei_ex(
         try:
             parser = _nuclei_json if is_json else _nuclei_text
             f = parser(line, action_id, target, audit_refs)
+        except _NotAMatch:
+            continue
         except Exception:  # noqa: BLE001 - JSONDecodeError, RecursionError, bad types...
             f = None
         if f is None:
