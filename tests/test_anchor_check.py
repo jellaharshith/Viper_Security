@@ -25,3 +25,9 @@ def receipt(provider: str) -> AnchorReceipt:
 ])
 def test_verdict_table(provider, in_chain, token_ok, label, fails):
     assert anchor_verdict(receipt(provider), in_chain=in_chain, token_ok=token_ok) == (label, fails)
+
+
+@pytest.mark.parametrize("provider", ["mock", "tsa", "rekor"])
+def test_malformed_token_fails_even_when_in_chain(provider):
+    bad = AnchorReceipt(provider=provider, head_hash=HEAD, token="!!not base64!!")  # noqa: S106
+    assert anchor_verdict(bad, in_chain=True, token_ok=False) == ("MALFORMED", True)

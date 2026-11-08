@@ -83,3 +83,30 @@ def test_anchor_for_a_head_not_in_the_chain_is_flagged(env, capsys):
     capsys.readouterr()
     rc = cli.main(["audit", "verify", "--project", "demo"])
     assert rc == 2 and "MISMATCH" in capsys.readouterr().out
+
+
+def test_a_finished_thread_cannot_be_reused_or_overwritten(env, capsys):
+    assert run_plan(env) == 0
+    saved = env["tmp"] / "reports" / "t1.md"
+    first = saved.read_text(encoding="utf-8")
+    capsys.readouterr()
+    assert run_plan(env) == 1  # same thread id again
+    assert "agent error" in capsys.readouterr().out
+    assert saved.read_text(encoding="utf-8") == first
+
+
+def test_existing_report_file_blocks_a_new_run_before_anything_executes(env, capsys):
+    (env["tmp"] / "reports").mkdir()
+    (env["tmp"] / "reports" / "t9.md").write_text("planted", encoding="utf-8")
+    assert run_plan(env, "t9") == 1
+    assert not (env["tmp"] / "audit" / "demo.jsonl").exists()
+
+
+def test_terminal_output_has_control_and_bidi_characters_stripped(env, capsys):
+    (env["tmp"] / "reports").mkdir()
+    nasty = "ok" + chr(27) + "]52;c;SGVsbG8=" + chr(7) + chr(0x202E) + "tail" + chr(10)
+    (env["tmp"] / "reports" / "t8.md").write_text(nasty, encoding="utf-8")
+    assert cli.main(["report", "--thread", "t8"]) == 0
+    out = capsys.readouterr().out
+    assert chr(27) not in out and chr(7) not in out and chr(0x202E) not in out
+    assert "ok" in out and "tail" in out

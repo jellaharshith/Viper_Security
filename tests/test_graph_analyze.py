@@ -1,5 +1,6 @@
 """M7: execute -> analyze -> report. Real parsers + report on fake executor output; offline."""
 
+import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -63,19 +64,25 @@ def test_real_output_becomes_findings_and_a_traceable_report(tmp_path):
     assert all(h in out["report"] for f in out["findings"] for h in f["audit_refs"])
 
 
-def test_real_dispatch_is_audited_as_tool_executed_not_dry_run(tmp_path):
-    graph, deps = build(tmp_path, FakeExec((FIX / "nmap_scanme.txt").read_text()))
-    run_approved(graph)
+def test_real_dispatch_writes_intent_then_a_result_event_with_a_digest(tmp_path):
+    out_text = (FIX / "nmap_scanme.txt").read_text()
+    graph, deps = build(tmp_path, FakeExec(out_text))
+    out = run_approved(graph)
     seen = events(deps)
-    assert "tool_executed" in seen and "tool_dry_run" not in seen
-    assert seen.index("tool_executed") < seen.index("findings_generated") < seen.index("report_generated")
+    assert "tool_dispatch" in seen and "tool_result" in seen and "tool_dry_run" not in seen
+    assert (seen.index("tool_dispatch") < seen.index("tool_result")
+            < seen.index("findings_generated") < seen.index("report_generated"))
+    result_ev = next(e for e in deps.audit.events("t1") if e["event"] == "tool_result")
+    assert result_ev["detail"]["digest"] == hashlib.sha256(out_text.encode()).hexdigest()
+    assert result_ev["detail"]["simulated"] is False
+    assert out["results"][0]["audit_hash"] == result_ev["hash"]  # citations point at the RESULT
 
 
 def test_dry_run_plane_yields_no_findings_and_keeps_dry_run_event(tmp_path):
     graph, deps = build(tmp_path, executor=None)  # default DryRunExecutor
     out = run_approved(graph)
     assert out["status"] == "COMPLETED" and out["findings"] == []
-    assert "tool_dry_run" in events(deps) and "tool_executed" not in events(deps)
+    assert "tool_dry_run" in events(deps) and "tool_dispatch" not in events(deps)
     assert "No confirmed findings" in out["report"] or "no confirmed" in out["report"].lower()
 
 
@@ -121,3 +128,15 @@ def test_denied_section_neutralises_markdown_from_model_supplied_ids(tmp_path):
     denied = out["report"].split("## Denied actions", 1)[1]
     assert "http://evil" not in denied.split("---")[0] or "](" not in denied
     assert "\n# pwn" not in denied
+
+
+def test_analysis_warnings_surface_in_the_report_when_output_is_truncated(tmp_path):
+    class Truncating(FakeExec):
+        def run(self, action):
+            r = super().run(action)
+            return DryRunResult(**{**r.model_dump(), "truncated": True})
+
+    graph, _ = build(tmp_path, Truncating((FIX / "nmap_scanme.txt").read_text()))
+    out = run_approved(graph)
+    assert "## Analysis warnings" in out["report"] and "truncated" in out["report"]
+    assert "incomplete" in out["report"].lower()

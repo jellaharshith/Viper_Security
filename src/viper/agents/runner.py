@@ -47,7 +47,9 @@ def _save_report(settings: Settings, thread: str, out: dict[str, Any]) -> None:
         return
     path = report_path(settings, thread)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(out["report"]), encoding="utf-8", newline="\n")
+    # "x" = exclusive create: never overwrites a report and never follows a planted symlink.
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        handle.write(str(out["report"]))
 
 
 def llm_planner(settings: Settings, scope_path: Path) -> LLMPlanner:
@@ -122,11 +124,16 @@ def run(
 ) -> dict[str, Any]:
     """``actions`` is a fixed plan (list) or a planner callable (the LLM planner, M7)."""
     valid_thread(thread)
+    if report_path(settings, thread).exists():
+        raise ValueError("a report already exists for this thread id")
     project_id = load_scope(scope_path).project_id
     planner = (lambda _r: actions) if isinstance(actions, list) else actions
     conn = _connect(settings)
     try:
         graph = _graph(settings, scope_path, project_id, planner, conn)
+        if graph.get_state({"configurable": {"thread_id": thread}}).values:
+            # Checkpoints are keyed by thread only; reusing one would inherit another run's state.
+            raise ValueError("thread id already used; start a new thread or resume it")
         state = {"project_id": project_id, "thread_id": thread, "request": request}
         out: dict[str, Any] = graph.invoke(state, {"configurable": {"thread_id": thread}})
         _save_report(settings, thread, out)

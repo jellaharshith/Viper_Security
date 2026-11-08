@@ -172,6 +172,14 @@ def cmd_eval(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def terminal_safe(text: str) -> str:
+    """Drop control and format characters (ESC/OSC, BEL, bidi overrides) so tool-derived text can
+    never drive the operator's terminal; newlines and tabs stay."""
+    import unicodedata
+
+    return "".join(c for c in text if c in "\n	" or unicodedata.category(c) not in {"Cc", "Cf", "Cs", "Co"})
+
+
 def cmd_agent(settings: Settings, args: argparse.Namespace) -> int:
     from viper.agents import runner
 
@@ -200,7 +208,7 @@ def cmd_agent(settings: Settings, args: argparse.Namespace) -> int:
         print("PAUSED: approval needed. Resume with: "
               f"viper agent resume --scope <file> --thread {args.thread} --decision ALLOW|DENY")
         return 0
-    print(out.get("report", out.get("status", "")))
+    print(terminal_safe(str(out.get("report", out.get("status", "")))))
     return 1 if out.get("status") == "FAILED" else 0
 
 
@@ -249,13 +257,16 @@ def _verify_anchors(log: Any, anchors: Path) -> int:
     if not anchors.exists():
         print("anchors: none recorded")
         return 0
-    chain = log.hashes()
+    chain = log.index()
+    last = max(chain.values(), default=0)
     rc = 0
     for line in anchors.read_text(encoding="utf-8").splitlines():
         receipt = AnchorReceipt.model_validate_json(line)
         label, failed = anchor_verdict(receipt, in_chain=receipt.head_hash in chain,
                                        token_ok=verify_anchor(receipt, receipt.head_hash))
-        print(f"anchor {receipt.provider} head={receipt.head_hash[:12]}: {label}")
+        seq = chain.get(receipt.head_hash)
+        cover = f" covers seq 0-{seq} of {last}" if seq is not None else ""
+        print(f"anchor {receipt.provider} head={receipt.head_hash[:12]}{cover}: {label}")
         rc = 2 if failed else rc
     return rc
 
@@ -264,7 +275,7 @@ def cmd_report(settings: Settings, args: argparse.Namespace) -> int:
     from viper.agents.runner import report_path
 
     try:
-        print(report_path(settings, args.thread).read_text(encoding="utf-8"))
+        print(terminal_safe(report_path(settings, args.thread).read_text(encoding="utf-8")))
     except Exception as exc:  # noqa: BLE001 - class only
         print(f"report error: {type(exc).__name__}")
         return 1
