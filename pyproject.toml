@@ -23,7 +23,7 @@ Issues = "https://github.com/jellaharshith/Viper_Security/issues"
 Changelog = "https://github.com/jellaharshith/Viper_Security/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
