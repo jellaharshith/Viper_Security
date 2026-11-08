@@ -96,3 +96,28 @@ def test_tampered_audit_log_refuses_to_produce_a_report(tmp_path):
                 "action_hash": p["action_hash"], "timestamp": NOW.isoformat()} for p in pend]
     with pytest.raises(AuditError):  # the approval audit append already trips on the broken chain
         graph.invoke(Command(resume=answers), cfg)
+
+
+def test_report_lists_denied_actions_with_their_reasons(tmp_path):
+    settings = Settings(_env_file=None, audit_dir=tmp_path, allow_active_testing=False)
+    deps = Deps(planner=lambda _r: [NMAP], settings=settings, scope_provider=lambda: SCOPE,
+                audit=AuditLog(settings, "lab"), registry=default_registry, now=lambda: NOW)
+    graph = build_graph(deps, InMemorySaver())
+    out = graph.invoke({"project_id": "lab", "thread_id": "t1", "request": "scan"},
+                       {"configurable": {"thread_id": "t1"}})
+    assert "## Denied actions" in out["report"]
+    assert "n1" in out["report"] and "nmap" in out["report"]
+    assert "active testing is disabled" in out["report"]
+
+
+def test_denied_section_neutralises_markdown_from_model_supplied_ids(tmp_path):
+    nasty = Action(action_id="x`](http://evil)\n# pwn", tool_name="nmap", args={"target": "evil.com"})
+    settings = Settings(_env_file=None, audit_dir=tmp_path, allow_active_testing=True)
+    deps = Deps(planner=lambda _r: [nasty], settings=settings, scope_provider=lambda: SCOPE,
+                audit=AuditLog(settings, "lab"), registry=default_registry, now=lambda: NOW)
+    out = build_graph(deps, InMemorySaver()).invoke(
+        {"project_id": "lab", "thread_id": "t1", "request": "scan"},
+        {"configurable": {"thread_id": "t1"}})
+    denied = out["report"].split("## Denied actions", 1)[1]
+    assert "http://evil" not in denied.split("---")[0] or "](" not in denied
+    assert "\n# pwn" not in denied
