@@ -199,12 +199,8 @@ class AuditLog:
         except (OSError, ValueError, TypeError, RecursionError):
             raise AuditError("Audit event could not be committed") from None
 
-    def events(self, thread_id: str) -> list[dict[str, Any]]:
-        """Committed events for one thread, in order. Refuses to read a broken chain.
-
-        A report cites these hashes, so it must never be built from a tampered log. A missing
-        file simply means nothing was recorded yet.
-        """
+    def _records(self) -> list[dict[str, Any]]:
+        """All committed records. Refuses to read a broken chain; a missing file is empty."""
         if not self.path.exists():
             return []
         try:
@@ -212,7 +208,19 @@ class AuditLog:
                 broken, _ = _scan(self.path)
                 if broken is not None:
                     raise AuditError(f"Broken audit chain at sequence {broken}")
-                records = [json.loads(line) for line in self.path.read_bytes().splitlines()]
+                return [json.loads(line) for line in self.path.read_bytes().splitlines()]
         except (OSError, ValueError):
             raise AuditError("Audit log could not be read") from None
-        return [r for r in records if r.get("thread_id") == thread_id]
+
+    def events(self, thread_id: str) -> list[dict[str, Any]]:
+        """Committed events for one thread, in order. A report cites these hashes, so it is
+        never built from a tampered log."""
+        return [r for r in self._records() if r.get("thread_id") == thread_id]
+
+    def hashes(self) -> set[str]:
+        return {str(r["hash"]) for r in self._records()}
+
+    def head(self) -> str | None:
+        """Hash of the newest record (what an external anchor timestamps), or None if empty."""
+        records = self._records()
+        return str(records[-1]["hash"]) if records else None

@@ -178,8 +178,13 @@ def cmd_agent(settings: Settings, args: argparse.Namespace) -> int:
     scope_path = Path(args.scope)
     try:
         if args.agent_cmd == "run":
-            actions = runner.load_plan(Path(args.plan))
-            out = runner.run(settings, scope_path, actions, args.request, args.thread)
+            if args.llm:
+                if not args.request.strip():
+                    raise ValueError("--llm needs a non-empty --request")
+                plan: Any = runner.llm_planner(settings, scope_path)
+            else:
+                plan = runner.load_plan(Path(args.plan))
+            out = runner.run(settings, scope_path, plan, args.request, args.thread)
         else:
             # Show exactly what is being decided, read from the saved checkpoint.
             for p in runner.pending_details(settings, scope_path, args.thread):
@@ -200,16 +205,70 @@ def cmd_agent(settings: Settings, args: argparse.Namespace) -> int:
 
 
 def cmd_audit(settings: Settings, args: argparse.Namespace) -> int:
-    from viper.agents.audit import verify
+    from viper.agents.audit import AuditLog, verify
 
     path = settings.audit_dir / f"{args.project}.jsonl"
+    anchors = settings.audit_dir / f"{args.project}.anchors.jsonl"
     try:
+        if args.audit_cmd == "anchor":
+            return _audit_anchor(settings, args.project, anchors)
         broken = verify(path)
+        print("audit log OK" if broken is None else f"audit log BROKEN at seq {broken}")
+        if broken is not None:
+            return 2
+        return _verify_anchors(AuditLog(settings, args.project), anchors)
     except Exception as exc:  # noqa: BLE001
         print(f"audit error: {type(exc).__name__}")
         return 1
-    print("audit log OK" if broken is None else f"audit log BROKEN at seq {broken}")
-    return 0 if broken is None else 2
+
+
+def _audit_anchor(settings: Settings, project: str, anchors: Path) -> int:
+    """Anchor the current audit head. Mock only for now: real TSA/Rekor needs a trusted verifier."""
+    from viper.agents.anchor import anchor_head
+    from viper.agents.audit import AuditLog
+
+    log = AuditLog(settings, project)
+    head = log.head()
+    if head is None:
+        print("audit error: nothing to anchor (empty log)")
+        return 1
+    receipt = anchor_head(head, provider="mock")
+    anchors.parent.mkdir(parents=True, exist_ok=True)
+    with anchors.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(receipt.model_dump_json() + "\n")
+    log.append(thread_id="anchor", event="audit_anchored", actor="agent",
+               detail={"count": 1, "message": f"mock anchor of {head[:12]}"})
+    print(f"anchored head {head[:12]} (mock: consistency only, not external proof)")
+    return 0
+
+
+def _verify_anchors(log: Any, anchors: Path) -> int:
+    from viper.agents.anchor import AnchorReceipt, verify_anchor
+    from viper.agents.anchor_check import anchor_verdict
+
+    if not anchors.exists():
+        print("anchors: none recorded")
+        return 0
+    chain = log.hashes()
+    rc = 0
+    for line in anchors.read_text(encoding="utf-8").splitlines():
+        receipt = AnchorReceipt.model_validate_json(line)
+        label, failed = anchor_verdict(receipt, in_chain=receipt.head_hash in chain,
+                                       token_ok=verify_anchor(receipt, receipt.head_hash))
+        print(f"anchor {receipt.provider} head={receipt.head_hash[:12]}: {label}")
+        rc = 2 if failed else rc
+    return rc
+
+
+def cmd_report(settings: Settings, args: argparse.Namespace) -> int:
+    from viper.agents.runner import report_path
+
+    try:
+        print(report_path(settings, args.thread).read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 - class only
+        print(f"report error: {type(exc).__name__}")
+        return 1
+    return 0
 
 
 def _control_lock(settings: Settings, project: str) -> Any:
@@ -309,14 +368,20 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--scope", required=True, help="scope YAML file")
         p.add_argument("--thread", required=True)
         if name == "run":
-            p.add_argument("--plan", required=True, help="JSON list of proposed actions (planner stand-in)")
+            src = p.add_mutually_exclusive_group(required=True)
+            src.add_argument("--plan", help="JSON list of proposed actions (deterministic planner stand-in)")
+            src.add_argument("--llm", action="store_true", help="let the local model propose the plan (M7)")
             p.add_argument("--request", default="")
         else:
             p.add_argument("--decision", choices=("ALLOW", "DENY"), required=True)
     p_audit = sub.add_parser("audit", help="audit log tools")
     usub = p_audit.add_subparsers(dest="audit_cmd", required=True)
-    p_ver = usub.add_parser("verify", help="check the hash chain of a project log")
+    p_ver = usub.add_parser("verify", help="check the hash chain (and any anchors) of a project log")
     p_ver.add_argument("--project", required=True)
+    p_anc = usub.add_parser("anchor", help="anchor the current audit head (mock; M7)")
+    p_anc.add_argument("--project", required=True)
+    p_rep = sub.add_parser("report", help="print the saved report for a finished agent thread (M7)")
+    p_rep.add_argument("--thread", required=True)
     p_exec = sub.add_parser("exec", help="drive the execution plane: watch/pause/stop/takeover (M6)")
     xsub = p_exec.add_subparsers(dest="exec_cmd", required=True)
     for name in ("takeover", "release"):
@@ -346,6 +411,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_agent(settings, args)
     if args.command == "audit":
         return cmd_audit(settings, args)
+    if args.command == "report":
+        return cmd_report(settings, args)
     if args.command == "exec":
         return cmd_exec(settings, args)
     if args.command == "chat":
