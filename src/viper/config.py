@@ -45,11 +45,17 @@ class Settings(BaseSettings):
     # --- Execution plane: cloud Kali VM (empty until provisioned) ---
     exec_api_url: str = ""
     exec_api_token: SecretStr = SecretStr("")
+    exec_api_ca_cert: Path | None = None  # PEM the orchestrator trusts for the VM's TLS cert
+    exec_egress_allowlist: str = ""  # comma-separated hosts the exec client may target
 
     # --- Safety: active testing is OFF unless explicitly enabled ---
     allow_active_testing: bool = False
     audit_dir: Path = Path("data/audit")
     checkpoint_db: Path = Path("data/checkpoints.db")  # SQLite checkpoints for paused agent runs
+
+    def egress_hosts(self) -> list[str]:
+        """Allowlisted target hosts, lowercased. Empty means no target is permitted."""
+        return [h.strip().lower() for h in self.exec_egress_allowlist.split(",") if h.strip()]
 
     def redacted(self) -> dict[str, Any]:
         """Settings as a dict that is safe to print/log (secrets masked)."""

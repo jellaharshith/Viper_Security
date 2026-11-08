@@ -20,9 +20,13 @@ from viper.tools.registry import ToolRegistry, default_registry
 
 @runtime_checkable
 class Result(Protocol):
-    """Anything an executor returns: it must dump to a JSON-safe dict for the graph."""
+    """Anything an executor returns: it must dump to a JSON-safe dict for the graph.
 
-    def model_dump(self) -> dict[str, Any]: ...
+    ``mode`` mirrors pydantic's ``model_dump`` so the graph can request ``mode="json"`` for
+    checkpoint-safe serialization (both ``DryRunResult`` and remote results are pydantic models).
+    """
+
+    def model_dump(self, *, mode: str = "python") -> dict[str, Any]: ...
 
 
 @runtime_checkable

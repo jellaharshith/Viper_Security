@@ -129,3 +129,30 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
   CLI: `viper agent run|resume --scope scope.yaml --plan plan.json --thread T`, `viper audit verify --project P`.
   Decisions: SQLite checkpoints, OS-user approver, YAML scope, approval for ACTIVE only, audit log in `data/audit/`. 247 tests pass.
   Not done: an LLM-backed planner (a JSON plan file stands in), CLI repair command for a damaged audit log, external anchoring of the audit head (M6).
+
+## M6 — Cloud Kali execution plane, headless-first (2026-11-07)
+Built by a three-agent herdr crew (claude-m6 client, codex-m6 VM server, agy-m6 docs) with the
+coordinator wiring and merging. **Headless execution plane built and wired in dry-run; the paid GCP
+Kali VM and the one live scan are a gated on-demand step** (see `docs/plans/m6-gcloud-vm-setup.md`).
+- **Orchestrator client** (`src/viper/execution/remote.py`, `factory.py`): `RemoteExecutor` posts an
+  approved `Action` to the VM Exec API over TLS (verifying the VM CA), re-checks the target against the
+  client-side egress allowlist before any byte leaves, binds a durable dispatch claim, polls to a
+  terminal state, and returns a `DryRunResult(simulated=False)`. `make_executor()` is the fail-safe
+  selector: it returns `DryRunExecutor` **unless** `allow_active_testing` **and** `exec_api_url` **and**
+  a non-empty token **and** an existing CA cert are all present — so the default config can never reach
+  real execution.
+- **VM server** (`vmapi/`): FastAPI bound to 127.0.0.1 only, bearer-token auth on every route, a
+  per-tool argument allowlist (nmap/nuclei; no shell, no output redirection, exact in-scope target),
+  jobs spawned in their own process group so `/jobs/{id}/stop` SIGKILLs the whole tree and verifies it,
+  `/stream` for watch, `/pause` SIGSTOPs. 27 passed / 3 POSIX-only skipped on Windows (must run on the
+  Linux VM before deploy).
+- **Exclusive control** (`src/viper/execution/control.py`): one holder per project on SQLite; a human
+  `takeover()` preempts the agent, which then refuses to dispatch (`graph.execute` acquires `agent`
+  first). Reentrant for the agent, race-free (the INSERT is the compare-and-set).
+- **CLI**: `viper exec watch|pause|stop` (VM-backed) and `viper exec takeover|release` (control lock).
+- **Config**: `exec_api_ca_cert`, `exec_egress_allowlist` (+ `egress_hosts()`); `exec_api_url`,
+  `exec_api_token`, `allow_active_testing` already existed. Default config stays fully dry-run.
+- Verification: 276 src tests + 27 vmapi tests pass, ruff and mypy clean. Target for the gated run is
+  `scanme.nmap.org` (`projects/lab-scanme/scope.yaml`), reached over a gcloud IAP tunnel (no public port).
+- Not done: the live VM run itself (gated on user go), noVNC desktop take-over (deferred), external
+  audit-head anchoring (still open), real-execution audit event naming (reuses `tool_dry_run` for now).
