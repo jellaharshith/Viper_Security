@@ -180,6 +180,8 @@ def test_happy_path_posts_polls_and_returns_result() -> None:
             if n < 2:
                 return httpx.Response(200, json={"job_id": "act-1", "state": "running", "exit_code": None})
             return httpx.Response(200, json={"job_id": "act-1", "state": "done", "exit_code": 0})
+        if req.url.path == "/jobs/act-1/stream":
+            return _sse(["22/tcp open ssh"])
         raise AssertionError(f"unexpected {req.method} {req.url.path}")
 
     result = _executor(handler).run(_action())
@@ -190,3 +192,84 @@ def test_happy_path_posts_polls_and_returns_result() -> None:
     # polled at least twice (running -> done) and dumps cleanly for graph.execute
     assert sum(1 for m, _ in seen if m == "GET") >= 2
     assert result.model_dump(mode="json")["simulated"] is False
+
+
+# --------------------------------------------------------------------------- output capture
+
+
+def _sse(lines: list[str]) -> httpx.Response:
+    body = "".join(f"data: {ln}\n\n" for ln in lines)
+    return httpx.Response(200, content=body.encode(), headers={"content-type": "text/event-stream"})
+
+
+def _job_handler(stream: Any, state: str = "done", seen: list[httpx.Request] | None = None) -> Any:
+    def handler(req: httpx.Request) -> httpx.Response:
+        if seen is not None:
+            seen.append(req)
+        if req.method == "POST":
+            return httpx.Response(201, json={"job_id": "act-1", "state": "running"})
+        if req.url.path.endswith("/stream"):
+            return stream(req) if callable(stream) else stream
+        return httpx.Response(200, json={"job_id": "act-1", "state": state, "exit_code": 0})
+
+    return handler
+
+
+def test_done_job_output_is_captured_from_stream() -> None:
+    seen: list[httpx.Request] = []
+    h = _job_handler(_sse(["PORT STATE SERVICE", "22/tcp open ssh", "80/tcp open http"]), seen=seen)
+    result = _executor(h).run(_action())
+    assert result.output == "PORT STATE SERVICE\n22/tcp open ssh\n80/tcp open http"
+    assert result.simulated is False
+    stream_reqs = [r for r in seen if r.url.path == "/jobs/act-1/stream"]
+    assert len(stream_reqs) == 1
+    assert stream_reqs[0].headers["Authorization"] == f"Bearer {TOKEN}"
+
+
+def test_output_is_capped_at_one_mib_and_never_raises() -> None:
+    big = ["x" * 1000] * 3000  # ~3 MB
+    result = _executor(_job_handler(_sse(big))).run(_action())
+    assert 0 < len(result.output.encode()) <= 1024 * 1024
+
+
+def test_stream_http_error_after_done_raises() -> None:
+    from viper.execution.remote import RemoteJobError
+
+    h = _job_handler(lambda r: httpx.Response(500, text="boom"))
+    with pytest.raises(RemoteJobError):
+        _executor(h).run(_action())
+
+
+def test_stream_transport_error_after_done_raises() -> None:
+    from viper.execution.remote import RemoteJobError
+
+    def boom(req: httpx.Request) -> httpx.Response:
+        raise httpx.ReadError("connection reset", request=req)
+
+    with pytest.raises(RemoteJobError):
+        _executor(_job_handler(boom)).run(_action())
+
+
+def test_stream_401_raises_auth_error() -> None:
+    h = _job_handler(lambda r: httpx.Response(401, json={"detail": "no"}))
+    with pytest.raises(RemoteAuthError):
+        _executor(h).run(_action())
+
+
+def test_failed_job_still_raises_and_fetches_no_stream() -> None:
+    from viper.execution.remote import RemoteJobError
+
+    seen: list[httpx.Request] = []
+    h = _job_handler(_sse(["secret partial output"]), state="failed", seen=seen)
+    with pytest.raises(RemoteJobError):
+        _executor(h).run(_action())
+    assert not any(r.url.path.endswith("/stream") for r in seen)
+
+
+def test_dry_run_stubs_have_empty_output() -> None:
+    from viper.tools.registry import DryRunResult, default_registry
+
+    assert DryRunResult(tool="t", summary="s").output == ""
+    tool = default_registry.get("plan_scan")
+    assert tool is not None
+    assert tool.dry_run({"target": TARGET}).output == ""

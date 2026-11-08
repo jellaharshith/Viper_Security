@@ -25,6 +25,7 @@ class DryRunResult(BaseModel):
     args: dict[str, Any] = Field(default_factory=dict)
     summary: str
     simulated: bool = True
+    output: str = ""  # captured tool stdout (real execution only); stubs leave it empty
 
 
 def create_tool_info(name: str, risk: RiskLevel, *, dry_run_only: bool = True) -> ToolInfo:
