@@ -15,6 +15,11 @@ def anchor_verdict(receipt: AnchorReceipt, *, in_chain: bool, token_ok: bool) ->
     """
     if not in_chain:
         return "MISMATCH", True  # the anchored head is not in this log: rewritten or wrong file
-    # TODO(human): decide how much trust each remaining case earns and whether it fails verify.
-    # Cases left to decide: mock+token_ok, external+token_ok, external+not token_ok, mock+not token_ok.
+    if receipt.provider == "mock":
+        # A mock token only proves self-consistency. A mismatch means someone edited it.
+        return ("CONSISTENT_ONLY", False) if token_ok else ("TAMPERED", True)
+    if token_ok:
+        return "VERIFIED", False  # a trusted verifier vouched for the external receipt
+    # External receipt, no trusted verifier wired in yet. Honest but unproven: report it plainly,
+    # but do not fail every audit verify until a verifier exists.
     return "UNVERIFIED", False

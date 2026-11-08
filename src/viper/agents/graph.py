@@ -6,6 +6,7 @@ The model only proposes actions. Policy, approvals and audit are deterministic c
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -38,6 +39,14 @@ from viper.report.generator import render_report
 from viper.tools.registry import ToolRegistry, default_registry
 
 Planner = Callable[[str], list[Action]]
+
+_UNSAFE = re.compile(r"[^A-Za-z0-9 _.,=()@-]")
+
+
+def _safe(text: object) -> str:
+    """Model-supplied ids and names reach the report, so strip anything that could form Markdown,
+    a link, or a heading (no brackets, backticks, slashes, colons or newlines survive)."""
+    return _UNSAFE.sub("?", str(text))[:80]
 
 
 class AgentState(TypedDict, total=False):
@@ -265,6 +274,11 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                   detail={"count": len(state.get("findings", []))})
         except AuditError:
             return {"status": "FAILED", "report": f"report unavailable: audit log failed ({summary})"}
+        names = {a["action_id"]: a["tool_name"] for a in state.get("actions", [])}
+        lines = [f"- {_safe(k)} ({_safe(names.get(k, '?'))}): {_safe(v.get('reason', ''))}"
+                 for k, v in state.get("decisions", {}).items() if v["type"] == "DENY"]
+        if lines:  # a reader of the report must see what was refused and why, not just a count
+            text += "\n\n## Denied actions\n\n" + "\n".join(lines) + "\n"
         return {"report": f"{text}\n\n---\nRun summary: {summary}\n"}
 
     g = StateGraph(AgentState)
