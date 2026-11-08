@@ -26,6 +26,8 @@ _EVENTS = frozenset({
     "plan_proposed", "policy_decision", "approval_requested", "approval_granted",
     "approval_denied", "approval_expired", "approval_consumed", "tool_dry_run",
     "run_completed", "run_failed",
+    # M7: real dispatch (vs. simulated), finding analysis, report output, external anchoring.
+    "tool_executed", "findings_generated", "report_generated", "audit_anchored",
 })
 _DETAIL_KEYS = frozenset({
     "action_id", "tool", "tool_name", "args", "summary", "reason", "error", "status",
@@ -196,3 +198,21 @@ class AuditLog:
                 return record
         except (OSError, ValueError, TypeError, RecursionError):
             raise AuditError("Audit event could not be committed") from None
+
+    def events(self, thread_id: str) -> list[dict[str, Any]]:
+        """Committed events for one thread, in order. Refuses to read a broken chain.
+
+        A report cites these hashes, so it must never be built from a tampered log. A missing
+        file simply means nothing was recorded yet.
+        """
+        if not self.path.exists():
+            return []
+        try:
+            with _locked(self.path):
+                broken, _ = _scan(self.path)
+                if broken is not None:
+                    raise AuditError(f"Broken audit chain at sequence {broken}")
+                records = [json.loads(line) for line in self.path.read_bytes().splitlines()]
+        except (OSError, ValueError):
+            raise AuditError("Audit log could not be read") from None
+        return [r for r in records if r.get("thread_id") == thread_id]
