@@ -16,7 +16,7 @@ PLAN = [{"action_id": "p", "tool_name": "plan_scan", "args": {"target": "example
 def files(tmp_path, monkeypatch):
     monkeypatch.setenv("VIPER_AUDIT_DIR", str(tmp_path / "audit"))
     monkeypatch.setenv("VIPER_CHECKPOINT_DB", str(tmp_path / "cp.db"))
-    monkeypatch.delenv("VIPER_EXEC_API_URL", raising=False)
+    monkeypatch.setenv("VIPER_EXEC_API_URL", "")  # force-empty; overrides any .env value
     (tmp_path / "scope.yaml").write_text(SCOPE)
     (tmp_path / "plan.json").write_text(json.dumps(PLAN))
     return ["--scope", str(tmp_path / "scope.yaml"), "--plan", str(tmp_path / "plan.json"),
