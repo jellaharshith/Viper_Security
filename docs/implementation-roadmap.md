@@ -10,7 +10,7 @@ Rules: one milestone at a time; tests green before moving on; explicit approval 
 | M3 | Weekly RAG automation (**M3a-e built; `min_score` 0.70; full answer run at 0.70 pending**) | Staged update, eval gate, atomic promote, rollback, report | $0-low |
 | M4 | Colab QLoRA (gated by M2) | Candidate beats baseline without general regression; human approves | Colab free or ~$10/mo |
 | M5 | LangGraph agents + policy engine (**built, dry-run only**) | Approval checkpoints and audit log work with no live targets | $0 |
-| M6 | Cloud Kali GUI lab | Approve a lab task, watch it, take over, pause, emergency stop | On-demand, <$50/mo |
+| M6 | Cloud Kali GUI lab (**headless plane built & dry-run wired; paid VM gated**) | Approve a lab task, watch it, take over, pause, emergency stop | On-demand, <$50/mo |
 | M7 | Pentest copilot + bug bounty workflow | Traceable report from an authorized/lab target | On-demand |
 
 ## Dependencies

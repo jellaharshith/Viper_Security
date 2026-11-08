@@ -1,0 +1,8 @@
+project_id: lab-scanme
+program_url: https://scanme.nmap.org/
+evidence_ref: Nmap official scan-test host; authorized for benign scan testing per https://scanme.nmap.org/
+in_scope:
+  - scanme.nmap.org
+exclusions: []
+forbidden_techniques:
+  - INTRUSIVE

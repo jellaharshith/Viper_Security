@@ -19,7 +19,9 @@ from langgraph.types import interrupt
 from viper.agents.audit import AuditError, AuditLog
 from viper.agents.claims import ClaimStore, MemoryClaims
 from viper.config import Settings
+from viper.execution.control import AGENT, ControlLock
 from viper.execution.executor import DryRunExecutor
+from viper.execution.factory import Executor
 from viper.policy.approvals import (
     PendingApproval,
     ResumePayload,
@@ -59,6 +61,9 @@ class Deps:
     claims: ClaimStore = field(default_factory=MemoryClaims)
     now: Callable[[], datetime] = lambda: datetime.now(UTC)
     approval_ttl: timedelta = timedelta(minutes=15)
+    # M6: pluggable executor (defaults to DryRunExecutor) and the exclusive-control lock.
+    executor: Executor | None = None
+    control: ControlLock | None = None
 
 
 def _deny(action: Action, reason: str) -> Decision:
@@ -66,7 +71,7 @@ def _deny(action: Action, reason: str) -> Decision:
 
 
 def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledStateGraph[Any, Any, Any, Any]:
-    executor = DryRunExecutor(deps.registry)
+    executor = deps.executor or DryRunExecutor(deps.registry)
 
     def decide(action: Action) -> Decision:
         tool = deps.registry.get(action.tool_name)
@@ -169,6 +174,16 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         approvals = {PendingApproval.model_validate(v).action_id: PendingApproval.model_validate(v)
                      for v in state.get("pending", {}).values() if v["consumed"]}
         decisions = dict(state["decisions"])
+        # Exclusive control (M6): if a human has taken over the VM, the agent dispatches nothing.
+        if deps.control is not None and not deps.control.acquire(AGENT):
+            for raw in state["actions"]:
+                action = Action.model_validate(raw)
+                if decisions[action.action_id]["type"] != "DENY":
+                    decisions[action.action_id] = _deny(
+                        action, "human holds exclusive control").model_dump(mode="json")
+            audit(state, "policy_decision", "policy",
+                  detail={"reason": "exclusive control held by human"})
+            return {"status": "REJECTED", "results": results, "decisions": decisions}
         for raw in state["actions"]:
             action = Action.model_validate(raw)
             if decisions[action.action_id]["type"] == "DENY":
