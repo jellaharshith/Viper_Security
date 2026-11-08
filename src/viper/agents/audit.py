@@ -32,7 +32,7 @@ _EVENTS = frozenset({
 _DETAIL_KEYS = frozenset({
     "action_id", "tool", "tool_name", "args", "summary", "reason", "error", "status",
     "count", "scope_revision", "pending_approval_id", "approver", "results", "message",
-    "digest", "simulated",
+    "digest", "simulated", "truncated",
 })
 _FIELDS = frozenset({
     "seq", "ts", "thread_id", "event", "actor", "action_hash", "decision", "detail",

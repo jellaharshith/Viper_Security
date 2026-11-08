@@ -39,6 +39,7 @@ from viper.tools.registry import ToolRegistry, default_registry
 
 Planner = Callable[[str], list[Action]]
 
+_ACTION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 _UNSAFE = re.compile(r"[^A-Za-z0-9 _.,=()@-]")
 
 
@@ -107,7 +108,9 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
     def plan(state: AgentState) -> dict[str, Any]:
         actions = deps.planner(state["request"])  # untrusted proposals
         ids = [a.action_id for a in actions]
-        if any(not i.strip() for i in ids) or len(set(ids)) != len(ids):
+        if any(not _ACTION_ID.fullmatch(i) for i in ids):  # ids reach terminals and reports
+            raise ValueError("plan has an invalid action id")  # fail closed
+        if len(set(ids)) != len(ids):
             raise ValueError("plan has empty or duplicate action ids")  # fail closed
         audit(state, "plan_proposed", "agent", detail={"count": len(actions)})
         return {"actions": [a.model_dump(mode="json") for a in actions], "status": "DRAFT_PLAN"}
@@ -236,7 +239,8 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                     cite = audit(state, "tool_result", "agent", action_hash=ahash,
                                  detail={"action_id": action.action_id, "tool": action.tool_name,
                                          "digest": digest(str(raw.get("output", ""))),
-                                         "simulated": bool(raw.get("simulated", True))})["hash"]
+                                         "simulated": bool(raw.get("simulated", True)),
+                                         "truncated": bool(raw.get("truncated", False))})["hash"]
                 results.append({**raw, "action_id": action.action_id, "audit_hash": cite})
             except AuditError:
                 return {"status": "FAILED", "results": results, "decisions": decisions}
@@ -250,11 +254,18 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         audit(state, "run_completed", "agent", detail={"count": len(results)})
         return {"results": results, "decisions": decisions, "status": "COMPLETED"}
 
+    def bind(raw: dict[str, Any]) -> str | None:
+        """Recompute the policy hash of a checkpointed action to detect edits to it."""
+        action = Action.model_validate(raw)
+        info = deps.registry.get_info(action.tool_name)
+        return action_hash(action, info) if info else None
+
     def analyze(state: AgentState) -> dict[str, Any]:
         """Deterministic only: findings come from digest-verified tool output, never the LLM."""
         try:
             findings, warnings = rederive(state.get("results", []),
-                                          deps.audit.events(state["thread_id"]))
+                                          deps.audit.events(state["thread_id"]),
+                                          actions=state.get("actions", []), bind=bind)
         except AuditError:
             return {"status": "FAILED", "findings": [],
                     "analysis_warnings": ["audit log failed verification; analysis not possible"]}
@@ -269,7 +280,8 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         try:  # a report cites audit hashes, so it is only built from a verified chain
             events = deps.audit.events(state["thread_id"])
             # Re-derive again from the latest checkpointed results: stored findings are not trusted.
-            findings, warnings = rederive(state.get("results", []), events)
+            findings, warnings = rederive(state.get("results", []), events,
+                                          actions=state.get("actions", []), bind=bind)
             warnings = list(dict.fromkeys([*state.get("analysis_warnings", []), *warnings]))
             text = render_report(findings, events, project_id=state["project_id"],
                                  thread_id=state["thread_id"])

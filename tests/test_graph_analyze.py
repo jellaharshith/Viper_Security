@@ -117,17 +117,17 @@ def test_report_lists_denied_actions_with_their_reasons(tmp_path):
     assert "active testing is disabled" in out["report"]
 
 
-def test_denied_section_neutralises_markdown_from_model_supplied_ids(tmp_path):
-    nasty = Action(action_id="x`](http://evil)\n# pwn", tool_name="nmap", args={"target": "evil.com"})
-    settings = Settings(_env_file=None, audit_dir=tmp_path, allow_active_testing=True)
-    deps = Deps(planner=lambda _r: [nasty], settings=settings, scope_provider=lambda: SCOPE,
-                audit=AuditLog(settings, "lab"), registry=default_registry, now=lambda: NOW)
-    out = build_graph(deps, InMemorySaver()).invoke(
-        {"project_id": "lab", "thread_id": "t1", "request": "scan"},
-        {"configurable": {"thread_id": "t1"}})
-    denied = out["report"].split("## Denied actions", 1)[1]
-    assert "http://evil" not in denied.split("---")[0] or "](" not in denied
-    assert "\n# pwn" not in denied
+def test_hostile_action_ids_are_rejected_before_anything_runs(tmp_path):  # codex R4
+    esc = chr(27)
+    for bad in (f"x{esc}]52;c;AAAA", "x`](http://evil)", "a b", "", "x" * 200):
+        nasty = Action(action_id=bad, tool_name="nmap", args={"target": "evil.com"})
+        settings = Settings(_env_file=None, audit_dir=tmp_path, allow_active_testing=True)
+        deps = Deps(planner=lambda _r, n=nasty: [n], settings=settings, scope_provider=lambda: SCOPE,
+                    audit=AuditLog(settings, "lab"), registry=default_registry, now=lambda: NOW)
+        with pytest.raises(ValueError, match="action id"):
+            build_graph(deps, InMemorySaver()).invoke(
+                {"project_id": "lab", "thread_id": "t1", "request": "scan"},
+                {"configurable": {"thread_id": "t1"}})
 
 
 def test_analysis_warnings_surface_in_the_report_when_output_is_truncated(tmp_path):

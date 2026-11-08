@@ -105,3 +105,9 @@ def test_oversized_reply_is_rejected_before_parsing() -> None:
 def test_many_array_starts_do_not_cause_unbounded_work() -> None:
     with pytest.raises(PlannerError):
         planner("[1," * 20000)("scan")
+
+
+def test_control_characters_in_action_ids_are_rejected() -> None:
+    bad = [{**GOOD[0], "action_id": "x" + chr(27) + "]52;c;AAAA" + chr(7)}]
+    with pytest.raises(PlannerError, match="action id"):
+        planner(json.dumps(bad))("scan")

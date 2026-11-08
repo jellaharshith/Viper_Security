@@ -8,6 +8,7 @@ unknown tools, extra keys, duplicate ids, empty or oversized plans all fail clos
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +17,7 @@ from pydantic import ValidationError
 from viper.policy.models import Action, Scope
 from viper.tools.registry import ToolRegistry
 
+_ACTION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 MAX_REPLY_CHARS = 65_536  # a plan is a few lines; refuse to parse anything bigger
 MAX_DECODE_ATTEMPTS = 50
 MAX_ACTIONS = 8  # a plan is a handful of scans, not a campaign; humans approve each ACTIVE one
@@ -95,7 +97,9 @@ class LLMPlanner:
         except ValidationError:
             raise PlannerError("proposed action has an invalid shape") from None
         ids = [a.action_id for a in actions]
-        if any(not i.strip() for i in ids) or len(set(ids)) != len(ids):
+        if any(not _ACTION_ID.fullmatch(i) for i in ids):
+            raise PlannerError("invalid action id (letters, digits, _ . - only)")
+        if len(set(ids)) != len(ids):
             raise PlannerError("plan has empty or duplicate action ids")
         for action in actions:
             if self._registry.get(action.tool_name) is None:
