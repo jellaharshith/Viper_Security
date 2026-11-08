@@ -37,18 +37,25 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
 3. **Evidence Events v2 Architecture:**
    To guarantee that audit citations reflect actual execution results rather than dispatch intent, real execution records two distinct events:
    - `tool_dispatch`: Committed *before* dispatch, recording operational intent (`action_id`, `tool`). This event is never a citation target.
-   - `tool_result`: Committed *after* dispatch, recording the execution outcome with `detail = {"action_id": ..., "tool": ..., "digest": sha256(output), "simulated": False}`.
+   - `tool_result`: Committed *after* dispatch, recording the execution outcome with `detail = {"action_id": ..., "tool": ..., "digest": sha256(output), "simulated": False, "truncated": bool}`.
    - The legacy event `tool_executed` is permanently removed.
    - Simulated stub runs record the single event `tool_dry_run`.
    - Results in state carry `audit_hash` bound to the `tool_result` event hash.
 
-4. **Re-Derivation of Findings & Incomplete Analysis Warnings:**
-   - Stored findings in checkpoints are treated as untrusted. The graph `analyze` node and `report` node invoke `evidence.rederive(results, events)` to reconstruct findings directly from raw output whose SHA-256 matches the audited `tool_result` digest.
-   - If an output was truncated, malformed records were skipped (`skipped > 0`), an output digest mismatched, or no matching `tool_result` event exists, an analysis warning is generated.
+4. **Audit Log as Evidence Authority & Re-Derivation of Findings:**
+   - Stored findings in checkpoints are treated as untrusted. The verified audit log is the authoritative record of execution; checkpoint state is an untrusted cache.
+   - The graph `analyze` node and `report` node invoke `evidence.rederive(results, events, actions=..., bind=...)` iterating over audited real `tool_result` events from the verified chain.
+   - Each audited event requires exactly one matching checkpoint result:
+     - Matching `audit_hash`, `action_id`, `tool`, and `args`.
+     - Recomputed policy action hash matches the audited event's `action_hash`.
+     - Output SHA-256 matches the audited `detail.digest`.
+     - `simulated` and `truncated` flags are taken from the committed audit event, not the checkpoint.
+   - If a checkpoint result is missing, duplicated, edited (args/target/hash), simulated-flipped, or unaudited, output is ignored and an incomplete-analysis warning is generated.
+   - If an output was truncated, malformed records were skipped (`skipped > 0`), or a parser failed, an analysis warning is generated.
    - The report includes an explicit `## Analysis warnings` section stating: `Analysis is INCOMPLETE; do not read missing findings as a clean result.`
 
-5. **Bounded Tool Output Capture (1 MiB Ceiling & Wire Limits):**
-   `RemoteExecutor` captures job stdout from `GET /jobs/{id}/stream` over verified TLS once the job reaches `state == "done"`. Reads use bounded 8 KiB chunks and a 64 KiB line buffer. Captured stdout is capped at 1 MiB (`MAX_OUTPUT_BYTES = 1024 * 1024`), while wire limits enforce a 4 MiB transfer cap and 120s timeout. Hitting any limit marks `DryRunResult.truncated = True`. Stubs leave `output = ""`.
+5. **Hardened Remote Stream Capture (Identity Only & Wire Limits):**
+   `RemoteExecutor` captures job stdout from `GET /jobs/{id}/stream` over verified TLS once the job reaches `state == "done"`. Requests explicitly enforce `Accept-Encoding: identity` with a per-read timeout (`STREAM_READ_TIMEOUT = 10.0s`); any response with non-identity `Content-Encoding` (gzip, br, deflate) is refused with `RemoteJobError`. Streams are read via `iter_raw()` (no decoding, chunk_size=None), enforcing the 4 MiB wire cap (`MAX_WIRE_BYTES`) and 120s wall-clock deadline (`MAX_STREAM_SECONDS`) after *every* raw chunk. Reads use a bounded 64 KiB line buffer, and captured stdout is hard-capped at 1 MiB (`MAX_OUTPUT_BYTES = 1024 * 1024`), after which excess bytes are drained under wire/time limits. Hitting any limit marks `DryRunResult.truncated = True`. Stubs leave `output = ""`.
 
 6. **Deterministic Output Parsers & Foreign-Host Containment:**
    Tool output parsing (`parse_nmap_ex`, `parse_nuclei_ex`) operates as pure, deterministic functions returning `(findings, skipped_count)`. Parsers enforce strict resource budgets (JSON depth <= 32, lines <= 20K, total input <= 4 MiB, findings <= 500). Nuclei matches against foreign hosts are quarantined as hypothesis observations and never attributed as confirmed findings on the target.
@@ -61,14 +68,15 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
    - Thread IDs cannot be reused for new runs (`valid_thread` regex `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`), preventing cross-assessment state contamination or symlink attacks.
    - CLI verb `viper report --thread <thread>` displays the saved report.
 
-8. **Terminal Safety & Visible Control Escaping:**
+8. **Terminal Safety, Approval Display Sanitization & Safe Action IDs:**
+   - Action IDs must strictly match `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`, blocking control characters and escape sequences during plan proposal and LLM plan parsing.
    - `render_report` exposes all C0/C1 control bytes as printable `\xNN` hex escapes and Unicode bidirectional directional characters as `\uNNNN` escapes in evidence and metadata.
-   - `cli.py` applies `terminal_safe()` (stripping control and bidi characters while keeping newlines and tabs) when printing reports to the operator's terminal.
+   - `cli.py` applies `terminal_safe()` when printing saved reports and when printing pending action approval details in `viper agent resume`.
 
 9. **Opt-In, Budgeted LLM Planner:**
    - The LLM planner (`viper.agents.planner.LLMPlanner`) is opt-in via `viper agent run --llm --request <text>`, mutually exclusive with `--plan <file>`.
    - Enforces strict budgets: `MAX_REPLY_CHARS = 65_536`, `MAX_DECODE_ATTEMPTS = 50`, `MAX_ACTIONS = 8`.
-   - Validates proposals strictly against `Action.model_validate` and registry tool schemas; fails closed with `PlannerError`.
+   - Validates proposals strictly against `Action.model_validate` and registry tool schemas; validates action ID tokens; fails closed with `PlannerError`.
 
 10. **Audit Anchoring Limitation & Verdict Verification:**
     - Resolving ADR 0009 deferral, `viper.agents.anchor` implements cryptographic anchoring adapters.
@@ -87,11 +95,11 @@ See `docs/plans/m7-pentest-copilot.md`, `docs/plans/m6-execution-plane.md`, and 
 
 - **Positive:**
   - **Zero Hallucinated Confirmations:** Model imagination cannot contaminate the confirmed findings list.
-  - **Cryptographic Evidence Binding:** Findings are re-derived from tool output verified against audited SHA-256 digests. Checkpoint tampering is neutralized.
+  - **Audit Log Evidence Authority:** Findings are re-derived from tool output verified against audited SHA-256 digests. Checkpoint result deletion, argument editing, or simulation-flag flipping cannot hide or manufacture findings without triggering incomplete-analysis warnings.
   - **Transparent Deficiencies:** Truncated scans, skipped records, and denied actions are surfaced explicitly in report warning sections rather than appearing as clean scans.
-  - **Memory & Storage Safety:** 1 MiB stream ceiling, 4 MiB wire cap, and exclusive report creation prevent resource exhaustion and file overwrite attacks.
-  - **Terminal Protection:** Control and bidi character sanitization blocks terminal-based prompt injection and clipboard hijacking.
-  - **Offline Safety:** Automated test suite runs 100% offline (453 tests green).
+  - **Memory & Storage Safety:** 1 MiB stream ceiling, 4 MiB wire cap, identity encoding enforcement, and exclusive report creation prevent resource exhaustion, decompression bombs, and file overwrite attacks.
+  - **Terminal Protection:** Control and bidi character sanitization in reports and approval displays, paired with strict action ID token validation, blocks terminal-based prompt injection and clipboard hijacking.
+  - **Offline Safety:** Automated test suite runs 100% offline (465 tests green).
   - **Honest Telemetry:** Distinct `tool_dispatch` and `tool_result` events separate intent from verified outcome.
 
 - **Trade-offs & Limitations:**
