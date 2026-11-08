@@ -22,6 +22,8 @@ from viper.config import Settings
 from viper.execution.control import AGENT, ControlLock
 from viper.execution.executor import DryRunExecutor
 from viper.execution.factory import Executor
+from viper.findings.models import Finding
+from viper.findings.parsers import parse_nmap, parse_nuclei
 from viper.policy.approvals import (
     PendingApproval,
     ResumePayload,
@@ -32,6 +34,7 @@ from viper.policy.approvals import (
 )
 from viper.policy.engine import evaluate
 from viper.policy.models import Action, Decision, DecisionType, Scope
+from viper.report.generator import render_report
 from viper.tools.registry import ToolRegistry, default_registry
 
 Planner = Callable[[str], list[Action]]
@@ -47,6 +50,7 @@ class AgentState(TypedDict, total=False):
     decisions: dict[str, dict[str, Any]]
     pending: dict[str, dict[str, Any]]
     results: list[dict[str, Any]]
+    findings: list[dict[str, Any]]
     status: str
     report: str
 
@@ -83,8 +87,11 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         info = deps.registry.get_info(action.tool_name)
         return evaluate(action, info, deps.scope_provider(), deps.settings)
 
-    def audit(state: AgentState, event: str, actor: str, **kw: Any) -> None:
-        deps.audit.append(thread_id=state["thread_id"], event=event, actor=actor, **kw)
+    def audit(state: AgentState, event: str, actor: str, **kw: Any) -> dict[str, Any]:
+        return deps.audit.append(thread_id=state["thread_id"], event=event, actor=actor, **kw)
+
+    # Honest event naming (M7): simulated runs stay "tool_dry_run"; real dispatch is "tool_executed".
+    dispatch_event = "tool_dry_run" if isinstance(executor, DryRunExecutor) else "tool_executed"
 
     def plan(state: AgentState) -> dict[str, Any]:
         actions = deps.planner(state["request"])  # untrusted proposals
@@ -210,9 +217,11 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                       detail={"action_id": action.action_id, "reason": reason})
                 continue
             try:  # audit first: no committed evidence, no dispatch
-                audit(state, "tool_dry_run", "agent", action_hash=ahash,
-                      detail={"action_id": action.action_id, "tool": action.tool_name})
-                results.append(executor.run(action).model_dump(mode="json"))
+                entry = audit(state, dispatch_event, "agent", action_hash=ahash,
+                               detail={"action_id": action.action_id, "tool": action.tool_name})
+                # action_id + audit_hash let analyze() tie every finding back to this exact event
+                results.append({**executor.run(action).model_dump(mode="json"),
+                                "action_id": action.action_id, "audit_hash": entry["hash"]})
             except AuditError:
                 return {"status": "FAILED", "results": results, "decisions": decisions}
             except Exception as exc:  # noqa: BLE001 - record the class only, then stop the run
@@ -225,22 +234,51 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         audit(state, "run_completed", "agent", detail={"count": len(results)})
         return {"results": results, "decisions": decisions, "status": "COMPLETED"}
 
+    parsers = {"nmap": parse_nmap, "nuclei": parse_nuclei}
+
+    def analyze(state: AgentState) -> dict[str, Any]:
+        """Deterministic only: findings come from parsing real tool output, never from the LLM."""
+        findings: list[dict[str, Any]] = []
+        for r in state.get("results", []):
+            parser = parsers.get(r.get("tool", ""))
+            if parser is None or r.get("simulated", True) or not r.get("output"):
+                continue
+            try:
+                parsed = parser(r["output"], action_id=r["action_id"],
+                                target=str(r.get("args", {}).get("target", "")),
+                                audit_refs=[r["audit_hash"]])
+            except Exception:  # noqa: BLE001 - malformed output yields no findings, never a guess
+                parsed = []
+            findings += [f.model_dump(mode="json") for f in parsed]
+        audit(state, "findings_generated", "agent", detail={"count": len(findings)})
+        return {"findings": findings}
+
     def report(state: AgentState) -> dict[str, Any]:
         denied = [k for k, v in state.get("decisions", {}).items() if v["type"] == "DENY"]
-        text = (f"status={state.get('status')} executed={len(state.get('results', []))} "
-                f"denied={len(denied)}")
-        return {"report": text}
+        summary = (f"status={state.get('status')} executed={len(state.get('results', []))} "
+                   f"denied={len(denied)}")
+        try:  # a report cites audit hashes, so it is only built from a verified chain
+            events = deps.audit.events(state["thread_id"])
+            text = render_report([Finding.model_validate(f) for f in state.get("findings", [])],
+                                 events, project_id=state["project_id"], thread_id=state["thread_id"])
+            audit(state, "report_generated", "agent",
+                  detail={"count": len(state.get("findings", []))})
+        except AuditError:
+            return {"status": "FAILED", "report": f"report unavailable: audit log failed ({summary})"}
+        return {"report": f"{text}\n\n---\nRun summary: {summary}\n"}
 
     g = StateGraph(AgentState)
     g.add_node("plan", plan)
     g.add_node("policy_gate", policy_gate)
     g.add_node("approval", approval)
     g.add_node("execute", execute)
+    g.add_node("analyze", analyze)
     g.add_node("report", report)
     g.add_edge(START, "plan")
     g.add_edge("plan", "policy_gate")
     g.add_conditional_edges("policy_gate", route_after_gate, ["approval", "execute"])
     g.add_conditional_edges("approval", route_after_approval, ["execute", "report"])
-    g.add_edge("execute", "report")
+    g.add_edge("execute", "analyze")
+    g.add_edge("analyze", "report")
     g.add_edge("report", END)
     return g.compile(checkpointer=checkpointer)
