@@ -279,3 +279,57 @@ def test_reproduction_is_quoted_and_labelled_posix() -> None:
     assert shlex.split(n.reproducibility.removeprefix("POSIX shell: ")) == [
         "nmap", "-p", "22", "scanme.nmap.org; id"
     ]
+
+
+# ------------------------------------------- skipped means "looked like a finding, unusable"
+
+
+@pytest.mark.parametrize(
+    ("fixture", "kind"),
+    [
+        ("nmap_scanme.txt", "nmap"),
+        ("nmap_none_open.txt", "nmap"),
+        ("nuclei_text.txt", "nuclei"),
+        ("nuclei.jsonl", "nuclei"),
+    ],
+)
+def test_healthy_fixtures_report_zero_skipped(fixture: str, kind: str) -> None:
+    parse = parse_nmap_ex if kind == "nmap" else parse_nuclei_ex
+    _, skipped = parse(_read(fixture), **_kw())  # type: ignore[arg-type]
+    assert skipped == 0
+
+
+def test_nmap_normal_states_are_not_skipped() -> None:
+    rows = "\n".join(
+        f"{p}/tcp {s} svc"
+        for p, s in enumerate(
+            ["closed", "filtered", "unfiltered", "closed|filtered", "open|filtered"], 1
+        )
+    )
+    _, skipped = parse_nmap_ex(rows + "\n", **_kw())  # type: ignore[arg-type]
+    assert skipped == 0
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        "22/tcp banana ssh",  # unrecognised state
+        "70000/tcp closed x",  # port out of range
+        "80/tcp open",  # open row with no service: garbled
+        "22/tcp",  # truncated row
+    ],
+)
+def test_nmap_garbled_rows_are_skipped(row: str) -> None:
+    fs, skipped = parse_nmap_ex(row + "\n", **_kw())  # type: ignore[arg-type]
+    assert fs == [] and skipped >= 1
+
+
+def test_nuclei_matcher_status_false_is_normal_not_skipped() -> None:
+    fs, skipped = parse_nuclei_ex(_nj(**{"matcher-status": False}) + "\n", **_kw())  # type: ignore[arg-type]
+    assert fs == [] and skipped == 0
+
+
+def test_nuclei_unusable_records_still_counted() -> None:
+    bad = ['{"x":', '{"template-id":"t","info":{"severity":"low"}}', "[t] [http] [bogus] http://scanme.nmap.org/"]
+    _, skipped = parse_nuclei_ex("\n".join(bad) + "\n", **_kw())  # type: ignore[arg-type]
+    assert skipped == 3
