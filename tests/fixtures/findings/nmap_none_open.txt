@@ -1,0 +1,6 @@
+Nmap scan report for scanme.nmap.org (45.33.32.156)
+Host is up (0.17s latency).
+
+PORT      STATE    SERVICE
+25/tcp    filtered smtp
+31337/tcp closed   Elite
