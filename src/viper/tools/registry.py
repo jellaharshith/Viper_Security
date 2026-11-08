@@ -118,6 +118,7 @@ class ToolRegistry:
     def _ensure_defaults(self) -> None:
         if self._auto_load_defaults and not self._defaults_loaded:
             self._defaults_loaded = True
+            import viper.tools.real  # noqa: F401  # M6 nmap/nuclei (ACTIVE, real-exec)
             import viper.tools.stubs  # noqa: F401
 
     def register(self, tool: Tool, *, overwrite: bool = False) -> Tool:
