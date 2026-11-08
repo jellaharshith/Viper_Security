@@ -202,5 +202,29 @@ report + anchoring + security review, agy-m7 docs; coordinator wiring). 465 test
   UNVERIFIED until a trusted offline verifier is wired in (documented limitation).
 - **Security review**: codex reviewed `376c255..HEAD` (10 medium findings), all fixed; re-review found
   7 fixed / 3 partial + 4 residuals, all fixed in round 5.
-- **Not done**: the gated live run against scanme (needs the runbook infra re-provisioned: the M6 plane
-  was torn down); noVNC takeover and multi-job dispatch stay deferred.
+- **Not done**: noVNC takeover and multi-job dispatch stay deferred (see live validation below for the run).
+
+## M7 LIVE VALIDATION - 2026-11-08 (definition of done met)
+Re-provisioned the execution plane per the runbook, ran the full copilot workflow against the authorized
+lab host `scanme.nmap.org` only, then deleted everything (total cost: minutes of one spot e2-medium).
+- **Infra:** spot `e2-medium` Ubuntu 22.04 (`--no-address`), Cloud Router + NAT, IAP-only SSH firewall,
+  `vmapi` under systemd on 127.0.0.1:8443 (TLS + bearer token), reached by an SSH port-forward over IAP.
+  The pre-existing `kali-vm` in the project was not touched.
+- **Workflow:** `agent run` (plan) paused at the approval checkpoint; `agent resume --decision ALLOW`
+  dispatched `nmap -sT -sV -p 22,80,443 scanme.nmap.org`; output was captured from the job stream,
+  digest-committed, parsed, and rendered. Result: `COMPLETED executed=1`.
+- **Traceable report:** 2 confirmed findings (22/tcp ssh OpenSSH 6.6.1p1; 80/tcp http Apache 2.4.7), each with
+  the raw nmap line as evidence and a citation to the `tool_result` audit event (seq 32) bound to that exact
+  action. 443/tcp was not open, so no finding was produced for it.
+- **Audit:** chain `plan_proposed -> policy REQUIRE_APPROVAL -> approval_requested -> approval_granted ->
+  approval_consumed -> tool_dispatch -> tool_result(digest) -> run_completed -> findings_generated ->
+  report_generated`; `viper audit verify` OK; mock anchor `CONSISTENT_ONLY` covering seq 0-35.
+- **Runbook bugs found and fixed:** (1) the systemd unit ran `uvicorn app:app` but `app.py` imports
+  `vmapi.auth`, so it must run from `/opt/viper` as `vmapi.app:app`; (2) the VM env var is
+  `VIPER_EXEC_EGRESS_ALLOWLIST`, not `...TARGET_ALLOWLIST` (an empty allowlist makes every job a 422);
+  (3) the port-forward must use PuTTY-only flags on Windows; (4) Step 8 CLI invocations were wrong.
+  First attempt failed closed (`RemoteJobError`, nothing reached the target) and was recorded in the audit log.
+- **Teardown verified:** tunnel process stopped, VM + NAT + router + firewall rule deleted, `.env` restored
+  with `VIPER_ALLOW_ACTIVE_TESTING` unset, cert and token deleted. Only the user's own `kali-vm` remains.
+- **Follow-ups:** external TSA/Rekor anchoring needs a trusted offline verifier; noVNC takeover; nuclei is
+  not installed on the Ubuntu image (apt has no nuclei), so only nmap was exercised live.
