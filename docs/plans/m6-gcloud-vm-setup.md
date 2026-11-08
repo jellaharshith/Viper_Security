@@ -273,7 +273,7 @@ Execute the lab workflow using the authorized scope file:
 ```powershell
 # 1. Start agent thread with lab-scanme scope
 $env:PYTHONPATH="src"
-.venv\Scripts\python -m viper.cli agent run --scope projects/lab-scanme/scope.yaml --plan plans/scanme.json --thread lab1
+.venv\Scripts\python -m viper.cli agent run --scope projects/lab-scanme/scope.yaml --plan projects/lab-scanme/plan.json --thread lab1
 
 # 2. Review the pending active action, then resume
 .venv\Scripts\python -m viper.cli agent resume --scope projects/lab-scanme/scope.yaml --thread lab1 --decision ALLOW

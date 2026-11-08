@@ -15,3 +15,18 @@ models/
 *.gguf
 .crew/
 secrets/
+
+# local tooling / agent state (never commit)
+.codex/
+.claude/
+.mcp.json
+
+# build and coverage artefacts
+build/
+dist/
+.coverage
+htmlcov/
+
+# OS noise
+.DS_Store
+Thumbs.db

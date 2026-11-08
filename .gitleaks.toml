@@ -1,0 +1,11 @@
+# Gitleaks configuration (picked up automatically by gitleaks-action).
+title = "Viper gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives: fake receipts used by offline unit tests"
+# base64("external-token"): a dummy anchor receipt in tests/test_anchor.py, not a credential.
+regexes = ['''ZXh0ZXJuYWwtdG9rZW4=''']
+paths = ['''tests/fixtures/''']
