@@ -90,3 +90,18 @@ def test_model_failure_is_wrapped() -> None:
     p = LLMPlanner(boom, default_registry, lambda: SCOPE)
     with pytest.raises(PlannerError, match="model"):
         p("scan")
+
+
+def test_deeply_nested_reply_is_a_planner_error_not_a_crash() -> None:
+    with pytest.raises(PlannerError):
+        planner("[" * 5000 + "]" * 5000)("scan")
+
+
+def test_oversized_reply_is_rejected_before_parsing() -> None:
+    with pytest.raises(PlannerError, match="too large"):
+        planner("x" * 200_000)("scan")
+
+
+def test_many_array_starts_do_not_cause_unbounded_work() -> None:
+    with pytest.raises(PlannerError):
+        planner("[1," * 20000)("scan")

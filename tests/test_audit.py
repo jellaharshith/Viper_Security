@@ -164,7 +164,7 @@ def test_arbitrary_objects_are_not_formatted(tmp_path: Path) -> None:
 
 def test_m7_event_types_are_accepted(tmp_path: Path) -> None:
     log = log_at(tmp_path)
-    for event in ("tool_executed", "findings_generated", "report_generated", "audit_anchored"):
+    for event in ("tool_dispatch", "tool_result", "findings_generated", "report_generated", "audit_anchored"):
         record = log.append(thread_id="thread", event=event, actor="agent")
         assert record["event"] == event
     assert audit.verify(log.path) is None

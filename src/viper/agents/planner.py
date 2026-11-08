@@ -16,6 +16,8 @@ from pydantic import ValidationError
 from viper.policy.models import Action, Scope
 from viper.tools.registry import ToolRegistry
 
+MAX_REPLY_CHARS = 65_536  # a plan is a few lines; refuse to parse anything bigger
+MAX_DECODE_ATTEMPTS = 50
 MAX_ACTIONS = 8  # a plan is a handful of scans, not a campaign; humans approve each ACTIVE one
 
 Chat = Callable[[list[dict[str, str]]], str]
@@ -38,13 +40,19 @@ _SYSTEM = (
 
 def _first_array(text: str) -> list[Any]:
     """First JSON array of objects in ``text`` (tolerates fences and surrounding prose)."""
+    if len(text) > MAX_REPLY_CHARS:
+        raise PlannerError("model reply too large")
     decoder = json.JSONDecoder()
+    attempts = 0
     for start, ch in enumerate(text):
         if ch != "[":
             continue
+        attempts += 1
+        if attempts > MAX_DECODE_ATTEMPTS:
+            break
         try:
-            value, _ = decoder.raw_decode(text[start:])
-        except ValueError:
+            value, _ = decoder.raw_decode(text, start)
+        except (ValueError, RecursionError):  # malformed or absurdly deep: not a plan
             continue
         if isinstance(value, list) and value and all(isinstance(i, dict) for i in value):
             return value

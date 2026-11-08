@@ -27,11 +27,12 @@ _EVENTS = frozenset({
     "approval_denied", "approval_expired", "approval_consumed", "tool_dry_run",
     "run_completed", "run_failed",
     # M7: real dispatch (vs. simulated), finding analysis, report output, external anchoring.
-    "tool_executed", "findings_generated", "report_generated", "audit_anchored",
+    "tool_dispatch", "tool_result", "findings_generated", "report_generated", "audit_anchored",
 })
 _DETAIL_KEYS = frozenset({
     "action_id", "tool", "tool_name", "args", "summary", "reason", "error", "status",
     "count", "scope_revision", "pending_approval_id", "approver", "results", "message",
+    "digest", "simulated",
 })
 _FIELDS = frozenset({
     "seq", "ts", "thread_id", "event", "actor", "action_hash", "decision", "detail",
@@ -217,8 +218,12 @@ class AuditLog:
         never built from a tampered log."""
         return [r for r in self._records() if r.get("thread_id") == thread_id]
 
+    def index(self) -> dict[str, int]:
+        """Record hash -> sequence number, for judging how much of the chain an anchor covers."""
+        return {str(r["hash"]): int(r["seq"]) for r in self._records()}
+
     def hashes(self) -> set[str]:
-        return {str(r["hash"]) for r in self._records()}
+        return set(self.index())
 
     def head(self) -> str | None:
         """Hash of the newest record (what an external anchor timestamps), or None if empty."""

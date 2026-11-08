@@ -19,12 +19,11 @@ from langgraph.types import interrupt
 
 from viper.agents.audit import AuditError, AuditLog
 from viper.agents.claims import ClaimStore, MemoryClaims
+from viper.agents.evidence import digest, rederive
 from viper.config import Settings
 from viper.execution.control import AGENT, ControlLock
 from viper.execution.executor import DryRunExecutor
 from viper.execution.factory import Executor
-from viper.findings.models import Finding
-from viper.findings.parsers import parse_nmap, parse_nuclei
 from viper.policy.approvals import (
     PendingApproval,
     ResumePayload,
@@ -60,6 +59,7 @@ class AgentState(TypedDict, total=False):
     pending: dict[str, dict[str, Any]]
     results: list[dict[str, Any]]
     findings: list[dict[str, Any]]
+    analysis_warnings: list[str]
     status: str
     report: str
 
@@ -99,8 +99,10 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
     def audit(state: AgentState, event: str, actor: str, **kw: Any) -> dict[str, Any]:
         return deps.audit.append(thread_id=state["thread_id"], event=event, actor=actor, **kw)
 
-    # Honest event naming (M7): simulated runs stay "tool_dry_run"; real dispatch is "tool_executed".
-    dispatch_event = "tool_dry_run" if isinstance(executor, DryRunExecutor) else "tool_executed"
+    # M7: a simulated run keeps one "tool_dry_run" event. Real dispatch writes an INTENT event
+    # before the call and a RESULT event (with an output digest) after it; only the result is evidence.
+    real = not isinstance(executor, DryRunExecutor)
+    dispatch_event = "tool_dispatch" if real else "tool_dry_run"
 
     def plan(state: AgentState) -> dict[str, Any]:
         actions = deps.planner(state["request"])  # untrusted proposals
@@ -228,9 +230,14 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
             try:  # audit first: no committed evidence, no dispatch
                 entry = audit(state, dispatch_event, "agent", action_hash=ahash,
                                detail={"action_id": action.action_id, "tool": action.tool_name})
-                # action_id + audit_hash let analyze() tie every finding back to this exact event
-                results.append({**executor.run(action).model_dump(mode="json"),
-                                "action_id": action.action_id, "audit_hash": entry["hash"]})
+                raw = executor.run(action).model_dump(mode="json")
+                cite = entry["hash"]
+                if real:  # evidence = what came back, committed by digest AFTER the call
+                    cite = audit(state, "tool_result", "agent", action_hash=ahash,
+                                 detail={"action_id": action.action_id, "tool": action.tool_name,
+                                         "digest": digest(str(raw.get("output", ""))),
+                                         "simulated": bool(raw.get("simulated", True))})["hash"]
+                results.append({**raw, "action_id": action.action_id, "audit_hash": cite})
             except AuditError:
                 return {"status": "FAILED", "results": results, "decisions": decisions}
             except Exception as exc:  # noqa: BLE001 - record the class only, then stop the run
@@ -243,24 +250,17 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
         audit(state, "run_completed", "agent", detail={"count": len(results)})
         return {"results": results, "decisions": decisions, "status": "COMPLETED"}
 
-    parsers = {"nmap": parse_nmap, "nuclei": parse_nuclei}
-
     def analyze(state: AgentState) -> dict[str, Any]:
-        """Deterministic only: findings come from parsing real tool output, never from the LLM."""
-        findings: list[dict[str, Any]] = []
-        for r in state.get("results", []):
-            parser = parsers.get(r.get("tool", ""))
-            if parser is None or r.get("simulated", True) or not r.get("output"):
-                continue
-            try:
-                parsed = parser(r["output"], action_id=r["action_id"],
-                                target=str(r.get("args", {}).get("target", "")),
-                                audit_refs=[r["audit_hash"]])
-            except Exception:  # noqa: BLE001 - malformed output yields no findings, never a guess
-                parsed = []
-            findings += [f.model_dump(mode="json") for f in parsed]
+        """Deterministic only: findings come from digest-verified tool output, never the LLM."""
+        try:
+            findings, warnings = rederive(state.get("results", []),
+                                          deps.audit.events(state["thread_id"]))
+        except AuditError:
+            return {"status": "FAILED", "findings": [],
+                    "analysis_warnings": ["audit log failed verification; analysis not possible"]}
         audit(state, "findings_generated", "agent", detail={"count": len(findings)})
-        return {"findings": findings}
+        return {"findings": [f.model_dump(mode="json") for f in findings],
+                "analysis_warnings": warnings}
 
     def report(state: AgentState) -> dict[str, Any]:
         denied = [k for k, v in state.get("decisions", {}).items() if v["type"] == "DENY"]
@@ -268,18 +268,25 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                    f"denied={len(denied)}")
         try:  # a report cites audit hashes, so it is only built from a verified chain
             events = deps.audit.events(state["thread_id"])
-            text = render_report([Finding.model_validate(f) for f in state.get("findings", [])],
-                                 events, project_id=state["project_id"], thread_id=state["thread_id"])
-            audit(state, "report_generated", "agent",
-                  detail={"count": len(state.get("findings", []))})
+            # Re-derive again from the latest checkpointed results: stored findings are not trusted.
+            findings, warnings = rederive(state.get("results", []), events)
+            warnings = list(dict.fromkeys([*state.get("analysis_warnings", []), *warnings]))
+            text = render_report(findings, events, project_id=state["project_id"],
+                                 thread_id=state["thread_id"])
+            audit(state, "report_generated", "agent", detail={"count": len(findings)})
         except AuditError:
             return {"status": "FAILED", "report": f"report unavailable: audit log failed ({summary})"}
         names = {a["action_id"]: a["tool_name"] for a in state.get("actions", [])}
         lines = [f"- {_safe(k)} ({_safe(names.get(k, '?'))}): {_safe(v.get('reason', ''))}"
                  for k, v in state.get("decisions", {}).items() if v["type"] == "DENY"]
+        if warnings:  # absence of findings must never read as "clean" when analysis was impaired
+            text += ("\n\n" + "## Analysis warnings" + "\n\n"
+                     + "Analysis is INCOMPLETE; do not read missing findings as a clean result."
+                     + "\n\n" + "\n".join(f"- {_safe(w)}" for w in warnings))
         if lines:  # a reader of the report must see what was refused and why, not just a count
-            text += "\n\n## Denied actions\n\n" + "\n".join(lines) + "\n"
-        return {"report": f"{text}\n\n---\nRun summary: {summary}\n"}
+            text += "\n\n" + "## Denied actions" + "\n\n" + "\n".join(lines)
+        return {"report": text + "\n\n" + "---" + "\n" + "Run summary: " + summary + "\n",
+                "findings": [f.model_dump(mode="json") for f in findings]}
 
     g = StateGraph(AgentState)
     g.add_node("plan", plan)
