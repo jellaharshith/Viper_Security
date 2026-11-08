@@ -1,5 +1,7 @@
 """All network boundaries are injected; tests use no external services."""
 
+import base64
+
 import httpx
 import pytest
 
@@ -40,7 +42,7 @@ def test_external_submission_requires_opt_in_and_retains_opaque_token(provider: 
     with pytest.raises(AnchorError, match="opt-in"):
         anchor_head(HEAD, provider=provider, submit=submit)
     receipt = anchor_head(HEAD, provider=provider, allow_network=True, submit=submit)
-    assert receipt.token == "ZXh0ZXJuYWwtdG9rZW4="  # noqa: S105 - base64 test receipt
+    assert base64.b64decode(receipt.token) == b"external-token"
     assert not verify_anchor(receipt, HEAD)  # opaque bytes are not a verified signature
     assert verify_anchor(receipt, HEAD, verifier=lambda p, h, t: (
         p == provider and h == HEAD and t == b"external-token"
