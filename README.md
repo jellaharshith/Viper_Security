@@ -113,13 +113,13 @@ Bug bounty programs publish written rules and target lists in unstructured text.
 
 ```powershell
 # 1. Let the local model draft a structured scope from written program rules
-python -m viper.cli scope draft --program rules.txt --project myproject --url "https://example.com/bounty" --out myproject.draft.yaml
+python -m viper.cli scope draft --text-file rules.txt --project myproject --program-url "https://example.com/bounty" --out projects/drafts
 
 # 2. Inspect the draft and ambiguity warnings (the draft has status: DRAFT and is rejected by agent run)
-cat myproject.draft.yaml
+cat projects/drafts/myproject.draft.yaml
 
 # 3. Explicitly approve and publish the final scope (audited with a scope_approved event)
-python -m viper.cli scope approve --draft myproject.draft.yaml --confirm myproject
+python -m viper.cli scope approve --draft projects/drafts/myproject.draft.yaml --confirm myproject
 ```
 
 The model drafts the scope from program rules, but the resulting draft is **inert** (`status: DRAFT`) and cannot be used by the agent runner. It becomes active only after a human reviews it and runs `scope approve --confirm <project>`, which records an immutable `scope_approved` event in the audit log before publishing the final `.scope.yaml` file.
@@ -171,8 +171,8 @@ Cybersecurity reference knowledge is kept fresh by a GitHub Actions workflow ([`
 | `viper ingest-kev` | Download and index CISA KEV |
 | `viper kb update \| status \| rollback` | Gated knowledge-base lifecycle |
 | `viper eval build \| run \| compare` | Evaluation framework |
-| `viper scope draft --program FILE [--url URL] --project ID` | Draft a structured scope from written program rules |
-| `viper scope approve --draft FILE --confirm ID` | Validate, audit (`scope_approved`), and publish an approved scope |
+| `viper scope draft --text-file F --project ID [--program-url URL] [--out DIR]` | Draft a structured scope from program text (DIR default: projects/drafts) |
+| `viper scope approve --draft DIR/ID.draft.yaml --confirm ID` | Validate, audit (`scope_approved`), and publish an approved scope |
 | `viper agent run --plan FILE \| --llm` | Start a policy-gated agent run (plan file or opt-in LLM planner) |
 | `viper agent resume --decision ALLOW\|DENY` | Answer a pending approval |
 | `viper report --thread ID` | Print a finished run's traceable report |
