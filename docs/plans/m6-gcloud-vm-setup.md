@@ -136,12 +136,18 @@ sudo chown -R root:root /opt/viper/nuclei-templates
 sudo chmod -R u=rwX,go=rX /opt/viper/nuclei-templates
 nmap --version | head -n 1
 /usr/bin/nuclei -version
+# Before the first scan, confirm that this binary supports the frozen protocol flag:
+/usr/bin/nuclei -h | grep -i -- "-pt"
 ```
 
 Template installation requires operator-provisioned egress. Perform it only as
 root, outside jobs, and record the installed template revision. The service must
 run as an unprivileged account with read-only access to this root-owned directory.
 Stop jobs before template refreshes and reapply ownership and permissions afterward.
+Confirm the help output identifies `-pt` as the protocol/type selector before
+dispatching any scan. If the installed binary exposes only `-type`, stop and
+coordinate changing that one literal in the server, exact-argv test and docs;
+do not drop the HTTP restriction.
 
 Add `VIPER_EXEC_NUCLEI_TEMPLATES=/opt/viper/nuclei-templates` to
 `/etc/viper/vmapi.env` when creating it in Step 5. Nuclei jobs reject relative
@@ -153,7 +159,7 @@ are server-controlled. The live argv is:
 /usr/bin/nuclei -jsonl -silent -nc -duc -no-interactsh -disable-redirects
   -t /opt/viper/nuclei-templates -tags tech,exposure,misconfig
   -etags dos,fuzz,intrusive,bruteforce,rce,sqli,xss -severity info,low,medium
-  -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
+  -pt http -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
 ```
 
 There is no `-passive` flag. Stdout findings are JSONL; merged stderr may include
@@ -164,12 +170,21 @@ offline verification does not download binaries/templates or contact live target
 
 ### Step 5: Deploy `vmapi` Under systemd
 
-#### 1. Prepare Directory Structure on VM
+#### 1. Create an Unprivileged Service Account and Directories
 While connected to the VM:
 ```bash
-sudo mkdir -p /opt/viper/vmapi /etc/viper/certs
-sudo chown -R $USER:$USER /opt/viper/vmapi
+sudo useradd --system --user-group --create-home \
+  --home-dir /var/lib/viper-vmapi --shell /usr/sbin/nologin viper-vmapi
+sudo install -d -o root -g root -m 0755 /opt/viper
+sudo install -d -o root -g viper-vmapi -m 0750 /opt/viper/vmapi
+sudo install -d -o root -g viper-vmapi -m 0755 /etc/viper /etc/viper/certs
 ```
+
+Create the account once; if it already exists, verify its home, group and no-login
+shell before continuing. Both `nmap -sT` and Nuclei run without root privileges
+or Linux capabilities. Keep application code and the virtualenv administrator-owned;
+the service needs read/execute access only. Templates remain `root:root` with
+directories mode 755 and files mode 644, so this account cannot modify them.
 
 #### 2. Copy `vmapi` Code from Local Workstation
 From a **local workstation** terminal in `C:\Users\STSC\Desktop\Viper`:
@@ -180,13 +195,15 @@ gcloud compute scp --recurse --tunnel-through-iap vmapi viper-kali-lab:/tmp/vmap
 #### 3. Install Application and Virtual Environment on VM
 Back in the **VM SSH session**:
 ```bash
-cp -r /tmp/vmapi-upload/* /opt/viper/vmapi/
+sudo cp -r /tmp/vmapi-upload/* /opt/viper/vmapi/
 rm -rf /tmp/vmapi-upload
 
 # Create dedicated virtualenv
-python3 -m venv /opt/viper/vmapi/.venv
-/opt/viper/vmapi/.venv/bin/pip install --upgrade pip
-/opt/viper/vmapi/.venv/bin/pip install -r /opt/viper/vmapi/requirements.txt
+sudo python3 -m venv /opt/viper/vmapi/.venv
+sudo /opt/viper/vmapi/.venv/bin/pip install --upgrade pip
+sudo /opt/viper/vmapi/.venv/bin/pip install -r /opt/viper/vmapi/requirements.txt
+sudo chown -R root:viper-vmapi /opt/viper/vmapi
+sudo chmod -R u=rwX,g=rX,o= /opt/viper/vmapi
 ```
 
 #### 4. Generate TLS Certificate and Key on VM
@@ -198,7 +215,8 @@ sudo openssl req -x509 -newkey rsa:4096 -sha256 -days 90 -nodes \
   -subj "/CN=localhost" \
   -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 
-sudo chmod 600 /etc/viper/certs/vmapi-key.pem
+sudo chown root:viper-vmapi /etc/viper/certs/vmapi-key.pem /etc/viper/certs/vmapi-cert.pem
+sudo chmod 640 /etc/viper/certs/vmapi-key.pem
 sudo chmod 644 /etc/viper/certs/vmapi-cert.pem
 ```
 
@@ -211,13 +229,14 @@ echo "$TOKEN"
 echo "=============================================="
 
 # Write restricted environment file
-sudo bash -c "cat <<EOF > /etc/viper/vmapi.env
+sudo bash -c "umask 077; cat <<EOF > /etc/viper/vmapi.env
 VIPER_EXEC_API_TOKEN=${TOKEN}
 VIPER_EXEC_EGRESS_ALLOWLIST=scanme.nmap.org
 VIPER_EXEC_NUCLEI_TEMPLATES=/opt/viper/nuclei-templates
 EOF"
 
-sudo chmod 600 /etc/viper/vmapi.env
+sudo chown root:viper-vmapi /etc/viper/vmapi.env
+sudo chmod 640 /etc/viper/vmapi.env
 ```
 
 #### 6. Configure systemd Service
@@ -230,7 +249,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
+User=viper-vmapi
+Group=viper-vmapi
+Environment=HOME=/var/lib/viper-vmapi
 WorkingDirectory=/opt/viper
 EnvironmentFile=/etc/viper/vmapi.env
 ExecStart=/opt/viper/vmapi/.venv/bin/uvicorn vmapi.app:app --host 127.0.0.1 --port 8443 --ssl-keyfile /etc/viper/certs/vmapi-key.pem --ssl-certfile /etc/viper/certs/vmapi-cert.pem
@@ -243,6 +264,11 @@ PrivateTmp=true
 WantedBy=multi-user.target
 EOF'
 ```
+
+Keep `User=viper-vmapi` when adapting or replacing this unit; the API and scanner
+children must use the unprivileged account. `KillMode=control-group` cleans up
+scanner children if the service stops or crashes. Never grant the account write
+access to `/opt/viper/vmapi`, `/usr/bin/nuclei` or the template directory.
 
 #### 7. Enable and Start the Service
 ```bash

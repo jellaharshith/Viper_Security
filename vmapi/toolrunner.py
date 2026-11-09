@@ -61,7 +61,7 @@ def build_command(tool: str, args: dict, target: str, allowed_targets: frozenset
     return ["/usr/bin/nuclei", "-jsonl", "-silent", "-nc", "-duc", "-no-interactsh",
             "-disable-redirects", "-t", templates, "-tags", "tech,exposure,misconfig",
             "-etags", "dos,fuzz,intrusive,bruteforce,rce,sqli,xss", "-severity", "info,low,medium",
-            "-rl", str(rate), "-c", "5", "-timeout", "10", "-retries", "0", "-u", target]
+            "-pt", "http", "-rl", str(rate), "-c", "5", "-timeout", "10", "-retries", "0", "-u", target]
 
 
 def spawn(command: list[str]) -> subprocess.Popen:
