@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     audit_dir: Path = Path("data/audit")
     checkpoint_db: Path = Path("data/checkpoints.db")  # SQLite checkpoints for paused agent runs
     report_dir: Path = Path("data/reports")  # M7: one Markdown report per finished thread
+    # v1.1: real audit anchoring via an RFC-3161 timestamp authority (network use is opt-in per command)
+    anchor_tsa_url: str = "http://timestamp.digicert.com"
+    anchor_tsa_ca: Path | None = None  # None = verify against the certifi trust store
 
     def egress_hosts(self) -> list[str]:
         """Allowlisted target hosts, lowercased. Empty means no target is permitted."""

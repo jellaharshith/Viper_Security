@@ -43,3 +43,23 @@ def test_store_default_and_validation(monkeypatch) -> None:
     monkeypatch.setenv("VIPER_STORE", "unsupported")
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_tsa_anchoring_settings_have_safe_defaults(monkeypatch):
+    from viper.config import Settings
+
+    for key in ("VIPER_ANCHOR_TSA_URL", "VIPER_ANCHOR_TSA_CA"):
+        monkeypatch.delenv(key, raising=False)
+    s = Settings(_env_file=None)
+    assert s.anchor_tsa_url == "http://timestamp.digicert.com"  # public RFC-3161 service; the token is verified offline
+    assert s.anchor_tsa_ca is None  # None = use the certifi trust store
+
+
+def test_tsa_anchoring_settings_can_be_overridden(monkeypatch, tmp_path):
+    from viper.config import Settings
+
+    ca = tmp_path / "ca.pem"
+    monkeypatch.setenv("VIPER_ANCHOR_TSA_URL", "https://tsa.example.test/tsr")
+    monkeypatch.setenv("VIPER_ANCHOR_TSA_CA", str(ca))
+    s = Settings(_env_file=None)
+    assert s.anchor_tsa_url == "https://tsa.example.test/tsr" and s.anchor_tsa_ca == ca
