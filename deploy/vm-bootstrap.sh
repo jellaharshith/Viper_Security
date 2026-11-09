@@ -26,8 +26,13 @@ python3 - "$EGRESS_ALLOWLIST" <<'PY'
 import ipaddress
 import re
 import sys
+import unicodedata
 
-for host in sys.argv[1].split(','):
+allowlist = sys.argv[1]
+if '%' in allowlist or any(char.isspace() or unicodedata.category(char).startswith('C')
+                           for char in allowlist):
+    raise SystemExit('bootstrap: allowlist must not contain whitespace, controls or scoped IPv6')
+for host in allowlist.split(','):
     try:
         ipaddress.ip_address(host)
     except ValueError:

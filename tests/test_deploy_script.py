@@ -1,8 +1,10 @@
-"""Offline static checks only: never execute the VM bootstrap or any scanner."""
+"""Offline checks: inspect shell, run its isolated Python validator, never run the installer."""
 
+import ipaddress
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -69,3 +71,34 @@ def test_bootstrap_shell_syntax_when_bash_is_available():
         [bash, "-n", SCRIPT.as_posix()], capture_output=True, text=True, timeout=15,
     )
     assert result.returncode == 0, result.stderr
+
+
+def validate_allowlist(value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Extract ONLY the first, side-effect-free Python argument validator, not the shell installer.
+    marker = 'python3 - "$EGRESS_ALLOWLIST" <<\'PY\'\n'
+    validator = script_text().split(marker, 1)[1].split("\nPY", 1)[0]
+    monkeypatch.setattr(sys, "argv", ["allowlist-validator", value])
+    exec(compile(validator, str(SCRIPT) + ":allowlist-validator", "exec"), {})  # noqa: S102
+
+
+@pytest.mark.parametrize("value", [
+    "fe80::1%eth0", "fe80::1%eth0\nVIPER_EXEC_EGRESS_ALLOWLIST=evil.example",
+    "scanme.nmap.org,fe80::1%eth0\nVIPER_EXEC_EGRESS_ALLOWLIST=evil.example",
+    "scanme.nmap.org example.com", "scanme.nmap.org\u00a0", "scanme.nmap.org\u200b",
+    "scanme.nmap.org\u2028", "scanme.nmap.org\u202e",
+] + ["scanme.nmap.org" + chr(code) for code in (*range(32), *range(127, 160))])
+def test_bootstrap_refuses_unsafe_allowlist_before_any_ip_parsing(value, monkeypatch):
+    def must_not_parse_ip(_host):
+        pytest.fail("unsafe allowlist reached IP parsing before being rejected")
+
+    monkeypatch.setattr(ipaddress, "ip_address", must_not_parse_ip)
+    with pytest.raises(SystemExit):
+        validate_allowlist(value, monkeypatch)
+
+
+@pytest.mark.parametrize("value", [
+    "scanme.nmap.org", "192.0.2.1", "2001:db8::1", "::1",
+    "scanme.nmap.org,192.0.2.1,2001:db8::1",
+])
+def test_bootstrap_keeps_safe_exact_hosts_and_unscoped_ips(value, monkeypatch):
+    validate_allowlist(value, monkeypatch)
