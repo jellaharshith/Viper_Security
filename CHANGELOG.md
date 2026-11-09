@@ -4,6 +4,16 @@ All notable changes are documented here. The project is milestone-driven (see
 [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md)); versions track milestones.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Weekly knowledge-base refresh owner guide (`docs/weekly-kb.md`): 60-second setup covering repository secrets (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), manual `workflow_dispatch` execution, outcome interpretation, and artifact downloads.
+- Workflow guard tests (`tests/test_workflows.py`): offline YAML assertions ensuring full commit SHA action pinning, least-privilege permissions, absence of `pull_request_target`, schedule/dispatch triggers for weekly KB updates, and stability of required status check job names.
+
+### Changed
+- CI workflow health and concurrency: `.github/workflows/ci.yml` and `security.yml` configure concurrency to cancel superseded pull request runs while preserving push runs to main, declare explicit permissions, and harden status check aggregation.
+- Dependency bumps: updated build and development dependencies including setuptools, pytest, ruff, mypy, and pydantic-settings.
+
 ## [1.0.0] - 2026-11-08 - v1.0: Live nuclei, scope reader, weekly KB refresh (security-reviewed)
 
 ### Added

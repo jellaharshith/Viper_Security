@@ -162,6 +162,8 @@ Cybersecurity reference knowledge is kept fresh by a GitHub Actions workflow ([`
 - Serializes updates across git refs using a single `kb-weekly-database` concurrency queue.
 - Uploads update reports (`data/kb_reports/**`) as workflow artifacts.
 
+See the 60-second setup guide in [`docs/weekly-kb.md`](docs/weekly-kb.md).
+
 ## Command reference
 
 | Command | Purpose |
@@ -210,6 +212,7 @@ tests/          Unit and integration tests (offline)
 | [`docs/development-progress.md`](docs/development-progress.md) | What was built and validated, milestone by milestone |
 | [`docs/adr/`](docs/adr) | Architecture decision records (0001-0010) |
 | [`docs/plans/`](docs/plans) | Per-milestone specs and the cloud runbook |
+| [`docs/weekly-kb.md`](docs/weekly-kb.md) | 60-second owner guide for weekly RAG refresh |
 | [`docs/requirements.md`](docs/requirements.md) | Original product requirements |
 
 ## Development
