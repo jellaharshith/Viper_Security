@@ -96,10 +96,10 @@ The following features were evaluated during v1.0 design and deliberately deferr
 - **Motivation:** Enables manual inspection and exploitation tasks requiring browser interactions or desktop GUIs directly within the isolated cloud execution environment.
 - **Reason Deferred from v1.0:** Running a full X11/XFCE desktop environment and VNC-to-WebSocket bridge significantly increases VM compute and memory consumption (necessitating larger VM instances), expands the attack surface, and complicates authentication across the IAP tunnel. The headless HTTPS/SSE API with CLI process controls (`pause`, `stop`, `takeover`) achieved all core automation and emergency-stop requirements at zero GUI overhead.
 
-### 2.3 Real RFC-3161 TSA & Sigstore Rekor External Anchoring
-- **Description:** Cryptographic anchoring of audit log head hashes to external public or private Timestamp Authorities (RFC-3161 TSAs over HTTPS) and public transparency ledgers (Sigstore Rekor transparency log), with offline signature and inclusion proof verification.
+### 2.3 Real RFC-3161 TSA External Anchoring (Delivered in v1.1)
+- **Description:** Cryptographic anchoring of audit log head hashes to external public or private Timestamp Authorities (RFC-3161 TSAs over HTTPS) with offline signature, certificate path, and digest verification via OpenSSL (`openssl ts`).
 - **Motivation:** Provides indisputable, third-party cryptographic proof that audit records and pentest evidence existed at a specific time and have not been altered since the assessment.
-- **Reason Deferred from v1.0:** Generating and verifying ASN.1/DER PKCS#7 timestamp tokens and Rekor signed entry inclusion proofs requires substantial external cryptographic libraries (such as `cryptography`, `pyasn1`, and `sigstore-python`), as well as trusted root CA bundle management. v1.0 established the complete audit schema, mock provider, anchor file persistence, and CLI verification matrix, deferring heavy cryptographic verification dependencies to v1.1.
+- **Implementation in v1.1:** Fully delivered in v1.1 via `verify_tsa_token` and `make_tsa_verifier` in `viper.agents.anchor`. Uses OS OpenSSL subprocess with `-attime <epoch>` historical timestamp validation, `certifi` Mozilla CA trust store, configurable enterprise CA roots, and fail-closed error handling (see ADR 0011). Sigstore Rekor inclusion proof anchoring remains in the backlog for future cloud-native workflows.
 
 ### 2.4 Scope Rate-Limit & Automation Policy Fields
 - **Description:** Extension of the `Scope` model and policy engine to parse, store, and enforce program-specific rate limits (e.g., `max_rate_limit: 5`) and granular automation constraints (e.g., `automation_allowed: false` on `/checkout` or specific URL subpaths).
