@@ -52,11 +52,13 @@ Viper v1.0 delivers an end-to-end, safety-first autonomous cybersecurity copilot
 ### 1.6 Security Scanning Tools
 - **Nmap (`/usr/bin/nmap`):** Authorized TCP port scanning with service detection and unprivileged port discovery against in-scope targets.
 - **Nuclei (`/usr/bin/nuclei`):** Benign, HTTP-only vulnerability and technology detection with a frozen safety profile:
+  - Protocol restriction: `-pt http` (enforcing HTTP protocol templates only).
   - Tags: `tech,exposure,misconfig` only.
   - Excluded tags: `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`.
   - Severities: `info,low,medium` only.
   - Operational bounds: `-rl 5`, `-c 5`, `-timeout 10`, `-retries 0`, `-no-interactsh`, `-disable-redirects`.
   - Root-owned, read-only template directory (`/opt/viper/nuclei-templates`).
+  - *Hardening boundary:* While `-pt http`, tag allowlists, and tag denylists enforce the HTTP protocol and severity envelope at the runner CLI level, curating and pinning a dedicated, independently reviewed HTTP template subset (rather than relying on broad community template updates) is scheduled as a v1.1 hardening item.
 
 ### 1.7 Findings Architecture & Traceable Reporting
 - **Frozen Finding Schema v1 (`viper.findings.models.Finding`):** Standardized finding model with title, asset, tool, action ID, raw evidence, severity, confidence, reproducibility, remediation, references, and audit refs.
@@ -118,3 +120,8 @@ The following features were evaluated during v1.0 design and deliberately deferr
 - **Description:** Capability for the agent or operator to dispatch and manage multiple concurrent security scanner jobs on the execution plane simultaneously (e.g., running Nmap and Nuclei in parallel).
 - **Motivation:** Reduces total engagement execution time by executing complementary passive and active reconnaissance tasks concurrently.
 - **Reason Deferred from v1.0:** Concurrent job execution on a single target introduces risks of rate-limit exhaustion, network contention, and out-of-order target impacts. Furthermore, managing process-group signals (SIGSTOP, SIGKILL) and multiplexed SSE output streams for concurrent processes increases execution engine complexity. Single-job dispatch ensured deterministic audit trails, straightforward stream capture, and reliable emergency stopping.
+
+### 2.9 Reviewed HTTP Nuclei Template Subset & Template Pinning
+- **Description:** Curation, offline security auditing, and cryptographic hash-pinning of a minimal, reviewed subset of Nuclei HTTP templates strictly restricted to benign technology and exposure checks, packaged directly with the deployment rather than relying on broad community template updates.
+- **Motivation:** While v1.0 enforces `-pt http`, tag allowlists (`tech,exposure,misconfig`), and tag denylists (`dos,fuzz,intrusive,...`), community template updates can introduce new or modified templates with unexpected network behaviors or payloads.
+- **Reason Deferred from v1.0:** In v1.0, the combination of fixed CLI flags (`-pt http`, `-tags`, `-etags`, `-severity info,low,medium`, `-no-interactsh`, `-disable-redirects`), unprivileged service execution, and root-owned read-only `/opt/viper/nuclei-templates` provides robust runtime containment. Manually auditing and maintaining an in-tree curated catalog of thousands of individual YAML templates is deferred to v1.1.

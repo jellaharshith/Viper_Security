@@ -36,3 +36,8 @@ embedding drift) must never degrade answers. Fine-tuning is unrelated and never 
   - If `SUPABASE_URL` or `SUPABASE_SECRET_KEY` are not configured in repository secrets, the workflow logs a notice
     and exits cleanly (green) without running the update. Failed gates exit with code 2 and visibly fail the CI run,
     while update reports (`data/kb_reports/**`) are uploaded as artifacts for inspection.
+  - **Run serialization & unique staging names:** To prevent concurrent runs on different branches or refs from
+    overlapping on the shared remote database, the workflow specifies a single constant concurrency group
+    (`kb-weekly-database`) with `cancel-in-progress: false` so executions queue serially. In addition, staging
+    collection names include a unique per-run random suffix (`kb_<ver>_<timestamp>_<hex>`) generated in `viper.cli`,
+    preventing runs that execute in close proximity from colliding on or accidentally dropping shared staging data.
