@@ -485,3 +485,41 @@ def test_load_draft_rejects_bad_limit_values() -> None:
     d = load_draft(yaml.safe_dump({**good, "permitted_techniques": ["Not A Slug"]}))
     assert d.scope.permitted_techniques == ()
     assert any("Not A Slug" in a and "not enforced" in a.lower() for a in d.ambiguities)
+
+
+from viper.policy import scope_draft  # noqa: E402
+
+
+@pytest.mark.parametrize("entry", ["127.0.0.1:3000", "http://127.0.0.1:3000", "https://example.com:8443/"])
+def test_host_port_entries_become_host_entries_with_a_human_note(entry):
+    host = entry.split("//")[-1].split(":")[0]
+    reply = json.dumps({"in_scope": [entry], "evidence_ref": "rules"})
+    draft = scope_draft.draft_scope("rules text", lambda m: reply, project_id="p")
+    assert draft.scope.in_scope == (host,)
+    assert any("port or scheme" in a for a in draft.ambiguities)
+
+
+@pytest.mark.parametrize(
+    "entry", ["http://example.com/path", "user:pw@example.com:80", "example.com:99999999"])
+def test_other_url_shapes_still_fail_closed(entry):
+    reply = json.dumps({"in_scope": [entry], "evidence_ref": "rules"})
+    with pytest.raises(scope_draft.ScopeDraftError):
+        scope_draft.draft_scope("rules text", lambda m: reply, project_id="p")
+
+
+@pytest.mark.parametrize("text", [
+    "Automated scanning is allowed, at no more than 5 requests per second.",
+    "Scanners must not exceed 10 requests per second.",
+    "Crawlers are welcome but please do not exceed 2 requests per second.",
+])
+def test_a_rate_limit_is_not_read_as_an_automation_ban(text):
+    assert scope_draft.mentions_automation_restriction(text) is False
+
+
+@pytest.mark.parametrize("text", [
+    "Automated scanning is strictly prohibited.",
+    "No scanners. Manual testing only.",
+    "Scanners are not allowed, even at no more than 1 request per second.",
+])
+def test_real_automation_bans_are_still_caught(text):
+    assert scope_draft.mentions_automation_restriction(text) is True
