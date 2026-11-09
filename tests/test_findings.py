@@ -333,3 +333,41 @@ def test_nuclei_unusable_records_still_counted() -> None:
     bad = ['{"x":', '{"template-id":"t","info":{"severity":"low"}}', "[t] [http] [bogus] http://scanme.nmap.org/"]
     _, skipped = parse_nuclei_ex("\n".join(bad) + "\n", **_kw())  # type: ignore[arg-type]
     assert skipped == 3
+
+
+# ---------------------------------------------------------------- V1: real nuclei -jsonl output
+def test_nuclei_real_jsonl_keeps_structured_fields_and_downgrades_foreign_host() -> None:
+    out = _read("nuclei_real.jsonl")
+    fs, skipped = parse_nuclei_ex(out, **_kw())  # type: ignore[arg-type]
+    # stderr lines ([INF]/[WRN]/[ERR]) are noise, not skipped records; the matcher-status=false
+    # record is a normal no-match, so exactly three records become findings.
+    assert skipped == 0
+    assert len(fs) == 3
+    by_tpl = {tpl: f for f in fs for tpl in ("http-missing-security-headers", "apache-detect",
+                                              "cdn-redirect-detect") if f"({tpl})" in f.title}
+    assert set(by_tpl) == {"http-missing-security-headers", "apache-detect", "cdn-redirect-detect"}
+    assert not any("git-config-exposure" in f.title for f in fs)
+
+    hdr = by_tpl["http-missing-security-headers"]
+    assert hdr.title.startswith("HTTP Missing Security Headers (")  # name kept
+    assert "Security headers are missing on the target." in hdr.evidence  # description kept
+    assert hdr.remediation == "Set the recommended security headers on all responses."
+    assert hdr.references[:2] == [
+        "https://owasp.org/www-project-secure-headers/",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers",
+    ]
+    assert hdr.confidence == "confirmed"
+    assert hdr.severity == "info"
+
+    apache = by_tpl["apache-detect"]
+    assert apache.references == ["https://httpd.apache.org/"]
+    assert "Detects the Apache HTTP server version" in apache.evidence
+    assert apache.remediation  # falls back to a generic, non-empty remediation
+
+    cdn = by_tpl["cdn-redirect-detect"]
+    assert cdn.confidence == "hypothesis"  # foreign host still downgraded
+    assert cdn.severity == "info"
+    assert "cdn.thirdparty.example" in cdn.severity_rationale
+    assert cdn.title.startswith("Foreign-host observation: CDN Redirect Detection")
+    assert cdn.remediation == "Review the redirect target."  # structured fields survive downgrade
+    assert cdn.references == ["https://example.com/cdn-redirect"]
