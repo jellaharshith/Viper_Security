@@ -52,6 +52,11 @@ def _save_report(settings: Settings, thread: str, out: dict[str, Any]) -> None:
         handle.write(str(out["report"]))
 
 
+def llm_chat(settings: Settings) -> Any:
+    """Chat callable on the local Ollama model (shared by the planner and the scope reader)."""
+    return OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model).chat
+
+
 def llm_planner(settings: Settings, scope_path: Path) -> LLMPlanner:
     """Ollama-backed planner. Opt-in only; the JSON plan file remains the deterministic path."""
     client = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
