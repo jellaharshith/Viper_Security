@@ -62,12 +62,16 @@ Viper v1.0 delivers an end-to-end, safety-first autonomous cybersecurity copilot
   - *Hardening boundary:* While `-pt http`, tag allowlists, and tag denylists enforce the HTTP protocol and severity envelope at the runner CLI level, curating and pinning a dedicated, independently reviewed HTTP template subset (rather than relying on broad community template updates) is scheduled as a v1.1 hardening item.
 
 ### 1.7 Findings Architecture & Traceable Reporting
-- **Frozen Finding Schema v1 (`viper.findings.models.Finding`):** Standardized finding model with title, asset, tool, action ID, raw evidence, severity, confidence, reproducibility, remediation, references, and audit refs.
+- **Finding Schema v1.1 (`viper.findings.models.Finding`):** Standardized finding model with title, asset, tool, action ID, raw evidence, severity, confidence, reproducibility, remediation, references, audit refs, and additive v1.1 fields: `description: str = ""` and `cwe: list[str] = []` with backward-compatible defaults.
+- **Deterministic Finding Enrichment (`viper.findings.enrich`):** Offline, pure enrichment pipeline populating generic descriptions, CWE classifications, and vendor references from a curated offline catalog (e.g. common HTTP security headers, technology disclosures, and standard service ports) without overwriting specific tool-supplied findings or mutating severity/confidence.
 - **The Confirmed vs. Hypothesis Rule:**
   - `confidence="confirmed"` is granted **only** when deterministic tool parsers extract explicit positive evidence matching the approved asset.
   - Ambiguous states (`open|filtered`), model inferences, or observations on foreign hosts/redirects are labeled `confidence="hypothesis"`.
 - **Finding Re-Derivation from Evidence:** Findings are dynamically re-derived at report generation from audited stdout and verified against SHA-256 output digests. Stored finding claims in checkpoints are never implicitly trusted.
-- **Stakeholder-Ready Markdown Reports (`viper report`):** Persisted with exclusive file creation (`mode="x"`) to `data/reports/<thread>.md`, containing sanitized terminal output, distinct Confirmed Findings and Hypotheses sections, reproducible CLI commands, and an audit citation index.
+- **Stakeholder-Ready Multi-Format Reports (`viper report`):**
+  - **Human-Readable Markdown:** Persisted with exclusive file creation (`mode="x"`) to `data/reports/<thread>.md`, featuring an executive summary matrix, tool-level grouping, dynamic backtick fencing outgrowing hostile scanner backticks, pretty-printed JSON evidence (for valid JSON < 8 KiB), sanitized control/bidi character escaping, and an audit citation index.
+  - **Machine-Readable JSON (`viper.report.formats.render_json`):** Export conforming to `"schema": "viper-report/1"` with summary metrics, structured findings, and resolved audit event citations.
+  - **Industry-Standard SARIF 2.1.0 (`viper.report.formats.render_sarif`):** Full OASIS SARIF v2.1.0 export with rule deduplication by template ID/port, mapped severity levels (`note`, `warning`, `error`), and `viperFindingId/v1` fingerprints for automated vulnerability management pipelines.
 
 ### 1.8 Audit Integrity & Head Anchoring
 - **Hash-Chained Audit Trail:** Append-only JSONL log (`data/audit/{project_id}.jsonl`) with genesis block (`seq=0`, `prev_hash=0*64`), per-event SHA-256 hashing, recursive secret sanitization, and exclusive file locking.

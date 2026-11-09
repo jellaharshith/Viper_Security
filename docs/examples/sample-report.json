@@ -1,0 +1,113 @@
+{
+  "schema": "viper-report/1",
+  "project_id": "lab-scanme",
+  "thread_id": "20261109-042000-scanme",
+  "counts": {
+    "total": 3,
+    "by_severity_and_confidence": {
+      "critical": {
+        "confirmed": 0,
+        "hypothesis": 0
+      },
+      "high": {
+        "confirmed": 0,
+        "hypothesis": 0
+      },
+      "medium": {
+        "confirmed": 1,
+        "hypothesis": 0
+      },
+      "low": {
+        "confirmed": 0,
+        "hypothesis": 0
+      },
+      "info": {
+        "confirmed": 1,
+        "hypothesis": 1
+      }
+    }
+  },
+  "findings": [
+    {
+      "id": "f-nmap-22-scan1",
+      "title": "Open TCP port 22 (ssh)",
+      "affected_asset": "scanme.nmap.org",
+      "source_tool": "nmap",
+      "source_action_id": "scan_nmap_1",
+      "severity": "info",
+      "severity_rationale": "Open port exposure alone is not an exploitable vulnerability.",
+      "confidence": "confirmed",
+      "description": "The SSH service port is open and accessible from the network.",
+      "cwe": [
+        "CWE-200"
+      ],
+      "remediation": "Restrict SSH access to authorized management networks using network ACLs or host-based firewall rules.",
+      "reproducibility": "nmap -sT -p 22 scanme.nmap.org",
+      "evidence": "22/tcp open  ssh     OpenSSH 6.6.1p1 Ubuntu 2ubuntu2.13 (Ubuntu Linux; protocol 2.0)",
+      "references": [
+        "https://nmap.org/book/man-version-detection.html"
+      ],
+      "audit_refs": [
+        "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0"
+      ]
+    },
+    {
+      "id": "f-nuclei-headers-scan2",
+      "title": "Missing HTTP Security Headers (http-missing-security-headers)",
+      "affected_asset": "scanme.nmap.org",
+      "source_tool": "nuclei",
+      "source_action_id": "scan_nuclei_2",
+      "severity": "medium",
+      "severity_rationale": "Absence of defensive HTTP response headers increases client vulnerability to clickjacking, MIME-sniffing, and cross-site content injection.",
+      "confidence": "confirmed",
+      "description": "The server response lacks recommended defensive headers including Content-Security-Policy, Strict-Transport-Security, and X-Frame-Options.",
+      "cwe": [
+        "CWE-693"
+      ],
+      "remediation": "Configure web server to return Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, and Strict-Transport-Security headers.",
+      "reproducibility": "nuclei -u http://scanme.nmap.org -id http-missing-security-headers",
+      "evidence": "{\"template-id\":\"http-missing-security-headers\",\"matched-at\":\"http://scanme.nmap.org\",\"extracted-results\":[\"Content-Security-Policy\",\"Strict-Transport-Security\",\"X-Frame-Options\"],\"info\":{\"name\":\"Missing HTTP Security Headers\",\"severity\":\"medium\"}}",
+      "references": [
+        "https://owasp.org/www-project-secure-headers/"
+      ],
+      "audit_refs": [
+        "b2c3d4e5f6a7890123456789abcdef0123456789abcdef0123456789abcdef01"
+      ]
+    },
+    {
+      "id": "f-nmap-80-filtered",
+      "title": "Filtered HTTP port (80/tcp)",
+      "affected_asset": "scanme.nmap.org",
+      "source_tool": "nmap",
+      "source_action_id": "scan_nmap_1",
+      "severity": "info",
+      "severity_rationale": "Filtered state indicates packet filtering or upstream firewall, not a confirmed vulnerability.",
+      "confidence": "hypothesis",
+      "description": "Port did not respond to TCP SYN packets; network firewalling or packet filtering suspected.",
+      "cwe": [],
+      "remediation": "Verify firewall rules and intended network boundary policy.",
+      "reproducibility": "nmap -sT -p 80 scanme.nmap.org",
+      "evidence": "80/tcp filtered http",
+      "references": [],
+      "audit_refs": [
+        "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0"
+      ]
+    }
+  ],
+  "audit_citations": [
+    {
+      "reference": "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0",
+      "status": "resolved",
+      "seq": 4,
+      "action_id": "scan_nmap_1",
+      "tool": "nmap"
+    },
+    {
+      "reference": "b2c3d4e5f6a7890123456789abcdef0123456789abcdef0123456789abcdef01",
+      "status": "resolved",
+      "seq": 6,
+      "action_id": "scan_nuclei_2",
+      "tool": "nuclei"
+    }
+  ]
+}
