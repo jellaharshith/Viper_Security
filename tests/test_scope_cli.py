@@ -140,3 +140,56 @@ def test_an_existing_scope_blocks_approval_before_anything_is_audited(env):
     log = AuditLog(Settings(_env_file=None, audit_dir=env["tmp"] / "audit"), "acme")
     assert log.events("scope") == []
     assert (env["tmp"] / "scopes" / "acme.scope.yaml").read_text(encoding="utf-8") == "planted"
+
+
+# --- codex v1 re-review R1: publication must be all-or-nothing -------------------------------------
+
+def _leftovers(env):
+    return sorted(p.name for p in (env["tmp"] / "scopes").iterdir() if not p.name.endswith(".draft.yaml"))
+
+
+def test_a_crash_while_writing_the_scope_leaves_nothing_behind(env, monkeypatch, capsys):
+    import os as _os
+
+    assert draft(env) == 0
+
+    real_fsync = _os.fsync
+
+    def boom(fd):
+        import sys
+
+        if sys._getframe(1).f_code.co_filename.endswith("cli.py"):  # only the scope-file write fails
+            raise OSError("disk full during fsync")
+        return real_fsync(fd)
+
+    monkeypatch.setattr(_os, "fsync", boom)
+    assert approve(env, confirm="acme") == 1
+    assert _leftovers(env) == []  # no partial scope file, no stray temp file
+    log = AuditLog(Settings(_env_file=None, audit_dir=env["tmp"] / "audit"), "acme")
+    assert [e["event"] for e in log.events("scope")] == ["scope_approved"]  # audit-before-publication kept
+    assert "scope error" in capsys.readouterr().out
+
+
+def test_a_failed_publish_step_leaves_nothing_behind(env, monkeypatch):
+    import os as _os
+
+    assert draft(env) == 0
+
+    def no_link(_src, _dst):
+        raise OSError("link failed")
+
+    monkeypatch.setattr(_os, "link", no_link, raising=False)
+    monkeypatch.setattr(_os, "replace", no_link)
+    assert approve(env, confirm="acme") == 1
+    assert _leftovers(env) == []
+
+
+def test_the_published_scope_is_complete_and_matches_the_audited_revision(env):
+    assert draft(env) == 0
+    assert approve(env, confirm="acme") == 0
+    final = env["tmp"] / "scopes" / "acme.scope.yaml"
+    scope = runner.load_scope(final)
+    assert "admin.acme.test" in scope.exclusions and "dos" in scope.forbidden_techniques
+    log = AuditLog(Settings(_env_file=None, audit_dir=env["tmp"] / "audit"), "acme")
+    assert log.events("scope")[0]["detail"]["scope_revision"] == scope.revision
+    assert _leftovers(env) == ["acme.scope.yaml"]
