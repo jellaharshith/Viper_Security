@@ -23,12 +23,12 @@ Weekly RAG pipeline runs independently and feeds retrieval for the local assista
 2. **Laptop is CPU-only** (Ryzen 5 PRO 8540U, 14.7 GB RAM, integrated GPU). It runs quantized GGUF via Ollama and never trains.
 3. **Adapters do not run directly in Ollama.** Export path: merge LoRA into base, convert to GGUF, quantize.
 4. **Baseline before training.** Evaluate the original model + RAG first; QLoRA only if measurably justified.
-5. **Embedded Qdrant for the MVP** (no Docker). A persistent Qdrant is needed before weekly automation; CI runners are ephemeral and cannot host it.
-6. **Burp Suite is manual-GUI only** (not headless-automatable). Nmap, ZAP, Nuclei form the automated core.
+5. **Dual vector store backends.** Embedded Qdrant for offline local development and Supabase pgvector (`VIPER_STORE=supabase`) for remote team/CI access. Weekly automation runs stateless in GitHub Actions against Supabase.
+6. **Burp Suite is manual-GUI only** (not headless-automatable). Nmap and Nuclei form the automated core (ZAP planned for v1.1).
 7. **Cloud VM is on-demand** with idle shutdown. Scanning from a cloud provider may violate its acceptable-use policy; check before any live use.
 
 ## Module map (`src/viper/`)
-`llm` (Ollama client), `training` (export handling), `rag` (ingest/embed/retrieve), `agents` (LangGraph), `policy` (scope engine), `tools` (Tool Registry), `execution` (VM client), plus `config`, `logging_setup`, `cli`.
+`llm` (Ollama client), `rag` (ingest/embed/retrieve/gated updates), `agents` (LangGraph loop, planner, audit log, evidence, anchoring), `policy` (scope engine, approval models, scope drafting), `tools` (Tool Registry, nmap, nuclei, dry-run stubs), `execution` (remote executor, fail-safe factory, control lock), `findings` (schema and parsers), `report` (traceable Markdown renderer), `eval` (evaluation harness), plus `config`, `logging_setup`, `cli`.
 
 ## Human control states
 `DRAFT_PLAN -> AWAIT_APPROVAL -> RUNNING <-> PAUSED -> MANUAL_CONTROL -> COMPLETED | FAILED`; emergency stop revokes new jobs and terminates tracked process trees.

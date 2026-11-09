@@ -4,6 +4,32 @@ All notable changes are documented here. The project is milestone-driven (see
 [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md)); versions track milestones.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.0] - 2026-11-08 - v1.0: Live nuclei, scope reader, weekly KB refresh (security-reviewed)
+
+### Added
+- Scope reader library and CLI (`viper scope draft`, `viper scope approve`): model proposes a structured YAML scope from unstructured bug bounty program rules; drafts are inert (`status: DRAFT`) until human validation; `scope approve --confirm <project>` records a signed `scope_approved` audit event before writing the final scope.
+- Live Nuclei execution profile on remote execution plane: protocol restricted to HTTP (`-pt http`), strict tags (`tech,exposure,misconfig`), excluded tags (`dos,fuzz,intrusive,bruteforce,rce,sqli,xss`), severities (`info,low,medium`), rate-limited (`-rl 5`), and root-owned read-only templates.
+- Automated weekly knowledge base update workflow (`.github/workflows/kb-weekly.yml`): scheduled (Mondays 03:00 UTC) and dispatch-triggered gated updates against Supabase pgvector; official SHA-256 archive verification for Ollama releases; graceful skipping when secrets are unconfigured; single `kb-weekly-database` concurrency queue.
+- Reproducible VM bootstrap script (`deploy/vm-bootstrap.sh`): idempotent setup script for cloud execution VM with dedicated unprivileged `viper-vmapi` service account, local TLS generation, and systemd process group management.
+- Comprehensive v1 scope document (`docs/v1-scope.md`) defining v1.0 capabilities and the prioritized v1.1 backlog (OWASP ZAP, noVNC desktop, real RFC-3161 TSA anchoring, scope rate-limits, SSH shell takeover, NVD source, PostgreSQL operational tables, multi-job dispatch, reviewed HTTP template subset).
+
+### Security
+- Comprehensive v1 security review addressing 9 findings:
+  - Scopes published only after durable audit event append succeeds (atomic approval).
+  - Scope draft validation rejects shorthand/alternate IP notations (e.g. `127.1`) to prevent CIDR exclusion bypasses.
+  - Scope draft validation rejects public-suffix wildcards (`*.co.uk`, `*.github.io`) using a pinned offline suffix list.
+  - Verified SHA-256 checksum before extracting the Ollama Linux binary archive.
+  - Serialized workflow database concurrency across git refs via constant `kb-weekly-database` group.
+  - Unique per-run random tokens in KB staging collection names to prevent collisions.
+  - Enforced `-pt http` protocol restriction on remote Nuclei execution.
+  - Hardened VM deployment runbook and bootstrap to run `vmapi` as an unprivileged service with root-owned templates.
+  - Reserved capacity for mandatory scope draft warnings against model ambiguity limits.
+  - Aligned exact-target and port argument validation schemas across client planner and server tool runner.
+
+### Changed
+- Nuclei execution upgraded from passive response mode to active HTTP-only technology and exposure scanning.
+- ADR 0004 updated to record weekly automation via GitHub Actions and explain stateless runner safety with Supabase pgvector.
+
 ## [0.7.0] - 2026-11-08 - M7: Pentest copilot (live-validated)
 
 ### Added
