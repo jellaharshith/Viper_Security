@@ -12,7 +12,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Topic :: Security",
 ]
-dependencies = ["pydantic>=2.7,<3", "pydantic-settings>=2.3,<3", "httpx>=0.27,<1", "qdrant-client>=1.9,<2", "psycopg[binary]>=3.2,<4", "langgraph>=1.2,<2", "langgraph-checkpoint-sqlite>=3.1,<4", "pyyaml>=6,<7"]
+dependencies = ["pydantic>=2.7,<3", "pydantic-settings>=2.16.2,<3", "httpx>=0.27,<1", "qdrant-client>=1.9,<2", "psycopg[binary]>=3.2,<4", "langgraph>=1.2,<2", "langgraph-checkpoint-sqlite>=3.1,<4", "pyyaml>=6,<7"]
 
 [project.scripts]
 viper = "viper.cli:main"
@@ -23,7 +23,7 @@ Issues = "https://github.com/jellaharshith/Viper_Security/issues"
 Changelog = "https://github.com/jellaharshith/Viper_Security/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
