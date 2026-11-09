@@ -1,7 +1,7 @@
 # Personal Cybersecurity AI Agent — Architecture & Product Design v1
 
 **Date:** November 4, 2026  
-**Status:** Proposed architecture (design only; not yet implemented)  
+**Status:** Implemented through M7 (see docs/implementation-roadmap.md)  
 **Audience:** Beginner building a personal tool, with possible future open-source/SaaS expansion.
 
 ## 1. Product vision
