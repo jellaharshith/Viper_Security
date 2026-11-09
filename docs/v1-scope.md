@@ -48,6 +48,7 @@ Viper v1.0 delivers an end-to-end, safety-first autonomous cybersecurity copilot
 - **Real-Time Stream Processing:** Live scanner stdout streamed via Server-Sent Events (SSE) with strict wire caps (4 MiB), output capture ceilings (1 MiB), bounded line buffers (64 KiB), and total time/idle timeouts.
 - **Process Lifecycle Control:** Full process-group signal management (`viper exec watch`, `pause`, `stop`, `takeover`, `release`) enabling operator emergency stops (SIGKILL) and temporary suspension (SIGSTOP).
 - **Exclusive Control Lock:** SQLite-backed control lock preventing agent dispatch when a human operator assumes manual control.
+- **Unprivileged Service Execution & Bootstrap:** Service runs as dedicated unprivileged system user `viper-vmapi` under systemd with `KillMode=control-group`. Automated and reproducible VM setup is provided via `deploy/vm-bootstrap.sh`.
 
 ### 1.6 Security Scanning Tools
 - **Nmap (`/usr/bin/nmap`):** Authorized TCP port scanning with service detection and unprivileged port discovery against in-scope targets.
