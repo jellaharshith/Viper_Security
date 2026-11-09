@@ -119,7 +119,7 @@ the exact allowlisted target):
 
 ```text
 /usr/bin/nuclei -jsonl -silent -nc -duc -no-interactsh -disable-redirects
-  -t TEMPLATES_DIR -tags tech,exposure,misconfig
+  -t TEMPLATES_DIR -tags tech,misconfig
   -etags dos,fuzz,intrusive,bruteforce,rce,sqli,xss -severity info,low,medium
   -pt http -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
 ```

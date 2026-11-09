@@ -71,7 +71,7 @@ Full design: [`docs/architecture.md`](docs/architecture.md) and [`docs/security-
 | M5 | LangGraph agents + policy engine | Done |
 | M6 | Cloud execution plane: approve, watch, take over, pause, emergency-stop | Done, live-validated |
 | M7 | Pentest copilot: planner, finding validation, traceable report | Done, live-validated |
-| v1.0 | v1.0: live nuclei, scope reader, weekly KB refresh | Built and security-reviewed offline; second live validation pending |
+| v1.0 | v1.0: live nuclei, scope reader, weekly KB refresh | Done, security-reviewed and live-validated (nmap + nuclei on a real VM) |
 
 M7 was validated end to end on 2026-11-08 against the authorized lab host `scanme.nmap.org`: an approved `nmap`
 scan produced two confirmed findings, each citing the audit event that produced it, and the audit chain verified.
@@ -149,7 +149,7 @@ To run real tools, deploy the execution plane with
 
 When configured for real execution (`VIPER_ALLOW_ACTIVE_TESTING=true`), tools run **only** on a remote execution plane (a headless GCP Kali VM with zero public ingress):
 - **Nmap**: Authorized TCP port discovery with service detection against in-scope targets.
-- **Nuclei**: Benign, HTTP-only vulnerability and technology detection with a frozen safety profile: protocol restricted to `-pt http`, tags `tech,exposure,misconfig`, excluded tags `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`, severities `info,low,medium`, bounded rate (`-rl 5`), no interactsh, no redirects, and root-owned read-only templates.
+- **Nuclei**: Benign, HTTP-only vulnerability and technology detection with a frozen safety profile: protocol restricted to `-pt http`, tags `tech,misconfig`, excluded tags `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`, severities `info,low,medium`, bounded rate (`-rl 5`), no interactsh, no redirects, and root-owned read-only templates.
 - **VM Bootstrap**: Automated via [`deploy/vm-bootstrap.sh`](deploy/vm-bootstrap.sh) (installs Nmap, verified Nuclei release, sets up unprivileged `viper-vmapi` service, generates TLS certificates, and configures the `vmapi` systemd service). See [`docs/plans/m6-gcloud-vm-setup.md`](docs/plans/m6-gcloud-vm-setup.md).
 
 ### Weekly KB refresh

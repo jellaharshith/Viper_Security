@@ -86,9 +86,16 @@ release="https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_
   install -o root -g root -m 0755 nuclei /usr/bin/nuclei
 )
 install -d -o root -g root -m 0755 /opt/viper/nuclei-templates
-/usr/bin/nuclei -update-templates -ud /opt/viper/nuclei-templates -duc
+# NOTE: do NOT pass -duc here. With -duc, -update-templates silently installs nothing (verified on a real VM),
+# and nuclei would then "succeed" while running zero templates.
+/usr/bin/nuclei -update-templates -ud /opt/viper/nuclei-templates
 chown -R root:root /opt/viper/nuclei-templates
 chmod -R u=rwX,go=rX /opt/viper/nuclei-templates
+template_count=$(find /opt/viper/nuclei-templates -name '*.yaml' | wc -l)
+if [[ "$template_count" -lt 1000 ]]; then
+  echo "bootstrap: nuclei templates were not installed (found $template_count)" >&2
+  exit 1
+fi
 
 # Preserve an existing certificate/key pair; never silently rotate the client's trust anchor.
 if [[ -e /etc/viper/certs/vmapi-key.pem || -e /etc/viper/certs/vmapi-cert.pem ]]; then

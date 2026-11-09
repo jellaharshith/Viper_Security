@@ -59,7 +59,7 @@ def build_command(tool: str, args: dict, target: str, allowed_targets: frozenset
         raise ValueError(
             "VIPER_EXEC_NUCLEI_TEMPLATES must be an absolute path without whitespace or controls")
     return ["/usr/bin/nuclei", "-jsonl", "-silent", "-nc", "-duc", "-no-interactsh",
-            "-disable-redirects", "-t", templates, "-tags", "tech,exposure,misconfig",
+            "-disable-redirects", "-t", templates, "-tags", "tech,misconfig",
             "-etags", "dos,fuzz,intrusive,bruteforce,rce,sqli,xss", "-severity", "info,low,medium",
             "-pt", "http", "-rl", str(rate), "-c", "5", "-timeout", "10", "-retries", "0", "-u", target]
 

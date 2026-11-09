@@ -229,7 +229,7 @@ lab host `scanme.nmap.org` only, then deleted everything (total cost: minutes of
 - **Follow-ups:** external TSA/Rekor anchoring needs a trusted offline verifier; noVNC takeover; nuclei is
   not installed on the Ubuntu image (apt has no nuclei), so only nmap was exercised live.
 
-## V1 BUILD - 2026-11-08 (offline definition of done met; second live validation pending)
+## V1 BUILD - 2026-11-08 (offline definition of done met; live-validated, see below)
 Four-session herdr crew on branch `v1/finish` (claude-v1 scope reader + rehearsal test, codex-v1 VM `nuclei`
 profile + bootstrap + security review, agy-v1 weekly workflow + docs, coordinator planner/CLI/wiring).
 718 tests + 64 VM-API tests, ruff and mypy clean.
@@ -237,7 +237,7 @@ profile + bootstrap + security review, agy-v1 weekly workflow + docs, coordinato
   `"true"`/`1` booleans, no `"5"` rates, no explicit null ports) because the ORIGINAL args are dispatched; the
   planner prompt carries the exact allowed hosts and argument formats, and a real-tool target must be an exact
   egress host, so a bad plan fails at plan time instead of after a human approved it.
-- **Live nuclei profile:** `-passive` is gone. Frozen argv: JSONL, tags `tech,exposure,misconfig`, excluded tags
+- **Live nuclei profile:** `-passive` is gone. Frozen argv: JSONL, tags `tech,misconfig`, excluded tags
   `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`, severities `info,low,medium`, `-pt http`, `-rl`, `-c 5`,
   `-timeout 10`, `-retries 0`. The template directory comes only from `VIPER_EXEC_NUCLEI_TEMPLATES` on the VM,
   never from request arguments. All 15 flags were checked against the pinned nuclei 3.3.10 documentation.
@@ -260,3 +260,41 @@ profile + bootstrap + security review, agy-v1 weekly workflow + docs, coordinato
   accuracy). All fixed and re-verified.
 - **Deferred to v1.1 (docs/v1-scope.md):** OWASP ZAP, noVNC desktop, real RFC-3161 anchoring, scope rate-limit
   fields, SSH takeover shell, NVD source, PostgreSQL operational tables, multi-job dispatch.
+
+## V1 LIVE VALIDATION - 2026-11-08/09 (what the real run changed)
+A real GCP VM (spot e2-medium, no public IP, NAT, IAP-only) bootstrapped with `deploy/vm-bootstrap.sh`; the local
+Foundation-Sec model planned each scan and the human approval checkpoint was used. The run found four problems the
+offline suite could not, all fixed here:
+1. **Template install was a silent no-op.** The bootstrap ran `nuclei -update-templates ... -duc`; `-duc` makes the update
+   do nothing, so the VM had 0 templates and nuclei would have "succeeded" with no results. Fixed: no `-duc` on that
+   step, plus a guard that fails the bootstrap if fewer than 1,000 templates are installed.
+2. **A shared public sandbox throttles nuclei.** Against `scanme.nmap.org` the first nuclei run hit I/O timeouts and
+   nuclei marked the host unresponsive (zero output, exit 0). Nmap-style benign scanning of that host is fine; template
+   scanning it is the "do not hammer" case its rules describe (and which the scope reader flagged as an ambiguity). Nuclei
+   was therefore validated against a web server on the VM's own loopback instead.
+3. **The nuclei profile was too big for the job limit.** `tech,exposure,misconfig` is ~8,290 requests (~28 min at 5 req/s)
+   and the VM API killed the job at its hard 300 s limit (`killed`, exit -9). The run failed closed: audited `run_failed`,
+   nmap findings kept, nothing reported as clean. Measured on the VM: `tech,misconfig` = 1,636 requests, `tech` = 860.
+   Fixed: the `exposure` tag (the bulk of the requests, and the most intrusive part) is dropped, and the VM API now has a
+   per-tool wall-clock limit (nmap 300 s, nuclei 900 s) chosen from the program name only.
+4. **Real-model scope reader worked in the loop:** it drafted the scope for the self-owned loopback target, a human
+   approved it with `--confirm`, and the agent then planned and ran under that scope.
+5. **Re-running the bootstrap is safe**, which was itself tested live: the idempotent re-run kept the existing token and
+   certificate, found the templates current, restarted the service and passed its authenticated health check. A CRLF copy
+   of the script breaks bash on the VM (`set: pipefail`), so a test now fails if the script ever contains a carriage return.
+6. **Test isolation:** the live `.env` (active testing on, a VM URL and token) flipped five unit tests to the remote
+   executor. No traffic reached the VM (the client egress check refuses first), but tests must never depend on a developer
+   `.env`, so `tests/conftest.py` now pins the execution-plane variables to their safe defaults.
+
+**Result (definition of done met).** Two approved AI-planned runs on the live VM, each paused at the human approval
+checkpoint and ended `COMPLETED`:
+- `scanme.nmap.org` (published sandbox, nmap only): ports 22/ssh (OpenSSH 6.6.1p1) and 80/http (Apache 2.4.7), 2 confirmed
+  findings, each citing its `tool_result` audit event.
+- the VM's own loopback web server (scope drafted by the real model, approved by a human): nmap found 22 and 80, and
+  nuclei (the frozen `tech,misconfig` HTTP profile, 900 s limit, ~5 minutes) found 4 confirmed findings: `waf-detect`,
+  `tech-detect`, `http-missing-security-headers` and `nginx-eol`, each citing audit event seq 28.
+- `viper audit verify` OK for both project logs and a mock anchor recorded (`CONSISTENT_ONLY`, not external proof).
+- Teardown verified: tunnel stopped; VM, NAT, router and firewall rule deleted; `.env` restored; certificate, token and
+  scratch files deleted. Only the owner's own `kali-vm` remains in the project.
+- Follow-ups for v1.1: richer remediation text and references for nuclei findings (real nuclei JSON carries little of it for
+  many templates), evidence rendering that is easier to read than HTML-escaped JSON, and a reviewed HTTP template subset.

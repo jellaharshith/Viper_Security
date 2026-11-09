@@ -80,7 +80,7 @@ def test_allowlists_build_single_target():
     assert command == [
         "/usr/bin/nuclei", "-jsonl", "-silent", "-nc", "-duc", "-no-interactsh",
         "-disable-redirects", "-t", "/opt/viper/nuclei-templates",
-        "-tags", "tech,exposure,misconfig", "-etags", "dos,fuzz,intrusive,bruteforce,rce,sqli,xss",
+        "-tags", "tech,misconfig", "-etags", "dos,fuzz,intrusive,bruteforce,rce,sqli,xss",
         "-severity", "info,low,medium", "-pt", "http", "-rl", "1", "-c", "5", "-timeout", "10",
         "-retries", "0", "-u", "scanme.nmap.org",
     ]
@@ -228,3 +228,24 @@ def test_stop_is_idempotent_without_resignalling_reused_pid(client, monkeypatch)
 def test_stream_waits_for_output_capture_after_process_exit():
     job = Job("job-1", Mock(), state="done", output_done=True, lines=["last line"])
     assert list(JobRegistry.stream(job)) == ["data: last line\n\n"]
+
+
+# --- live validation finding: a nuclei scan needs more than nmap's 300 s, and the limit is per tool ---
+
+def test_job_time_limit_is_per_tool_and_nuclei_gets_more_than_nmap():
+    from vmapi.jobs import job_timeout
+
+    assert job_timeout(["/usr/bin/nmap", "-sT", "x"]) == 300
+    assert job_timeout(["/usr/bin/nuclei", "-u", "x"]) == 900
+    assert job_timeout(["/usr/bin/other"]) == 300  # unknown tools keep the strict default
+    assert job_timeout([]) == 300
+    assert job_timeout(["nuclei"]) == 900  # matched on the program name, not the full path
+
+
+def test_the_nuclei_profile_stays_within_its_time_budget():
+    """tech,misconfig is ~1,636 requests on a default install (measured live); at the default 5 req/s that is
+    ~330 s, so it needs the 900 s nuclei limit but not an unbounded one. The excluded `exposure` tag alone was
+    ~6,600 more requests (~28 min at 5 req/s) and probes for leaked files."""
+    command = build_command("nuclei", {"target": "x.test", "rate_limit": 5}, "x.test", frozenset({"x.test"}))
+    assert command[command.index("-tags") + 1] == "tech,misconfig"
+    assert "exposure" not in " ".join(command)
