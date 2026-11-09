@@ -371,3 +371,30 @@ def test_nuclei_real_jsonl_keeps_structured_fields_and_downgrades_foreign_host()
     assert cdn.title.startswith("Foreign-host observation: CDN Redirect Detection")
     assert cdn.remediation == "Review the redirect target."  # structured fields survive downgrade
     assert cdn.references == ["https://example.com/cdn-redirect"]
+
+
+# --- Finding schema v1.1: additive, backward compatible ---------------------------------------------
+
+def _v1_finding_kwargs():
+    return dict(id="f-1", title="t", affected_asset="a.test", source_tool="nmap", source_action_id="n1",
+                evidence="22/tcp open ssh", severity="info", severity_rationale="r", confidence="confirmed",
+                reproducibility="r", remediation="x", references=[], audit_refs=["h"])
+
+
+def test_v1_data_without_the_new_fields_still_loads_with_safe_defaults():
+    from viper.findings.models import Finding
+
+    f = Finding(**_v1_finding_kwargs())
+    assert f.description == "" and f.cwe == []
+
+
+def test_v1_1_fields_round_trip_and_extra_keys_are_still_forbidden():
+    import pytest
+    from pydantic import ValidationError
+
+    from viper.findings.models import Finding
+
+    f = Finding(**_v1_finding_kwargs(), description="Missing headers.", cwe=["CWE-693"])
+    assert Finding.model_validate(f.model_dump(mode="json")) == f
+    with pytest.raises(ValidationError):
+        Finding(**_v1_finding_kwargs(), unexpected="x")
