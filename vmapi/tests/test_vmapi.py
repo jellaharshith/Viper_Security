@@ -19,6 +19,11 @@ POSIX = pytest.mark.skipif(os.name != "posix", reason="Linux VM process groups r
 AUTH = {"Authorization": "Bearer test-only-token"}
 
 
+@pytest.fixture(autouse=True)
+def default_nuclei_templates(monkeypatch):
+    monkeypatch.delenv("VIPER_EXEC_NUCLEI_TEMPLATES", raising=False)
+
+
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv("VIPER_EXEC_API_TOKEN", "test-only-token")
@@ -72,8 +77,70 @@ def test_allowlists_build_single_target():
                          "scanme.nmap.org", allowed) == [
         "/usr/bin/nmap", "-sT", "-sV", "-Pn", "-p", "80,443", "scanme.nmap.org"]
     command = build_command("nuclei", {"target": "scanme.nmap.org"}, "scanme.nmap.org", allowed)
-    assert command[-2:] == ["-u", "scanme.nmap.org"]
-    assert "-passive" in command
+    assert command == [
+        "/usr/bin/nuclei", "-jsonl", "-silent", "-nc", "-duc", "-no-interactsh",
+        "-disable-redirects", "-t", "/opt/viper/nuclei-templates",
+        "-tags", "tech,exposure,misconfig", "-etags", "dos,fuzz,intrusive,bruteforce,rce,sqli,xss",
+        "-severity", "info,low,medium", "-rl", "1", "-c", "5", "-timeout", "10",
+        "-retries", "0", "-u", "scanme.nmap.org",
+    ]
+
+
+def test_nuclei_templates_env_override(monkeypatch):
+    monkeypatch.setenv("VIPER_EXEC_NUCLEI_TEMPLATES", "/srv/trusted-templates")
+    command = build_command("nuclei", {"target": "scanme.nmap.org", "rate_limit": 10},
+                            "scanme.nmap.org", frozenset({"scanme.nmap.org"}))
+    assert command[command.index("-t") + 1] == "/srv/trusted-templates"
+    assert command[command.index("-rl") + 1] == "10"
+
+
+@pytest.mark.parametrize("directory", [
+    "", "relative/templates", "-templates", "-/opt/templates", "C:/templates",
+    "/opt/two templates", "/opt/templates\t", "/opt/templates\n", "/opt/templates\r",
+    "/opt/templates\x1b", "/opt/templates\x7f", "/opt/templates\x85",
+    "/opt/templates\u00a0", "/opt/templates\u200b",
+])
+def test_nuclei_bad_templates_env_refuses_job(client, monkeypatch, directory):
+    monkeypatch.setenv("VIPER_EXEC_NUCLEI_TEMPLATES", directory)
+    start = Mock()
+    monkeypatch.setattr(client.app.state.jobs, "start", start)
+    response = client.post("/jobs", headers=AUTH, json=payload(
+        tool="nuclei", args={"target": "scanme.nmap.org"}))
+    assert response.status_code == 422
+    start.assert_not_called()
+
+
+@pytest.mark.parametrize("key", ["templates", "tags", "severity", "t", "-passive"])
+def test_nuclei_profile_args_rejected(client, monkeypatch, key):
+    start = Mock()
+    monkeypatch.setattr(client.app.state.jobs, "start", start)
+    response = client.post("/jobs", headers=AUTH, json=payload(
+        tool="nuclei", args={"target": "scanme.nmap.org", key: "untrusted"}))
+    assert response.status_code == 422
+    start.assert_not_called()
+
+
+@pytest.mark.parametrize("target", [
+    "https://scanme.nmap.org@evil.test", "scanme.nmap.org;id", "scanme.nmap.org evil.test",
+    "scanme.nmap.org\n-templates", "-scanme.nmap.org", "scanme.nmap.org/24", "example.com",
+])
+def test_nuclei_target_smuggling_rejected(client, monkeypatch, target):
+    start = Mock()
+    monkeypatch.setattr(client.app.state.jobs, "start", start)
+    response = client.post("/jobs", headers=AUTH, json=payload(
+        tool="nuclei", target=target, args={"target": target}))
+    assert response.status_code == 422
+    start.assert_not_called()
+
+
+@pytest.mark.parametrize("rate", [True, False, 0, 11, 1.0, "1", None])
+def test_nuclei_rate_requires_bounded_integer(client, monkeypatch, rate):
+    start = Mock()
+    monkeypatch.setattr(client.app.state.jobs, "start", start)
+    response = client.post("/jobs", headers=AUTH, json=payload(
+        tool="nuclei", args={"target": "scanme.nmap.org", "rate_limit": rate}))
+    assert response.status_code == 422
+    start.assert_not_called()
 
 
 def wait_terminal(client):

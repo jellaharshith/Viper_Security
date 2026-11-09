@@ -13,6 +13,10 @@ the service owner (never commit credentials):
 - `VIPER_EXEC_EGRESS_ALLOWLIST`: required comma-separated exact target hosts/IPs,
   e.g. `scanme.nmap.org`; empty denies all jobs. Loaded at startup.
 - `VIPER_EXEC_API_TLS_CERT` / `VIPER_EXEC_API_TLS_KEY`: TLS certificate/key paths.
+- `VIPER_EXEC_NUCLEI_TEMPLATES`: trusted template directory, default
+  `/opt/viper/nuclei-templates`. Must be an absolute Linux path with no leading
+  dash, whitespace or control characters; invalid values refuse nuclei jobs (422).
+  This setting is read from the VM environment, never from request arguments.
 
 Launch **from the parent of `vmapi/`** with `python -m vmapi.app`. The launcher
 fixes the listener to `127.0.0.1:8443`, TLS, and one worker. Never override the
@@ -25,6 +29,50 @@ Every HTTP request requires `Authorization: Bearer <token>`, including health an
 unknown routes. Interactive docs and OpenAPI routes are disabled. HTTP auth occurs
 before request validation. Tokens are read from the environment on each request;
 expiry/rotation is managed by the operator, not encoded in this opaque token.
+
+## Install Nuclei and trusted templates (operator only)
+
+Ubuntu has no `nuclei` apt package. On the Linux amd64 VM, install a pinned
+GitHub release and verify its archive against that release's checksums file
+before installing it. These commands require operator-provisioned network
+access; they are deployment instructions, never part of offline tests.
+
+```bash
+set -euo pipefail
+sudo apt-get update
+sudo apt-get install -y nmap python3-pip python3-venv curl unzip ca-certificates
+(
+  NUCLEI_VERSION=3.3.10
+  NUCLEI_ARCHIVE="nuclei_${NUCLEI_VERSION}_linux_amd64.zip"
+  NUCLEI_RELEASE="https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}"
+  download_dir=$(mktemp -d)
+  trap 'rm -rf -- "$download_dir"' EXIT
+  cd "$download_dir"
+  curl --fail --location --proto '=https' --proto-redir '=https' \
+    -o "$NUCLEI_ARCHIVE" "$NUCLEI_RELEASE/$NUCLEI_ARCHIVE"
+  curl --fail --location --proto '=https' --proto-redir '=https' \
+    -o checksums.txt "$NUCLEI_RELEASE/nuclei_${NUCLEI_VERSION}_checksums.txt"
+  awk -v asset="$NUCLEI_ARCHIVE" '$2 == asset {print; found++} END {if (found != 1) exit 1}' \
+    checksums.txt > selected-checksum.txt
+  sha256sum --check selected-checksum.txt
+  unzip -q "$NUCLEI_ARCHIVE" nuclei
+  sudo install -o root -g root -m 0755 nuclei /usr/bin/nuclei
+)
+sudo install -d -o root -g root -m 0755 /opt/viper/nuclei-templates
+sudo /usr/bin/nuclei -update-templates -ud /opt/viper/nuclei-templates
+sudo chown -R root:root /opt/viper/nuclei-templates
+sudo chmod -R u=rwX,go=rX /opt/viper/nuclei-templates
+```
+
+Set the following in `/etc/viper/vmapi.env` alongside the bearer and TLS settings,
+then restart the service. Run the service as an unprivileged account so templates
+remain read-only to it. Template installation/refresh is a separate root operation;
+stop jobs before refreshing and reapply ownership/permissions afterward. The
+binary version is pinned; record the installed template revision for reproducibility.
+
+```ini
+VIPER_EXEC_NUCLEI_TEMPLATES=/opt/viper/nuclei-templates
+```
 
 ## Contract and argument schema
 
@@ -42,12 +90,22 @@ Job IDs contain 1–128 ASCII letters, digits, underscores or hyphens.
 | Tool | Allowed argument keys | Fixed behavior |
 |---|---|---|
 | nmap | `target`; optional strict booleans `service_detection`, `skip_discovery`; optional `ports` string of up to 32 comma-separated ports (1–65535) | TCP connect `-sT`; booleans map to `-sV`, `-Pn` |
-| nuclei | `target`; optional strict integer `rate_limit` (1–10, default 1) | Passive response processing; no Interactsh, updates, stdin or redirects |
+| nuclei | `target`; optional strict integer `rate_limit` (1–10, default 1) | Live JSONL profile below; server-owned templates, tags and severity |
 
-Nuclei's `-passive` mode is offline HTTP response processing, not a general live
-template scan; it may find nothing for hostname input. This slice deliberately
-does not expose custom templates, workflows or intrusive execution. See the
-[upstream flag reference](https://github.com/projectdiscovery/nuclei).
+Nuclei uses this fixed live profile (an argv list, with the last value bound to
+the exact allowlisted target):
+
+```text
+/usr/bin/nuclei -jsonl -silent -nc -duc -no-interactsh -disable-redirects
+  -t TEMPLATES_DIR -tags tech,exposure,misconfig
+  -etags dos,fuzz,intrusive,bruteforce,rce,sqli,xss -severity info,low,medium
+  -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
+```
+
+`-passive` is removed. Findings are JSONL on stdout; merged stderr can contain
+non-JSON diagnostic lines. Templates and tags are administrator-controlled so a
+request cannot select arbitrary templates or broaden the scan profile. Keys such
+as `templates`, `tags`, `severity`, `t` and `-passive` are rejected with 422.
 Neither tool accepts a raw argv/flags field, output flags or arbitrary strings.
 Targets occur once in argv; execution uses no shell. Exact hostname validation
 does not pin DNS resolution: an operator-managed egress firewall and trusted DNS
