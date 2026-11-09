@@ -106,15 +106,59 @@ Establish an initial SSH session via the IAP tunnel to verify connectivity and t
 gcloud compute ssh viper-kali-lab --tunnel-through-iap
 ```
 
-Inside the VM terminal, verify tool installation:
+Inside the VM terminal, install Nuclei from a pinned GitHub release (Ubuntu has
+no `nuclei` apt package). This example targets the amd64 VM above and verifies
+the archive against the same release's checksums file before installation:
 ```bash
-# If using Kali:
-which nmap nuclei
+set -euo pipefail
+sudo apt-get update
+sudo apt-get install -y nmap python3-pip python3-venv curl unzip ca-certificates
+(
+  NUCLEI_VERSION=3.3.10
+  NUCLEI_ARCHIVE="nuclei_${NUCLEI_VERSION}_linux_amd64.zip"
+  NUCLEI_RELEASE="https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}"
+  download_dir=$(mktemp -d)
+  trap 'rm -rf -- "$download_dir"' EXIT
+  cd "$download_dir"
+  curl --fail --location --proto '=https' --proto-redir '=https' \
+    -o "$NUCLEI_ARCHIVE" "$NUCLEI_RELEASE/$NUCLEI_ARCHIVE"
+  curl --fail --location --proto '=https' --proto-redir '=https' \
+    -o checksums.txt "$NUCLEI_RELEASE/nuclei_${NUCLEI_VERSION}_checksums.txt"
+  awk -v asset="$NUCLEI_ARCHIVE" '$2 == asset {print; found++} END {if (found != 1) exit 1}' \
+    checksums.txt > selected-checksum.txt
+  sha256sum --check selected-checksum.txt
+  unzip -q "$NUCLEI_ARCHIVE" nuclei
+  sudo install -o root -g root -m 0755 nuclei /usr/bin/nuclei
+)
+sudo install -d -o root -g root -m 0755 /opt/viper/nuclei-templates
+sudo /usr/bin/nuclei -update-templates -ud /opt/viper/nuclei-templates
+sudo chown -R root:root /opt/viper/nuclei-templates
+sudo chmod -R u=rwX,go=rX /opt/viper/nuclei-templates
 nmap --version | head -n 1
-
-# If using Ubuntu (install tools if not present):
-sudo apt-get update && sudo apt-get install -y nmap nuclei python3-pip python3-venv
+/usr/bin/nuclei -version
 ```
+
+Template installation requires operator-provisioned egress. Perform it only as
+root, outside jobs, and record the installed template revision. The service must
+run as an unprivileged account with read-only access to this root-owned directory.
+Stop jobs before template refreshes and reapply ownership and permissions afterward.
+
+Add `VIPER_EXEC_NUCLEI_TEMPLATES=/opt/viper/nuclei-templates` to
+`/etc/viper/vmapi.env` when creating it in Step 5. Nuclei jobs reject relative
+paths, leading dashes, whitespace and control characters. Requests accept only
+`target` and optional integer `rate_limit` (1–10); templates, tags and severity
+are server-controlled. The live argv is:
+
+```text
+/usr/bin/nuclei -jsonl -silent -nc -duc -no-interactsh -disable-redirects
+  -t /opt/viper/nuclei-templates -tags tech,exposure,misconfig
+  -etags dos,fuzz,intrusive,bruteforce,rce,sqli,xss -severity info,low,medium
+  -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
+```
+
+There is no `-passive` flag. Stdout findings are JSONL; merged stderr may include
+non-JSON diagnostics. These installation commands are instructions for deployment;
+offline verification does not download binaries/templates or contact live targets.
 
 ---
 
@@ -170,6 +214,7 @@ echo "=============================================="
 sudo bash -c "cat <<EOF > /etc/viper/vmapi.env
 VIPER_EXEC_API_TOKEN=${TOKEN}
 VIPER_EXEC_EGRESS_ALLOWLIST=scanme.nmap.org
+VIPER_EXEC_NUCLEI_TEMPLATES=/opt/viper/nuclei-templates
 EOF"
 
 sudo chmod 600 /etc/viper/vmapi.env
