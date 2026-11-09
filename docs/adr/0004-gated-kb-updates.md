@@ -22,5 +22,22 @@ embedding drift) must never degrade answers. Fine-tuning is unrelated and never 
 - The gate only measures retrieval on KEV-derived questions. When new sources (ATT&CK, OWASP, NVD) are added, the frozen
   dataset must grow (dataset v2) or the gate will not notice regressions there.
 - Embedded Qdrant allows one client per folder: update and chat cannot run at the same time.
-- **Not yet automated.** Embedding needs Ollama, which GitHub-hosted runners do not have, and a runner has no persistent
-  index. Scheduling is therefore a separate decision (laptop Task Scheduler vs hosted Qdrant + runner); see roadmap.
+- **Automated weekly via GitHub Actions (`.github/workflows/kb-weekly.yml`):**
+  The update is automated on a weekly schedule (`cron`) and via `workflow_dispatch` using the Supabase
+  (`VIPER_STORE=supabase`) backend.
+  - **Why Supabase makes a stateless runner safe:** In the local Qdrant backend, the live collection pointer
+    and vector store require persistent local disk storage. With Supabase (`pgvector`), the active collection
+    pointer resides directly in the database (`kb_registry` table), and all document vectors are stored remotely
+    in versioned database tables. The GitHub-hosted runner is completely stateless: it only needs to run an ephemeral
+    Ollama instance to compute embeddings for new or modified records and evaluate the retrieval quality gate
+    (`recall@4 >= 0.95`). When gates pass, promotion updates the live pointer in the database atomically.
+    When gates fail, the staged collection is dropped and the database pointer remains unchanged. Even though
+    the runner container is destroyed immediately after execution, no persistent state is lost.
+  - If `SUPABASE_URL` or `SUPABASE_SECRET_KEY` are not configured in repository secrets, the workflow logs a notice
+    and exits cleanly (green) without running the update. Failed gates exit with code 2 and visibly fail the CI run,
+    while update reports (`data/kb_reports/**`) are uploaded as artifacts for inspection.
+  - **Run serialization & unique staging names:** To prevent concurrent runs on different branches or refs from
+    overlapping on the shared remote database, the workflow specifies a single constant concurrency group
+    (`kb-weekly-database`) with `cancel-in-progress: false` so executions queue serially. In addition, staging
+    collection names include a unique per-run random suffix (`kb_<ver>_<timestamp>_<hex>`) generated in `viper.cli`,
+    preventing runs that execute in close proximity from colliding on or accidentally dropping shared staging data.

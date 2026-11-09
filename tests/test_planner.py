@@ -111,3 +111,60 @@ def test_control_characters_in_action_ids_are_rejected() -> None:
     bad = [{**GOOD[0], "action_id": "x" + chr(27) + "]52;c;AAAA" + chr(7)}]
     with pytest.raises(PlannerError, match="action id"):
         planner(json.dumps(bad))("scan")
+
+
+# --- v1: plans must be executable on the VM (exact egress hosts, argument formats) ---------------
+
+WILD = Scope(project_id="lab", in_scope=("*.example.com", "scanme.nmap.org"))
+
+
+def egress_planner(reply: str, hosts: list[str], calls: list | None = None) -> LLMPlanner:
+    def chat(messages: list[dict[str, str]]) -> str:
+        if calls is not None:
+            calls.append(messages)
+        return reply
+
+    return LLMPlanner(chat, default_registry, lambda: WILD, egress_provider=lambda: hosts)
+
+
+def nmap_for(target: str, action_id: str = "n1") -> str:
+    args = {"target": target, "ports": "80"}
+    return json.dumps([{"action_id": action_id, "tool_name": "nmap", "args": args}])
+
+
+def test_prompt_lists_the_exact_hosts_and_argument_formats() -> None:
+    calls: list = []
+    egress_planner(nmap_for("scanme.nmap.org"), ["scanme.nmap.org"], calls)("scan")
+    text = "\n".join(m["content"] for m in calls[0])
+    assert '"allowed_hosts"' in text and "scanme.nmap.org" in text
+    assert "range" in text.lower()  # the ports hint from the tool schema reaches the model
+
+
+def test_a_wildcard_subdomain_that_is_not_an_exact_egress_host_fails_at_plan_time() -> None:
+    with pytest.raises(PlannerError, match="egress"):
+        egress_planner(nmap_for("api.example.com"), ["scanme.nmap.org"])("scan")
+
+
+def test_an_exact_egress_host_is_accepted() -> None:
+    actions = egress_planner(nmap_for("scanme.nmap.org"), ["scanme.nmap.org"])("scan")
+    assert actions[0].args["target"] == "scanme.nmap.org"
+
+
+def test_a_mixed_case_target_is_rejected_because_the_vm_matches_exactly() -> None:  # codex v1 #9
+    with pytest.raises(PlannerError, match="egress"):
+        egress_planner(nmap_for("ScanMe.Nmap.Org"), ["scanme.nmap.org"])("scan")
+
+
+def test_without_an_egress_list_nothing_is_filtered_dry_run_mode() -> None:
+    assert egress_planner(nmap_for("api.example.com"), [])("scan")
+
+
+def test_read_only_tools_are_not_subject_to_the_egress_filter() -> None:
+    kb = json.dumps([{"action_id": "k1", "tool_name": "kb_answer", "args": {"question": "what is x"}}])
+    assert egress_planner(kb, ["scanme.nmap.org"])("ask")
+
+
+def test_a_missing_or_non_string_target_on_a_real_tool_is_rejected() -> None:
+    bad = json.dumps([{"action_id": "n1", "tool_name": "nmap", "args": {"ports": "80"}}])
+    with pytest.raises(PlannerError, match="target"):
+        egress_planner(bad, ["scanme.nmap.org"])("scan")

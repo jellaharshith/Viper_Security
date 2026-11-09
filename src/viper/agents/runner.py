@@ -52,10 +52,16 @@ def _save_report(settings: Settings, thread: str, out: dict[str, Any]) -> None:
         handle.write(str(out["report"]))
 
 
+def llm_chat(settings: Settings) -> Any:
+    """Chat callable on the local Ollama model (shared by the planner and the scope reader)."""
+    return OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model).chat
+
+
 def llm_planner(settings: Settings, scope_path: Path) -> LLMPlanner:
     """Ollama-backed planner. Opt-in only; the JSON plan file remains the deterministic path."""
     client = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
-    return LLMPlanner(client.chat, default_registry, lambda: load_scope(scope_path))
+    return LLMPlanner(client.chat, default_registry, lambda: load_scope(scope_path),
+                      egress_provider=settings.egress_hosts)
 
 
 @dataclass
@@ -83,9 +89,13 @@ def _exec_settings(settings: Settings) -> _ExecConfig:
     )
 
 
+def scope_from_text(text: str) -> Scope:
+    """Strict parse: unknown keys or bad types raise, so a typo cannot silently widen scope."""
+    return Scope.model_validate(yaml.safe_load(text))
+
+
 def load_scope(path: Path) -> Scope:
-    """Strict load: unknown keys or bad types raise, so a typo cannot silently widen scope."""
-    return Scope.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    return scope_from_text(path.read_text(encoding="utf-8"))
 
 
 def load_plan(path: Path) -> list[Action]:

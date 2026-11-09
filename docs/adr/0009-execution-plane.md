@@ -74,3 +74,34 @@ See `docs/plans/m6-execution-plane.md`, `docs/plans/m6-gcloud-vm-setup.md`, and 
 
 - **Single-condition executor toggle (relying solely on `allow_active_testing`):**
   *Rejected:* Insufficient defense in depth. Gating on active flag, valid API URL, and valid token/cert ensures that misconfiguration cannot inadvertently trigger live execution.
+
+## V1 addendum: fixed live Nuclei profile (2026-11-08)
+
+The VM replaces passive response processing with a fixed live JSONL profile:
+`-jsonl -silent -nc -duc -no-interactsh -disable-redirects`, server-owned templates
+via `-t`, tags `tech,misconfig`, excluded tags
+`dos,fuzz,intrusive,bruteforce,rce,sqli,xss`, severities `info,low,medium`, then
+`-pt http` to restrict execution to HTTP templates, concurrency 5, timeout 10
+seconds and zero retries. The sole target is appended with `-u`;
+`-rl` is a strict integer from 1 to 10 (default 1). Execution uses an argv list
+without a shell and retains exact-host allowlisting and matching target fields.
+
+`VIPER_EXEC_NUCLEI_TEMPLATES` is read only from the VM environment, defaulting to
+`/opt/viper/nuclei-templates`. Invalid paths (relative, leading dash, whitespace
+or control characters) refuse the job. The binary is installed at `/usr/bin/nuclei`
+from a pinned GitHub release after checksum verification; templates are installed
+by root and read-only to the unprivileged service. Operators control template
+refreshes separately and record the installed revision. The API and scanners run
+as the dedicated `viper-vmapi` system user, with read-only group access to code,
+TLS material and the environment file (`root:viper-vmapi`, mode 640 for the key
+and environment file). Nmap TCP connect scans and Nuclei need no root privileges;
+systemd retains `KillMode=control-group`. Operators verify the protocol flag
+spelling in the installed binary's help before the first live scan.
+
+Request arguments remain limited to `{target, rate_limit}`. Templates, tags and
+severity are not request-controllable because arbitrary template selection or
+profile expansion would bypass the reviewed execution boundary. `templates`,
+`tags`, `severity`, `t`, `pt`, `type`, `protocols`, `-passive` and other extra keys
+return 422. Tag/severity filters depend on trusted template metadata; they do not replace template review,
+scope approval or deployment egress controls. Findings use JSONL on stdout;
+consumers tolerate non-JSON diagnostics from merged stderr.

@@ -71,10 +71,13 @@ Full design: [`docs/architecture.md`](docs/architecture.md) and [`docs/security-
 | M5 | LangGraph agents + policy engine | Done |
 | M6 | Cloud execution plane: approve, watch, take over, pause, emergency-stop | Done, live-validated |
 | M7 | Pentest copilot: planner, finding validation, traceable report | Done, live-validated |
+| v1.0 | v1.0: live nuclei, scope reader, weekly KB refresh | Done, security-reviewed and live-validated (nmap + nuclei on a real VM) |
 
 M7 was validated end to end on 2026-11-08 against the authorized lab host `scanme.nmap.org`: an approved `nmap`
 scan produced two confirmed findings, each citing the audit event that produced it, and the audit chain verified.
 See [`docs/development-progress.md`](docs/development-progress.md).
+
+For the complete v1.0 capability specification and the planned v1.1 backlog (OWASP ZAP, noVNC desktop takeover, real RFC-3161 TSA anchoring, scope rate-limit and automation fields, SSH takeover shell, NVD source, PostgreSQL operational tables, multi-job dispatch, and reviewed HTTP template subset), see [`docs/v1-scope.md`](docs/v1-scope.md).
 
 ## Quick start
 
@@ -104,12 +107,32 @@ python -m viper.cli chat "What is CVE-2021-44228?"
 
 Answers cite numbered sources; if nothing relevant is retrieved they are labelled `UNVERIFIED`.
 
+### Scope reader (draft and approve)
+
+Bug bounty programs publish written rules and target lists in unstructured text. Viper's scope reader parses them into a strict, machine-enforceable `Scope` file:
+
+```powershell
+# 1. Let the local model draft a structured scope from written program rules
+python -m viper.cli scope draft --text-file rules.txt --project myproject --program-url "https://example.com/bounty" --out projects/drafts
+
+# 2. Inspect the draft and ambiguity warnings (the draft has status: DRAFT and is rejected by agent run)
+cat projects/drafts/myproject.draft.yaml
+
+# 3. Explicitly approve and publish the final scope (audited with a scope_approved event)
+python -m viper.cli scope approve --draft projects/drafts/myproject.draft.yaml --confirm myproject
+```
+
+The model drafts the scope from program rules, but the resulting draft is **inert** (`status: DRAFT`) and cannot be used by the agent runner. It becomes active only after a human reviews it and runs `scope approve --confirm <project>`, which records a `scope_approved` event in the tamper-evident (hash-chained) audit log before publishing the final `.scope.yaml` file.
+
 ### Run an agent workflow (dry-run by default)
 
 ```powershell
 # 1. plan: from a JSON plan file, or let the local model propose one with --llm
 python -m viper.cli agent run --scope projects/lab-scanme/scope.yaml `
     --plan projects/lab-scanme/plan.json --thread lab1
+# OR with the opt-in LLM planner:
+python -m viper.cli agent run --scope projects/lab-scanme/scope.yaml `
+    --llm --request "scan scanme.nmap.org for open web ports" --thread lab1
 # 2. approve the pending action (shows tool, arguments and hash first)
 python -m viper.cli agent resume --scope projects/lab-scanme/scope.yaml --thread lab1 --decision ALLOW
 # 3. read the report and verify the audit trail
@@ -122,6 +145,23 @@ To run real tools, deploy the execution plane with
 [`docs/plans/m6-gcloud-vm-setup.md`](docs/plans/m6-gcloud-vm-setup.md) and set the `VIPER_EXEC_*` variables
 (see [`.env.example`](.env.example)). Real execution additionally requires `VIPER_ALLOW_ACTIVE_TESTING=true`.
 
+### Live scanning
+
+When configured for real execution (`VIPER_ALLOW_ACTIVE_TESTING=true`), tools run **only** on a remote execution plane (a headless GCP Kali VM with zero public ingress):
+- **Nmap**: Authorized TCP port discovery with service detection against in-scope targets.
+- **Nuclei**: Benign, HTTP-only vulnerability and technology detection with a frozen safety profile: protocol restricted to `-pt http`, tags `tech,misconfig`, excluded tags `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`, severities `info,low,medium`, bounded rate (`-rl 5`), no interactsh, no redirects, and root-owned read-only templates.
+- **VM Bootstrap**: Automated via [`deploy/vm-bootstrap.sh`](deploy/vm-bootstrap.sh) (installs Nmap, verified Nuclei release, sets up unprivileged `viper-vmapi` service, generates TLS certificates, and configures the `vmapi` systemd service). See [`docs/plans/m6-gcloud-vm-setup.md`](docs/plans/m6-gcloud-vm-setup.md).
+
+### Weekly KB refresh
+
+Cybersecurity reference knowledge is kept fresh by a GitHub Actions workflow ([`.github/workflows/kb-weekly.yml`](.github/workflows/kb-weekly.yml)) scheduled weekly (Mondays 03:00 UTC) and callable via `workflow_dispatch`:
+- Runs against remote Supabase (`VIPER_STORE=supabase`) using pgvector.
+- Requires repository secrets `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. If unconfigured, the workflow logs a notice and ends successfully without running (CI stays green).
+- Verifies the official SHA-256 digest of the Ollama Linux binary archive before extraction.
+- Evaluates retrieval quality gates (`recall@4 >= 0.95`, regression <= 0.02) before atomically promoting the new collection. Failed gates visibly fail the run.
+- Serializes updates across git refs using a single `kb-weekly-database` concurrency queue.
+- Uploads update reports (`data/kb_reports/**`) as workflow artifacts.
+
 ## Command reference
 
 | Command | Purpose |
@@ -131,7 +171,9 @@ To run real tools, deploy the execution plane with
 | `viper ingest-kev` | Download and index CISA KEV |
 | `viper kb update \| status \| rollback` | Gated knowledge-base lifecycle |
 | `viper eval build \| run \| compare` | Evaluation framework |
-| `viper agent run --plan FILE \| --llm` | Start a policy-gated agent run |
+| `viper scope draft --text-file F --project ID [--program-url URL] [--out DIR]` | Draft a structured scope from program text (DIR default: projects/drafts) |
+| `viper scope approve --draft DIR/ID.draft.yaml --confirm ID` | Validate, audit (`scope_approved`), and publish an approved scope |
+| `viper agent run --plan FILE \| --llm` | Start a policy-gated agent run (plan file or opt-in LLM planner) |
 | `viper agent resume --decision ALLOW\|DENY` | Answer a pending approval |
 | `viper report --thread ID` | Print a finished run's traceable report |
 | `viper audit verify \| anchor --project ID` | Verify the hash chain and anchors; anchor the head |

@@ -61,22 +61,37 @@ def _first_array(text: str) -> list[Any]:
     raise PlannerError("model reply contained no JSON array of actions")
 
 
+def _arg_hint(prop: dict[str, Any]) -> str:
+    """One readable line per argument: type (resolving optional/anyOf) plus the schema description."""
+    kind = prop.get("type")
+    if kind is None:
+        kinds = [o.get("type") for o in prop.get("anyOf", []) if o.get("type") not in (None, "null")]
+        kind = "|".join(kinds) or "any"
+    text = str(prop.get("description", ""))
+    return f"{kind}. {text}".strip()
+
+
 class LLMPlanner:
     def __init__(
         self, chat: Chat, registry: ToolRegistry, scope_provider: Callable[[], Scope | None],
+        egress_provider: Callable[[], list[str]] = list,
     ) -> None:
         self._chat = chat
         self._registry = registry
         self._scope = scope_provider
+        # Exact hosts the execution plane will accept. Scope may be broader (wildcards, CIDR), so a
+        # plan is checked against this list too; otherwise the VM refuses it AFTER a human approved it.
+        self._egress = egress_provider
 
     def _prompt(self, request: str, scope: Scope) -> list[dict[str, str]]:
         tools = []
         for tool in self._registry.list():
             props = tool.params_schema.model_json_schema().get("properties", {})
             tools.append({"name": tool.name, "risk": tool.risk.name, "description": tool.description,
-                          "args": {k: v.get("type", "any") for k, v in props.items()}})
+                          "args": {k: _arg_hint(v) for k, v in props.items()}})
         context = {"in_scope": list(scope.in_scope), "excluded": list(scope.exclusions),
-                   "forbidden_techniques": list(scope.forbidden_techniques), "tools": tools}
+                   "forbidden_techniques": list(scope.forbidden_techniques),
+                   "allowed_hosts": self._egress(), "tools": tools}
         ctx = json.dumps(context, indent=2)
         user = f"Context:\n{ctx}\n\nRequest:\n{request}"
         return [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": user}]
@@ -101,7 +116,17 @@ class LLMPlanner:
             raise PlannerError("invalid action id (letters, digits, _ . - only)")
         if len(set(ids)) != len(ids):
             raise PlannerError("plan has empty or duplicate action ids")
+        allowed = {h.lower() for h in self._egress()}
         for action in actions:
-            if self._registry.get(action.tool_name) is None:
+            tool = self._registry.get(action.tool_name)
+            if tool is None:
                 raise PlannerError(f"unknown tool proposed: {action.tool_name!r}")
+            if allowed and not tool.dry_run_only:  # a real tool will be sent to the VM
+                target = action.args.get("target")
+                if not isinstance(target, str) or not target:
+                    raise PlannerError(f"{action.tool_name}: a string target is required")
+                if target not in allowed:  # exact match, like the VM: mixed case is refused there
+                    raise PlannerError(
+                        f"{action.tool_name}: target {target!r} is not an exact egress host; "
+                        f"allowed: {sorted(allowed)}")
         return actions

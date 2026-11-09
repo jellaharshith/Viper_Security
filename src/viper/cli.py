@@ -6,6 +6,9 @@ import argparse
 import getpass
 import json
 import logging
+import os
+import re
+import secrets
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -109,7 +112,8 @@ def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
     qembed = PrefixEmbedder(llm, settings.embed_query_prefix)
     base = open_store(settings, reg.active or "")
     active = base
-    staging = base.view(f"kb_{settings.kb_version}_{datetime.now(UTC):%Y%m%d%H%M%S}")
+    # A random suffix keeps two runs that start in the same second from sharing (and dropping) a collection.
+    staging = base.view(f"kb_{settings.kb_version}_{datetime.now(UTC):%Y%m%d%H%M%S}_{secrets.token_hex(3)}")
     cases = load_retrieval()
 
     def recall(store: Store) -> float:
@@ -272,6 +276,97 @@ def _verify_anchors(log: Any, anchors: Path) -> int:
     return rc
 
 
+_PROJECT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
+MAX_PROGRAM_TEXT_BYTES = 200_000  # a program page, not a book; the library caps what the model sees
+
+
+def _show_draft(draft: Any) -> None:
+    """Everything the human must read before approving. Model text is stripped of control characters."""
+    scope = draft.scope
+    print(terminal_safe(f"DRAFT scope for project {scope.project_id} (NOT active until approved)"))
+    print(terminal_safe(f"  program_url : {scope.program_url}"))
+    evidence = scope.evidence_ref or "(none: you must supply permission evidence)"
+    print(terminal_safe(f"  evidence_ref: {evidence}"))
+    for label, values in (("in_scope", scope.in_scope), ("exclusions", scope.exclusions),
+                          ("forbidden_techniques", scope.forbidden_techniques)):
+        print(terminal_safe(f"  {label}: {', '.join(values) if values else '(none)'}"))
+    print("Ambiguities the model could not resolve (read the program rules yourself):")
+    for item in draft.ambiguities or ["(none reported; do not assume there are none)"]:
+        print(terminal_safe(f"  - {item}"))
+
+
+def _publish_exclusive(final: Path, text: str) -> None:
+    """All-or-nothing, never-overwrite publication of a scope file.
+
+    The complete text is written and fsynced to a private temp file first; only then is it linked into
+    place (``os.link`` fails if ``final`` exists). A crash or full disk therefore leaves either the whole
+    scope or nothing: never a prefix that would load with default (empty) exclusions.
+    """
+    tmp = final.with_name(f".{final.name}.{secrets.token_hex(4)}.tmp")
+    try:
+        with tmp.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(tmp, final)
+        except (AttributeError, NotImplementedError):  # a filesystem without hard links
+            if final.exists():
+                raise FileExistsError("a scope file already exists for this project") from None
+            os.replace(tmp, final)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def cmd_scope(settings: Settings, args: argparse.Namespace) -> int:
+    """Draft a scope from program text with the model, then approve it only by explicit human action."""
+    from viper.agents import runner
+    from viper.agents.audit import AuditLog
+    from viper.policy import scope_draft
+
+    try:
+        if args.scope_cmd == "draft":
+            if not _PROJECT.fullmatch(args.project):
+                raise ValueError("invalid project id")
+            source = Path(args.text_file)
+            if source.stat().st_size > MAX_PROGRAM_TEXT_BYTES:
+                raise ValueError("program text file too large")
+            draft = scope_draft.draft_scope(
+                source.read_text(encoding="utf-8"), runner.llm_chat(settings),
+                project_id=args.project, program_url=args.program_url)
+            out = Path(args.out)
+            out.mkdir(parents=True, exist_ok=True)
+            with (out / f"{args.project}.draft.yaml").open("x", encoding="utf-8", newline="\n") as handle:
+                handle.write(scope_draft.dump_draft(draft))
+            _show_draft(draft)
+            print(f"wrote {out / (args.project + '.draft.yaml')}; review it, then: viper scope approve "
+                  f"--draft <that file> --confirm {args.project}")
+            return 0
+        draft_path = Path(args.draft)
+        draft = scope_draft.load_draft(draft_path.read_text(encoding="utf-8"))
+        project = draft.scope.project_id
+        _show_draft(draft)
+        if args.confirm != project:
+            print(f"Not approved. To approve exactly this scope run again with: --confirm {project}")
+            return 1
+        final = draft_path.with_name(f"{project}.scope.yaml")
+        if final.exists():
+            raise FileExistsError("a scope file already exists for this project")
+        text = scope_draft.finalize(draft)
+        scope = runner.scope_from_text(text)  # must load under the strict model BEFORE anything is published
+        # Audit first: a scope file must never exist without its durable approval record.
+        AuditLog(settings, project).append(
+            thread_id="scope", event="scope_approved", actor="human",
+            detail={"scope_revision": scope.revision, "approver": getpass.getuser(),
+                    "count": len(scope.in_scope)})
+        _publish_exclusive(final, text)
+        print(f"approved: {final} (revision {scope.revision[:12]})")
+        return 0
+    except Exception as exc:  # noqa: BLE001 - class only; never echo details
+        print(f"scope error: {type(exc).__name__}")
+        return 1
+
+
 def cmd_report(settings: Settings, args: argparse.Namespace) -> int:
     from viper.agents.runner import report_path
 
@@ -392,6 +487,16 @@ def main(argv: list[str] | None = None) -> int:
     p_ver.add_argument("--project", required=True)
     p_anc = usub.add_parser("anchor", help="anchor the current audit head (mock; M7)")
     p_anc.add_argument("--project", required=True)
+    p_scope = sub.add_parser("scope", help="draft a scope from program rules; you approve it")
+    ssub = p_scope.add_subparsers(dest="scope_cmd", required=True)
+    p_sd = ssub.add_parser("draft", help="model drafts a scope from text (inactive until approved)")
+    p_sd.add_argument("--text-file", required=True, help="program rules / scope page saved as text")
+    p_sd.add_argument("--project", required=True)
+    p_sd.add_argument("--program-url", default="")
+    p_sd.add_argument("--out", default="projects/drafts")
+    p_sa = ssub.add_parser("approve", help="turn a reviewed draft into the real scope file")
+    p_sa.add_argument("--draft", required=True)
+    p_sa.add_argument("--confirm", default="", help="type the project id to approve exactly this scope")
     p_rep = sub.add_parser("report", help="print the saved report for a finished agent thread (M7)")
     p_rep.add_argument("--thread", required=True)
     p_exec = sub.add_parser("exec", help="drive the execution plane: watch/pause/stop/takeover (M6)")
@@ -425,6 +530,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_audit(settings, args)
     if args.command == "report":
         return cmd_report(settings, args)
+    if args.command == "scope":
+        return cmd_scope(settings, args)
     if args.command == "exec":
         return cmd_exec(settings, args)
     if args.command == "chat":

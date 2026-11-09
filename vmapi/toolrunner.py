@@ -2,8 +2,10 @@
 
 import ipaddress
 import os
+import posixpath
 import re
 import subprocess
+import unicodedata
 
 TOOLS = ("nmap", "nuclei")
 ARGUMENT_ALLOWLIST = {
@@ -50,8 +52,16 @@ def build_command(tool: str, args: dict, target: str, allowed_targets: frozenset
     rate = args.get("rate_limit", 1)
     if type(rate) is not int or not 1 <= rate <= 10:
         raise ValueError("rate_limit must be an integer from 1 to 10")
-    return ["/usr/bin/nuclei", "-passive", "-no-interactsh", "-disable-update-check",
-            "-no-stdin", "-disable-redirects", "-rate-limit", str(rate), "-u", target]
+    templates = os.environ.get("VIPER_EXEC_NUCLEI_TEMPLATES", "/opt/viper/nuclei-templates")
+    if (not posixpath.isabs(templates) or templates.startswith("-")
+            or any(char.isspace() or unicodedata.category(char).startswith("C")
+                   for char in templates)):
+        raise ValueError(
+            "VIPER_EXEC_NUCLEI_TEMPLATES must be an absolute path without whitespace or controls")
+    return ["/usr/bin/nuclei", "-jsonl", "-silent", "-nc", "-duc", "-no-interactsh",
+            "-disable-redirects", "-t", templates, "-tags", "tech,misconfig",
+            "-etags", "dos,fuzz,intrusive,bruteforce,rce,sqli,xss", "-severity", "info,low,medium",
+            "-pt", "http", "-rl", str(rate), "-c", "5", "-timeout", "10", "-retries", "0", "-u", target]
 
 
 def spawn(command: list[str]) -> subprocess.Popen:
