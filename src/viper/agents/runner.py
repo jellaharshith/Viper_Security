@@ -55,7 +55,8 @@ def _save_report(settings: Settings, thread: str, out: dict[str, Any]) -> None:
 def llm_planner(settings: Settings, scope_path: Path) -> LLMPlanner:
     """Ollama-backed planner. Opt-in only; the JSON plan file remains the deterministic path."""
     client = OllamaClient(settings.ollama_host, settings.ollama_model, settings.embed_model)
-    return LLMPlanner(client.chat, default_registry, lambda: load_scope(scope_path))
+    return LLMPlanner(client.chat, default_registry, lambda: load_scope(scope_path),
+                      egress_provider=settings.egress_hosts)
 
 
 @dataclass
