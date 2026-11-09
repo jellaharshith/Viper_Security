@@ -91,7 +91,10 @@ class LLMPlanner:
                           "args": {k: _arg_hint(v) for k, v in props.items()}})
         context = {"in_scope": list(scope.in_scope), "excluded": list(scope.exclusions),
                    "forbidden_techniques": list(scope.forbidden_techniques),
-                   "allowed_hosts": self._egress(), "tools": tools}
+                   "allowed_hosts": self._egress(), "tools": tools,
+                   "scope_limits": {"max_rate_rps": scope.max_rate_rps,
+                                    "automation_allowed": scope.automation_allowed,
+                                    "permitted_techniques": list(scope.permitted_techniques)}}
         ctx = json.dumps(context, indent=2)
         user = f"Context:\n{ctx}\n\nRequest:\n{request}"
         return [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": user}]

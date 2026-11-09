@@ -29,6 +29,7 @@ _EVENTS = frozenset({
     # M7: real dispatch (vs. simulated), finding analysis, report output, external anchoring.
     "tool_dispatch", "tool_result", "findings_generated", "report_generated", "audit_anchored",
     "scope_approved",  # v1: a human approved a model-drafted engagement scope
+    "human_shell_opened",  # v1.1: a human opened an interactive shell on the execution VM
 })
 _DETAIL_KEYS = frozenset({
     "action_id", "tool", "tool_name", "args", "summary", "reason", "error", "status",

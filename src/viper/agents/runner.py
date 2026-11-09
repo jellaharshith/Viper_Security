@@ -37,8 +37,13 @@ def valid_thread(thread: str) -> str:
     return thread
 
 
-def report_path(settings: Settings, thread: str) -> Path:
-    return settings.report_dir / f"{valid_thread(thread)}.md"
+_REPORT_SUFFIX = {"md": ".md", "json": ".json", "sarif": ".sarif"}
+
+
+def report_path(settings: Settings, thread: str, fmt: str = "md") -> Path:
+    if fmt not in _REPORT_SUFFIX:
+        raise ValueError("unknown report format")
+    return settings.report_dir / f"{valid_thread(thread)}{_REPORT_SUFFIX[fmt]}"
 
 
 def _save_report(settings: Settings, thread: str, out: dict[str, Any]) -> None:
@@ -50,6 +55,25 @@ def _save_report(settings: Settings, thread: str, out: dict[str, Any]) -> None:
     # "x" = exclusive create: never overwrites a report and never follows a planted symlink.
     with path.open("x", encoding="utf-8", newline="\n") as handle:
         handle.write(str(out["report"]))
+    _save_machine_reports(settings, thread, out)
+
+
+def _save_machine_reports(settings: Settings, thread: str, out: dict[str, Any]) -> None:
+    """JSON and SARIF renderings of the same findings, so other tools can consume them."""
+    from viper.agents.audit import AuditError
+    from viper.findings.models import Finding
+    from viper.report.formats import render_json, render_sarif
+
+    findings = [Finding.model_validate(f) for f in out.get("findings", [])]
+    project = str(out.get("project_id") or "")
+    try:
+        events = AuditLog(settings, project).events(thread)
+    except AuditError:
+        events = []  # the markdown report already refused to cite an unverified chain
+    for fmt, render in (("json", render_json), ("sarif", render_sarif)):
+        text = render(findings, events, project_id=project, thread_id=thread)
+        with report_path(settings, thread, fmt).open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
 
 
 def llm_chat(settings: Settings) -> Any:
