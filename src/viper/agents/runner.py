@@ -89,9 +89,13 @@ def _exec_settings(settings: Settings) -> _ExecConfig:
     )
 
 
+def scope_from_text(text: str) -> Scope:
+    """Strict parse: unknown keys or bad types raise, so a typo cannot silently widen scope."""
+    return Scope.model_validate(yaml.safe_load(text))
+
+
 def load_scope(path: Path) -> Scope:
-    """Strict load: unknown keys or bad types raise, so a typo cannot silently widen scope."""
-    return Scope.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    return scope_from_text(path.read_text(encoding="utf-8"))
 
 
 def load_plan(path: Path) -> list[Action]:

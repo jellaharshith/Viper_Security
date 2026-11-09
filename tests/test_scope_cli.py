@@ -117,3 +117,26 @@ def test_terminal_output_is_stripped_of_control_characters(env, monkeypatch, cap
     assert draft(env) == 0
     out = capsys.readouterr().out
     assert chr(27) not in out and chr(7) not in out and chr(0x202E) not in out
+
+
+def test_a_failed_audit_append_leaves_no_usable_scope(env, monkeypatch, capsys):  # codex v1 #1
+    from viper.agents.audit import AuditError
+
+    assert draft(env) == 0
+
+    def boom(self, **kwargs):
+        raise AuditError("disk full")
+
+    monkeypatch.setattr(AuditLog, "append", boom)
+    assert approve(env, confirm="acme") == 1
+    assert not (env["tmp"] / "scopes" / "acme.scope.yaml").exists()
+    assert "scope error" in capsys.readouterr().out
+
+
+def test_an_existing_scope_blocks_approval_before_anything_is_audited(env):
+    assert draft(env) == 0
+    (env["tmp"] / "scopes" / "acme.scope.yaml").write_text("planted", encoding="utf-8")
+    assert approve(env, confirm="acme") == 1
+    log = AuditLog(Settings(_env_file=None, audit_dir=env["tmp"] / "audit"), "acme")
+    assert log.events("scope") == []
+    assert (env["tmp"] / "scopes" / "acme.scope.yaml").read_text(encoding="utf-8") == "planted"
