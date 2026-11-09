@@ -81,7 +81,7 @@ def test_allowlists_build_single_target():
         "/usr/bin/nuclei", "-jsonl", "-silent", "-nc", "-duc", "-no-interactsh",
         "-disable-redirects", "-t", "/opt/viper/nuclei-templates",
         "-tags", "tech,exposure,misconfig", "-etags", "dos,fuzz,intrusive,bruteforce,rce,sqli,xss",
-        "-severity", "info,low,medium", "-rl", "1", "-c", "5", "-timeout", "10",
+        "-severity", "info,low,medium", "-pt", "http", "-rl", "1", "-c", "5", "-timeout", "10",
         "-retries", "0", "-u", "scanme.nmap.org",
     ]
 
@@ -110,7 +110,7 @@ def test_nuclei_bad_templates_env_refuses_job(client, monkeypatch, directory):
     start.assert_not_called()
 
 
-@pytest.mark.parametrize("key", ["templates", "tags", "severity", "t", "-passive"])
+@pytest.mark.parametrize("key", ["templates", "tags", "severity", "t", "-passive", "pt", "type", "protocols"])
 def test_nuclei_profile_args_rejected(client, monkeypatch, key):
     start = Mock()
     monkeypatch.setattr(client.app.state.jobs, "start", start)

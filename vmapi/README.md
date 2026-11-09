@@ -6,8 +6,8 @@ Nmap and Nuclei binaries at `/usr/bin/nmap` and `/usr/bin/nuclei` separately.
 Run as a dedicated unprivileged service account, using a clean home and trusted,
 administrator-owned scanner configuration/templates. Do not run as root.
 
-Set these environment variables in a service environment file readable only by
-the service owner (never commit credentials):
+Set these environment variables in `/etc/viper/vmapi.env`, owned by
+`root:viper-vmapi` with mode 640 (never commit credentials):
 
 - `VIPER_EXEC_API_TOKEN`: required bearer secret; missing/empty fails closed.
 - `VIPER_EXEC_EGRESS_ALLOWLIST`: required comma-separated exact target hosts/IPs,
@@ -74,6 +74,28 @@ binary version is pinned; record the installed template revision for reproducibi
 VIPER_EXEC_NUCLEI_TEMPLATES=/opt/viper/nuclei-templates
 ```
 
+Before the first scan, run `/usr/bin/nuclei -h | grep -i -- "-pt"` on the VM and
+confirm the protocol/type selector spelling. If only `-type` is supported,
+coordinate replacing that literal in the server, exact-argv test and docs before
+scanning; retain the HTTP restriction. This offline change does not run the binary.
+
+## Unprivileged service deployment
+
+Create the `viper-vmapi` system user/group with no login shell and a clean home at
+`/var/lib/viper-vmapi`. Keep code and the virtualenv `root:viper-vmapi`, readable
+and executable by that group but never writable by it. Set the TLS key and
+`/etc/viper/vmapi.env` to `root:viper-vmapi`, mode 640; the public certificate can
+be mode 644 with the same ownership. Parent directories must permit traversal.
+Keep `/opt/viper/nuclei-templates` root-owned, with directories mode 755 and
+files mode 644. Both `nmap -sT` and Nuclei require no root privileges or capabilities.
+
+Use `User=viper-vmapi`, `Group=viper-vmapi`,
+`Environment=HOME=/var/lib/viper-vmapi`, `WorkingDirectory=/opt/viper`,
+`EnvironmentFile=/etc/viper/vmapi.env` and `KillMode=control-group` in systemd.
+The uvicorn process and scanner children run under this unprivileged account.
+See the [VM runbook](../docs/plans/m6-gcloud-vm-setup.md#step-5-deploy-vmapi-under-systemd)
+for account creation, installation, permissions and the complete unit.
+
 ## Contract and argument schema
 
 `GET /health` returns `{"status":"ok","tools":["nmap","nuclei"]}`.
@@ -99,13 +121,15 @@ the exact allowlisted target):
 /usr/bin/nuclei -jsonl -silent -nc -duc -no-interactsh -disable-redirects
   -t TEMPLATES_DIR -tags tech,exposure,misconfig
   -etags dos,fuzz,intrusive,bruteforce,rce,sqli,xss -severity info,low,medium
-  -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
+  -pt http -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
 ```
 
-`-passive` is removed. Findings are JSONL on stdout; merged stderr can contain
+`-pt http` restricts execution to HTTP templates. `-passive` is removed.
+Findings are JSONL on stdout; merged stderr can contain
 non-JSON diagnostic lines. Templates and tags are administrator-controlled so a
 request cannot select arbitrary templates or broaden the scan profile. Keys such
-as `templates`, `tags`, `severity`, `t` and `-passive` are rejected with 422.
+as `templates`, `tags`, `severity`, `t`, `pt`, `type`, `protocols` and `-passive`
+are rejected with 422.
 Neither tool accepts a raw argv/flags field, output flags or arbitrary strings.
 Targets occur once in argv; execution uses no shell. Exact hostname validation
 does not pin DNS resolution: an operator-managed egress firewall and trusted DNS
