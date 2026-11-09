@@ -101,10 +101,10 @@ The following features were evaluated during v1.0 design and deliberately deferr
 - **Motivation:** Provides indisputable, third-party cryptographic proof that audit records and pentest evidence existed at a specific time and have not been altered since the assessment.
 - **Implementation in v1.1:** Fully delivered in v1.1 via `verify_tsa_token` and `make_tsa_verifier` in `viper.agents.anchor`. Uses OS OpenSSL subprocess with `-attime <epoch>` historical timestamp validation, `certifi` Mozilla CA trust store, configurable enterprise CA roots, and fail-closed error handling (see ADR 0011). Sigstore Rekor inclusion proof anchoring remains in the backlog for future cloud-native workflows.
 
-### 2.4 Scope Rate-Limit & Automation Policy Fields
-- **Description:** Extension of the `Scope` model and policy engine to parse, store, and enforce program-specific rate limits (e.g., `max_rate_limit: 5`) and granular automation constraints (e.g., `automation_allowed: false` on `/checkout` or specific URL subpaths).
-- **Motivation:** Allows automated enforcement of explicit bug bounty program rules that restrict scanning speeds or forbid automated testing on sensitive application workflows.
-- **Reason Deferred from v1.0:** In v1.0, rate limiting is enforced uniformly at the tool invocation level (e.g., Nuclei fixed `-rl 5`), and scoping is strictly host- and IP-based. Enforcing path-level automation filters and dynamic scanner throttling requires deep URL-level policy evaluation across all tool arguments, which was scoped out to ensure the v1.0 policy engine remained simple, verifiable, and zero-defect.
+### 2.4 Scope Rate-Limit & Automation Policy Fields (Delivered in v1.1)
+- **Description:** Extension of the `Scope` model and policy engine to store and enforce program-specific request rate limits (`max_rate_rps`), automation permissions (`automation_allowed`), and technique constraints (`permitted_techniques`, `forbidden_techniques`).
+- **Motivation:** Allows automated, fail-closed enforcement of explicit bug bounty program rules that restrict scanning speeds, forbid automated scanning tools, or constrain allowed testing techniques.
+- **Implementation in v1.1:** Fully delivered in v1.1 via additive fields on `Scope`, registry-owned `ToolInfo.techniques` tags and `default_rate_rps`, fail-closed policy engine evaluations with exact deny strings, and deterministic pattern-based automation ban detection in `viper.policy.scope_draft` (see ADR 0012).
 
 ### 2.5 Integrated SSH Takeover Shell
 - **Description:** A native CLI command (`viper exec shell --project <id>`) that establishes an interactive terminal (PTY) session directly into the cloud Kali VM through the IAP tunnel, automatically acquiring the exclusive control lock.
