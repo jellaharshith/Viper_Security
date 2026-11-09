@@ -6,6 +6,7 @@ import argparse
 import getpass
 import json
 import logging
+import os
 import re
 import secrets
 import sys
@@ -294,6 +295,29 @@ def _show_draft(draft: Any) -> None:
         print(terminal_safe(f"  - {item}"))
 
 
+def _publish_exclusive(final: Path, text: str) -> None:
+    """All-or-nothing, never-overwrite publication of a scope file.
+
+    The complete text is written and fsynced to a private temp file first; only then is it linked into
+    place (``os.link`` fails if ``final`` exists). A crash or full disk therefore leaves either the whole
+    scope or nothing: never a prefix that would load with default (empty) exclusions.
+    """
+    tmp = final.with_name(f".{final.name}.{secrets.token_hex(4)}.tmp")
+    try:
+        with tmp.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(tmp, final)
+        except (AttributeError, NotImplementedError):  # a filesystem without hard links
+            if final.exists():
+                raise FileExistsError("a scope file already exists for this project") from None
+            os.replace(tmp, final)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def cmd_scope(settings: Settings, args: argparse.Namespace) -> int:
     """Draft a scope from program text with the model, then approve it only by explicit human action."""
     from viper.agents import runner
@@ -335,8 +359,7 @@ def cmd_scope(settings: Settings, args: argparse.Namespace) -> int:
             thread_id="scope", event="scope_approved", actor="human",
             detail={"scope_revision": scope.revision, "approver": getpass.getuser(),
                     "count": len(scope.in_scope)})
-        with final.open("x", encoding="utf-8", newline="\n") as handle:  # never overwrites a scope
-            handle.write(text)
+        _publish_exclusive(final, text)
         print(f"approved: {final} (revision {scope.revision[:12]})")
         return 0
     except Exception as exc:  # noqa: BLE001 - class only; never echo details
