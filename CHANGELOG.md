@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [1.0.0] - 2026-11-08 - v1.0: Live nuclei, scope reader, weekly KB refresh (security-reviewed)
 
 ### Added
-- Scope reader library and CLI (`viper scope draft`, `viper scope approve`): model proposes a structured YAML scope from unstructured bug bounty program rules; drafts are inert (`status: DRAFT`) until human validation; `scope approve --confirm <project>` records a signed `scope_approved` audit event before writing the final scope.
+- Scope reader library and CLI (`viper scope draft`, `viper scope approve`): model proposes a structured YAML scope from unstructured bug bounty program rules; drafts are inert (`status: DRAFT`) until human validation; `scope approve --confirm <project>` records a hash-chained `scope_approved` audit event with audit-before-publication ordering before writing the final scope.
 - Live Nuclei execution profile on remote execution plane: protocol restricted to HTTP (`-pt http`), strict tags (`tech,exposure,misconfig`), excluded tags (`dos,fuzz,intrusive,bruteforce,rce,sqli,xss`), severities (`info,low,medium`), rate-limited (`-rl 5`), and root-owned read-only templates.
 - Automated weekly knowledge base update workflow (`.github/workflows/kb-weekly.yml`): scheduled (Mondays 03:00 UTC) and dispatch-triggered gated updates against Supabase pgvector; official SHA-256 archive verification for Ollama releases; graceful skipping when secrets are unconfigured; single `kb-weekly-database` concurrency queue.
 - Reproducible VM bootstrap script (`deploy/vm-bootstrap.sh`): idempotent setup script for cloud execution VM with dedicated unprivileged `viper-vmapi` service account, local TLS generation, and systemd process group management.
@@ -15,7 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Security
 - Comprehensive v1 security review addressing 9 findings:
-  - Scopes published only after durable audit event append succeeds (atomic approval).
+  - Scopes published only after durable audit event append succeeds (audit-before-publication ordering).
   - Scope draft validation rejects shorthand/alternate IP notations (e.g. `127.1`) to prevent CIDR exclusion bypasses.
   - Scope draft validation rejects public-suffix wildcards (`*.co.uk`, `*.github.io`) using a pinned offline suffix list.
   - Verified SHA-256 checksum before extracting the Ollama Linux binary archive.
