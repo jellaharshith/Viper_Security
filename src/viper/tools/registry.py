@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from viper.policy.models import RiskLevel, ToolInfo
+from viper.policy.models import KNOWN_TECHNIQUES, RiskLevel, ToolInfo
 
 
 class DryRunResult(BaseModel):
@@ -29,9 +29,26 @@ class DryRunResult(BaseModel):
     output: str = ""  # captured tool stdout (real execution only); stubs leave it empty
 
 
-def create_tool_info(name: str, risk: RiskLevel, *, dry_run_only: bool = True) -> ToolInfo:
+# Registry-owned technique tags and default request rates (F3). A model can never supply these;
+# tools registered without explicit values fall back to this table by name, else to "none".
+TOOL_TECHNIQUES: dict[str, frozenset[str]] = {
+    "nmap": frozenset({"port-scan", "service-detection"}),
+    "nuclei": frozenset({"web-scan", "template-scan"}),
+}
+TOOL_DEFAULT_RATE_RPS: dict[str, int] = {"nuclei": 5}  # NucleiArgs.rate_limit default
+
+
+def create_tool_info(
+    name: str, risk: RiskLevel, *, dry_run_only: bool = True,
+    techniques: frozenset[str] | None = None, default_rate_rps: int | None = None,
+) -> ToolInfo:
     """Create an authoritative ToolInfo record for policy evaluation."""
-    return ToolInfo(name=name, risk=risk, dry_run_only=dry_run_only)
+    chosen = TOOL_TECHNIQUES.get(name, frozenset()) if techniques is None else frozenset(techniques)
+    if not chosen <= KNOWN_TECHNIQUES:
+        raise ValueError(f"unknown technique tags for tool {name!r}")
+    rate = TOOL_DEFAULT_RATE_RPS.get(name) if default_rate_rps is None else default_rate_rps
+    return ToolInfo(name=name, risk=risk, dry_run_only=dry_run_only, techniques=chosen,
+                    default_rate_rps=rate)
 
 
 class Tool:
@@ -49,6 +66,8 @@ class Tool:
         *,
         dry_run_only: bool = True,
         description: str = "",
+        techniques: frozenset[str] | None = None,
+        default_rate_rps: int | None = None,
     ) -> None:
         if not isinstance(name, str) or not name.strip():
             raise ValueError("Tool name must be a non-empty string")
@@ -65,7 +84,9 @@ class Tool:
         self._dry_run_fn = dry_run_fn
         self._dry_run_only = bool(dry_run_only)
         self._description = description
-        self._info = create_tool_info(self._name, self._risk, dry_run_only=self._dry_run_only)
+        self._info = create_tool_info(
+            self._name, self._risk, dry_run_only=self._dry_run_only,
+            techniques=techniques, default_rate_rps=default_rate_rps)
 
     @property
     def name(self) -> str:

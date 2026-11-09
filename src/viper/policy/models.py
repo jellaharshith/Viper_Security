@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from enum import IntEnum, StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RiskLevel(IntEnum):
@@ -23,6 +24,19 @@ class DecisionType(StrEnum):
     DENY = "DENY"
 
 
+KNOWN_TECHNIQUES = frozenset({
+    "port-scan", "service-detection", "web-scan", "template-scan", "passive-scan", "spider",
+    "brute-force", "dos", "exploit",
+})
+_SLUG = re.compile(r"[a-z0-9-]{1,64}")
+MAX_PERMITTED_TECHNIQUES = 20
+
+
+def normalize_technique(text: str) -> str:
+    """Lowercase slug of free text (runs of anything but a-z0-9 become one dash)."""
+    return re.sub(r"[^a-z0-9]+", "-", text.strip().lower()).strip("-")
+
+
 class ToolInfo(BaseModel):
     """Registry-owned facts about a tool. Only ``viper.tools.registry`` may create these."""
 
@@ -31,6 +45,8 @@ class ToolInfo(BaseModel):
     name: str
     risk: RiskLevel
     dry_run_only: bool = True  # M5 stubs never touch a target
+    techniques: frozenset[str] = frozenset()  # registry-owned technique tags (F3)
+    default_rate_rps: int | None = None  # request rate when the action omits ``rate_limit``
 
 
 class Action(BaseModel):
@@ -62,7 +78,20 @@ class Scope(BaseModel):
     evidence_ref: str = ""  # where the permission to test is documented
     in_scope: tuple[str, ...] = ()  # hosts, "*.domain" wildcards, or CIDR ranges
     exclusions: tuple[str, ...] = ()  # always win over in_scope
+    # Free text for humans; the engine enforces only entries that normalise to a KNOWN technique
+    # slug (see KNOWN_TECHNIQUES), so old entries such as "INTRUSIVE" stay readable but inert.
     forbidden_techniques: tuple[str, ...] = ()
+    # v1.1 limits (additive: old scope files keep loading with these defaults)
+    max_rate_rps: int | None = Field(default=None, ge=1, le=1000, strict=True)
+    automation_allowed: bool = Field(default=True, strict=True)
+    permitted_techniques: tuple[str, ...] = ()  # empty = no restriction; else only these slugs
+
+    @field_validator("permitted_techniques")
+    @classmethod
+    def _slugs_only(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(value) > MAX_PERMITTED_TECHNIQUES or any(not _SLUG.fullmatch(t) for t in value):
+            raise ValueError("permitted_techniques must be a short list of lowercase [a-z0-9-] slugs")
+        return value
 
     @property
     def revision(self) -> str:

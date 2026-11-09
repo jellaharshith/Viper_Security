@@ -369,3 +369,119 @@ def test_a_model_ambiguity_duplicating_a_warning_is_not_doubled() -> None:
     first = _draft(_reply(evidence_ref="", ambiguities=[]))
     d = _draft(_reply(evidence_ref="", ambiguities=[first.ambiguities[0]]))
     assert d.ambiguities == first.ambiguities
+
+
+# ------------------------------------------------------------------ F3: limits extracted from program text
+def _limits(**over: Any) -> str:
+    return _reply(**over)
+
+
+def test_new_fields_default_conservatively_when_absent() -> None:
+    d = _draft(_reply())
+    assert d.scope.max_rate_rps is None and d.scope.automation_allowed is True
+    assert d.scope.permitted_techniques == ()
+
+
+def test_model_supplied_limits_are_validated_and_applied() -> None:
+    d = _draft(_limits(max_rate_rps=3, automation_allowed=True,
+                       permitted_techniques=["Port Scanning", "service detection"]))
+    assert d.scope.max_rate_rps == 3
+    assert d.scope.permitted_techniques == ("port-scan", "service-detection")
+
+
+@pytest.mark.parametrize("field,bad", [("max_rate_rps", 0), ("max_rate_rps", 5000),
+                                       ("max_rate_rps", "5"), ("max_rate_rps", True),
+                                       ("max_rate_rps", 2.5), ("automation_allowed", "no"),
+                                       ("automation_allowed", 0), ("permitted_techniques", "dos"),
+                                       ("permitted_techniques", [1])])
+def test_bad_limit_values_fail_closed(field: str, bad: Any) -> None:
+    with pytest.raises(ScopeDraftError):
+        _draft(_limits(**{field: bad}))
+
+
+def test_free_text_techniques_map_to_slugs_and_unmapped_add_an_ambiguity() -> None:
+    d = _draft(_limits(forbidden_techniques=["Denial of Service", "Brute Force", "social engineering"]))
+    assert d.scope.forbidden_techniques == ("dos", "brute-force", "social engineering")
+    assert any("social engineering" in a and "not enforced" in a.lower() for a in d.ambiguities)
+
+
+def test_unmapped_permitted_technique_is_dropped_with_an_ambiguity() -> None:
+    d = _draft(_limits(permitted_techniques=["port scanning", "fuzzing"]))
+    assert d.scope.permitted_techniques == ("port-scan",)
+    assert any("fuzzing" in a for a in d.ambiguities)
+
+
+def test_all_permitted_unmapped_is_flagged_as_not_enforced() -> None:
+    d = _draft(_limits(permitted_techniques=["fuzzing"]))
+    assert d.scope.permitted_techniques == ()
+    assert any("fuzzing" in a and "not enforced" in a.lower() for a in d.ambiguities)
+
+
+@pytest.mark.parametrize("sentence", [
+    "Automated scanning is prohibited.",
+    "Do not use automated scanners against production.",
+    "No automated tools or scanners are allowed.",
+    "Scanners are not permitted on this program.",
+    "Automated testing is restricted to the staging host.",
+    "AUTOMATED SCANNING IS FORBIDDEN",
+    "You must not run vulnerability scanners.",
+    "Use of automation tools is not allowed",
+])
+def test_prohibited_automation_text_forces_a_conservative_scope_and_an_ambiguity(sentence: str) -> None:
+    # even a model that claims automation is fine cannot override the deterministic text check
+    d = draft_scope(f"Rules.\n{sentence}\nIn scope: scanme.nmap.org",
+                    Chat(_limits(automation_allowed=True)), project_id=PID)
+    assert d.scope.automation_allowed is False
+    assert any("automat" in a.lower() for a in d.ambiguities)
+    assert not d.ambiguities[0].startswith("No evidence_ref") or len(d.ambiguities) > 1
+
+
+def test_automation_warning_cannot_be_pushed_out_by_model_ambiguities() -> None:
+    d = draft_scope("Automated scanning is not allowed.",
+                    Chat(_limits(ambiguities=[f"q{i}" for i in range(50)])), project_id=PID)
+    assert d.scope.automation_allowed is False
+    assert any("automat" in a.lower() for a in d.ambiguities[:3])
+    assert len(d.ambiguities) >= 51
+
+
+def test_benign_automation_mentions_do_not_force_a_restriction() -> None:
+    d = draft_scope("You may use scanners at reasonable rates. Automated tools are welcome.",
+                    Chat(_limits(automation_allowed=True)), project_id=PID)
+    assert d.scope.automation_allowed is True
+    assert not any("automat" in a.lower() for a in d.ambiguities)
+
+
+def test_the_model_may_restrict_automation_itself() -> None:
+    d = _draft(_limits(automation_allowed=False))
+    assert d.scope.automation_allowed is False
+
+
+def test_limits_survive_dump_load_and_finalize(tmp_path: Path) -> None:
+    d = draft_scope("Automated scanning is prohibited.",
+                    Chat(_limits(max_rate_rps=4, permitted_techniques=["port scan", "fuzzing"],
+                                 forbidden_techniques=["dos", "social engineering"])),
+                    project_id=PID)
+    assert load_draft(dump_draft(d)) == d
+    final = tmp_path / "scope.yaml"
+    final.write_text(finalize(d), encoding="utf-8")
+    scope = load_scope(final)
+    assert scope == d.scope and scope.max_rate_rps == 4 and scope.automation_allowed is False
+
+
+def test_hostile_text_in_limits_is_neutralised() -> None:
+    d = _draft(_limits(forbidden_techniques=["bad\x1b[31m tech\x07"],
+                       permitted_techniques=["port scan\x00"]))
+    for text in [*d.scope.forbidden_techniques, *d.ambiguities]:
+        assert not any(ord(c) < 32 for c in text)
+
+
+def test_load_draft_rejects_bad_limit_values() -> None:
+    good = yaml.safe_load(dump_draft(_draft(_reply())))
+    for bad in ({**good, "max_rate_rps": 0}, {**good, "automation_allowed": "no"},
+                {**good, "permitted_techniques": "dos"}):
+        with pytest.raises(ScopeDraftError):
+            load_draft(yaml.safe_dump(bad))
+    # an unmappable permitted entry is dropped with a visible note, never silently kept
+    d = load_draft(yaml.safe_dump({**good, "permitted_techniques": ["Not A Slug"]}))
+    assert d.scope.permitted_techniques == ()
+    assert any("Not A Slug" in a and "not enforced" in a.lower() for a in d.ambiguities)
