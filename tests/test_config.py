@@ -51,7 +51,8 @@ def test_tsa_anchoring_settings_have_safe_defaults(monkeypatch):
     for key in ("VIPER_ANCHOR_TSA_URL", "VIPER_ANCHOR_TSA_CA"):
         monkeypatch.delenv(key, raising=False)
     s = Settings(_env_file=None)
-    assert s.anchor_tsa_url == "http://timestamp.digicert.com"  # public RFC-3161 service; the token is verified offline
+    # public RFC-3161 service; the returned token is verified offline
+    assert s.anchor_tsa_url == "http://timestamp.digicert.com"
     assert s.anchor_tsa_ca is None  # None = use the certifi trust store
 
 
