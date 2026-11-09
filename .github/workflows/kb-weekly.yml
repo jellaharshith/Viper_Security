@@ -1,0 +1,76 @@
+name: Weekly Knowledge Base Update
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: kb-weekly-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  kb-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check Supabase credentials
+        id: check_secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::SUPABASE_URL and/or SUPABASE_SECRET_KEY secrets are not configured. Skipping KB update; job ends successfully."
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository
+        if: steps.check_secrets.outputs.has_secrets == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python 3.12
+        if: steps.check_secrets.outputs.has_secrets == 'true'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies
+        if: steps.check_secrets.outputs.has_secrets == 'true'
+        run: python -m pip install -r requirements.txt -e .
+
+      - name: Install Ollama and pull embedding model
+        if: steps.check_secrets.outputs.has_secrets == 'true'
+        run: |
+          curl -fsSL https://github.com/ollama/ollama/releases/download/v0.5.7/ollama-linux-amd64.tgz -o ollama.tgz
+          sudo tar -C /usr -xzf ollama.tgz
+          rm ollama.tgz
+          ollama serve &
+          for i in {1..30}; do
+            if curl -s http://localhost:11434/ >/dev/null; then break; fi
+            sleep 1
+          done
+          ollama pull nomic-embed-text
+
+      - name: Run KB update
+        if: steps.check_secrets.outputs.has_secrets == 'true'
+        env:
+          VIPER_STORE: supabase
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m viper.cli kb update
+
+      - name: Upload KB update reports
+        if: always() && steps.check_secrets.outputs.has_secrets == 'true'
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: kb-reports
+          path: data/kb_reports/**
+          if-no-files-found: ignore

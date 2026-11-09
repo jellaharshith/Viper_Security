@@ -14,7 +14,7 @@ This directory defines the authoritative engagement scope for testing Viper agai
 ## Testing Invariants in M7
 
 1. **Strict Target Restriction:** All test plans, action dispatches, and finding validations must target `scanme.nmap.org` exclusively. Any action addressing other IPs or domain names is refused by client-side egress validation and server-side allowlists.
-2. **Benign Scanning Only:** Scans are limited to TCP port discovery (`nmap`) and benign, passive vulnerability/technology detection (`nuclei`).
+2. **Benign Scanning Only:** Scans are limited to TCP port discovery (`nmap`) and benign vulnerability/technology detection (`nuclei`). The nuclei run is strictly HTTP-only with tags `tech,exposure,misconfig` and severities `info,low,medium` against `scanme.nmap.org` only (excluding intrusive, dos, fuzz, bruteforce, rce, sqli, xss tags).
 3. **Confirmed vs. Hypothesis Findings:**
    - Standard open ports (e.g. 22/tcp OpenSSH, 80/tcp Apache) parsed from Nmap output are classified as `confidence="confirmed"` with severity `info`.
    - Cleartext services (if any) escalate to severity `low`.
