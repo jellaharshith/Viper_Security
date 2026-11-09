@@ -5,6 +5,10 @@ Nothing here grants anything. The draft is a proposal a human must review and ap
 the program text is capped and delimiter-fenced, the reply is bounded and must be one JSON
 object with known keys, and every host/CIDR is re-validated deterministically. All failures
 are closed (``ScopeDraftError``) and never echo model or transport messages.
+
+``PUBLIC_SUFFIXES`` is a curated, pinned offline list (common multi-label ICANN suffixes plus
+common private hosting suffixes), NOT the full Public Suffix List; human approval of the
+finalized scope remains the final gate.
 """
 
 from __future__ import annotations
@@ -28,7 +32,35 @@ MAX_DECODE_ATTEMPTS = 50
 MAX_ENTRIES = 200
 MAX_ENTRY_CHARS = 253
 MAX_TEXT_CHARS = 500
-MAX_AMBIGUITIES = 50
+MAX_AMBIGUITIES = 50  # model-supplied ambiguities; library warnings are extra, never displaced
+MAX_WARNINGS = 5  # headroom for the library's own mandatory warnings in a draft file
+
+# Curated, pinned offline list of PUBLIC and PRIVATE suffixes under which unrelated parties
+# register names. A wildcard (or exact entry) equal to one of these would cover unrelated
+# organisations, so it is rejected. This is NOT the full Public Suffix List; human approval
+# remains the final gate.
+PUBLIC_SUFFIXES: frozenset[str] = frozenset({
+    # multi-label ICANN suffixes
+    "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "ltd.uk", "plc.uk", "net.uk", "sch.uk",
+    "com.au", "net.au", "org.au", "edu.au", "gov.au", "id.au", "co.jp", "or.jp", "ne.jp",
+    "ac.jp", "go.jp", "co.nz", "net.nz", "org.nz", "govt.nz", "ac.nz", "co.in", "net.in",
+    "org.in", "ac.in", "gov.in", "co.za", "org.za", "net.za", "gov.za", "ac.za", "com.br",
+    "net.br", "org.br", "gov.br", "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn", "com.mx",
+    "org.mx", "gob.mx", "com.tr", "org.tr", "gov.tr", "com.sg", "org.sg", "edu.sg", "com.hk",
+    "org.hk", "com.tw", "org.tw", "com.ar", "org.ar", "gob.ar", "com.co", "com.ua", "com.pl",
+    "co.kr", "or.kr", "co.il", "co.id", "co.th", "com.my", "com.ph", "com.vn", "com.eg",
+    "com.sa", "com.pk", "com.ng", "co.ke", "com.pe", "com.ve", "com.ec", "com.uy", "com.ru",
+    # private suffixes (hosting / PaaS / user-content platforms)
+    "github.io", "githubusercontent.com", "gitlab.io", "herokuapp.com", "herokussl.com",
+    "appspot.com", "cloudfront.net", "azurewebsites.net", "azureedge.net", "blob.core.windows.net",
+    "cloudapp.azure.com", "amazonaws.com", "s3.amazonaws.com", "elasticbeanstalk.com",
+    "compute.amazonaws.com", "vercel.app", "now.sh", "netlify.app", "netlify.com", "pages.dev",
+    "workers.dev", "web.app", "firebaseapp.com", "blogspot.com", "wordpress.com", "ngrok.io",
+    "ngrok-free.app", "fly.dev", "onrender.com", "railway.app", "repl.co", "glitch.me",
+    "surge.sh", "myshopify.com", "wixsite.com", "weebly.com", "squarespace.com", "tumblr.com",
+    "bitbucket.io", "readthedocs.io", "000webhostapp.com", "run.app", "cloudfunctions.net",
+    "azurestaticapps.net", "trycloudflare.com", "duckdns.org", "no-ip.org", "dyndns.org",
+})
 
 Chat = Callable[[list[dict[str, str]]], str]
 
@@ -107,9 +139,18 @@ def _entry(raw: object, what: str) -> str:
         raise ScopeDraftError(f"invalid {what} entry")  # bare TLD, '*', or not a usable host
     if not re.fullmatch(r"[a-z0-9._-]+", host):
         raise ScopeDraftError(f"invalid {what} entry")
+    if _ambiguous_numeric(host) or host in PUBLIC_SUFFIXES:
+        raise ScopeDraftError(f"invalid {what} entry")  # inet_aton-style alias / public suffix
     if wildcard and _is_ip(host):
         raise ScopeDraftError(f"invalid {what} entry")
     return ("*." if wildcard else "") + host
+
+
+def _ambiguous_numeric(host: str) -> bool:
+    """Last label all digits or 0x-hex: legacy resolvers read such a host as an IP (127.1,
+    2130706433, 0x7f.1, 010.0.0.1). Canonical IP literals were already handled as networks."""
+    last = host.rsplit(".", 1)[-1]
+    return last.isdigit() or bool(re.fullmatch(r"0x[0-9a-f]*", last))
 
 
 def _is_ip(host: str) -> bool:
@@ -140,14 +181,15 @@ def _techniques(raw: object) -> tuple[str, ...]:
     return tuple(seen)
 
 
-def _ambiguities(raw: object) -> list[str]:
-    if not isinstance(raw, list) or len(raw) > MAX_AMBIGUITIES:
+def _ambiguities(raw: object, limit: int) -> list[str]:
+    if not isinstance(raw, list) or len(raw) > limit:
         raise ScopeDraftError("ambiguities must be a short list")
     return [t for t in (_text(i, "ambiguity") for i in raw) if t]
 
 
 def _build(
     data: dict[str, Any], *, project_id: str, program_url: str, extra_ambiguities: list[str],
+    ambiguity_limit: int = MAX_AMBIGUITIES,
 ) -> ScopeDraft:
     """Deterministic validation shared by the model path, load_draft and finalize."""
     in_scope = _entries(data.get("in_scope", []), "in_scope")
@@ -157,9 +199,10 @@ def _build(
     if set(in_scope) & set(exclusions):
         raise ScopeDraftError("an entry is in both in_scope and exclusions")
     evidence_ref = _text(data.get("evidence_ref", ""), "evidence_ref")
-    ambiguities = _ambiguities(data.get("ambiguities", [])) + extra_ambiguities
-    if not evidence_ref and _NO_EVIDENCE not in ambiguities:
-        ambiguities.append(_NO_EVIDENCE)
+    # Mandatory warnings come FIRST and are never counted against the model's cap.
+    mandatory = ([] if evidence_ref else [_NO_EVIDENCE]) + extra_ambiguities
+    given = _ambiguities(data.get("ambiguities", []), ambiguity_limit)
+    ambiguities = mandatory + [a for a in given if a not in mandatory]
     try:
         scope = Scope(
             project_id=project_id, program_url=program_url, evidence_ref=evidence_ref,
@@ -168,7 +211,7 @@ def _build(
         )
     except ValidationError:
         raise ScopeDraftError("draft does not form a valid scope") from None
-    return ScopeDraft(scope=scope, ambiguities=ambiguities[:MAX_AMBIGUITIES])
+    return ScopeDraft(scope=scope, ambiguities=ambiguities)
 
 
 def _first_object(text: str) -> dict[str, Any]:
@@ -235,7 +278,8 @@ def dump_draft(draft: ScopeDraft) -> str:
 
 def _rebuild(scope: Scope, ambiguities: list[str]) -> ScopeDraft:
     return _build({**_scope_dump(scope), "ambiguities": ambiguities},
-                  project_id=scope.project_id, program_url=scope.program_url, extra_ambiguities=[])
+                  project_id=scope.project_id, program_url=scope.program_url, extra_ambiguities=[],
+                  ambiguity_limit=MAX_AMBIGUITIES + MAX_WARNINGS)
 
 
 def load_draft(text: str) -> ScopeDraft:
@@ -253,7 +297,8 @@ def load_draft(text: str) -> ScopeDraft:
         raise ScopeDraftError("draft has an invalid project_id")
     if not isinstance(program_url, str):
         raise ScopeDraftError("draft has an invalid program_url")
-    return _build(data, project_id=project_id, program_url=program_url, extra_ambiguities=[])
+    return _build(data, project_id=project_id, program_url=program_url, extra_ambiguities=[],
+                  ambiguity_limit=MAX_AMBIGUITIES + MAX_WARNINGS)
 
 
 def finalize(draft: ScopeDraft) -> str:
