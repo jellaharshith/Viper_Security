@@ -96,7 +96,7 @@ nuclei = Tool(
     params_schema=NucleiArgs,
     dry_run_fn=_nuclei_dry_run,
     dry_run_only=False,
-    description="Bounded nuclei scan (technology, exposure, misconfiguration) of an in-scope target.",
+    description="Bounded nuclei scan (technology detection and misconfiguration) of an in-scope target.",
 )
 
 ALL_REAL_TOOLS: tuple[Tool, ...] = (nmap, nuclei)

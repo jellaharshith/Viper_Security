@@ -157,7 +157,7 @@ are server-controlled. The live argv is:
 
 ```text
 /usr/bin/nuclei -jsonl -silent -nc -duc -no-interactsh -disable-redirects
-  -t /opt/viper/nuclei-templates -tags tech,exposure,misconfig
+  -t /opt/viper/nuclei-templates -tags tech,misconfig
   -etags dos,fuzz,intrusive,bruteforce,rce,sqli,xss -severity info,low,medium
   -pt http -rl RATE_LIMIT -c 5 -timeout 10 -retries 0 -u TARGET
 ```

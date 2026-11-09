@@ -29,7 +29,10 @@ def test_nuclei_archive_is_checked_before_installation():
     assert "checksums.txt" in text
     assert "sha256sum -c" in text
     assert text.index("sha256sum -c") < text.index("/usr/bin/nuclei")
-    assert "-update-templates -ud /opt/viper/nuclei-templates -duc" in text
+    line = next(ln for ln in text.splitlines() if ln.startswith("/usr/bin/nuclei -update-templates"))
+    assert "-ud /opt/viper/nuclei-templates" in line
+    assert "-duc" not in line  # -duc turns -update-templates into a silent no-op (found on a real VM)
+    assert "template_count" in text and "-lt 1000" in text  # a bootstrap with no templates must fail
 
 
 def test_service_and_templates_use_separate_privileges():
@@ -102,3 +105,11 @@ def test_bootstrap_refuses_unsafe_allowlist_before_any_ip_parsing(value, monkeyp
 ])
 def test_bootstrap_keeps_safe_exact_hosts_and_unscoped_ips(value, monkeypatch):
     validate_allowlist(value, monkeypatch)
+
+
+def test_bootstrap_script_has_unix_line_endings():
+    """A CRLF copy breaks bash on the VM ("set: pipefail\r: invalid option name"): caught on a live run."""
+    from pathlib import Path
+
+    data = (Path(__file__).resolve().parents[1] / "deploy" / "vm-bootstrap.sh").read_bytes()
+    assert b"\r" not in data

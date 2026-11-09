@@ -54,7 +54,7 @@ Viper v1.0 delivers an end-to-end, safety-first autonomous cybersecurity copilot
 - **Nmap (`/usr/bin/nmap`):** Authorized TCP port scanning with service detection and unprivileged port discovery against in-scope targets.
 - **Nuclei (`/usr/bin/nuclei`):** Benign, HTTP-only vulnerability and technology detection with a frozen safety profile:
   - Protocol restriction: `-pt http` (enforcing HTTP protocol templates only).
-  - Tags: `tech,exposure,misconfig` only.
+  - Tags: `tech,misconfig` only.
   - Excluded tags: `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`.
   - Severities: `info,low,medium` only.
   - Operational bounds: `-rl 5`, `-c 5`, `-timeout 10`, `-retries 0`, `-no-interactsh`, `-disable-redirects`.
@@ -124,5 +124,5 @@ The following features were evaluated during v1.0 design and deliberately deferr
 
 ### 2.9 Reviewed HTTP Nuclei Template Subset & Template Pinning
 - **Description:** Curation, offline security auditing, and cryptographic hash-pinning of a minimal, reviewed subset of Nuclei HTTP templates strictly restricted to benign technology and exposure checks, packaged directly with the deployment rather than relying on broad community template updates.
-- **Motivation:** While v1.0 enforces `-pt http`, tag allowlists (`tech,exposure,misconfig`), and tag denylists (`dos,fuzz,intrusive,...`), community template updates can introduce new or modified templates with unexpected network behaviors or payloads.
+- **Motivation:** While v1.0 enforces `-pt http`, tag allowlists (`tech,misconfig`), and tag denylists (`dos,fuzz,intrusive,...`), community template updates can introduce new or modified templates with unexpected network behaviors or payloads.
 - **Reason Deferred from v1.0:** In v1.0, the combination of fixed CLI flags (`-pt http`, `-tags`, `-etags`, `-severity info,low,medium`, `-no-interactsh`, `-disable-redirects`), unprivileged service execution, and root-owned read-only `/opt/viper/nuclei-templates` provides robust runtime containment. Manually auditing and maintaining an in-tree curated catalog of thousands of individual YAML templates is deferred to v1.1.

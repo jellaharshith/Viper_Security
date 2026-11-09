@@ -79,7 +79,7 @@ See `docs/plans/m6-execution-plane.md`, `docs/plans/m6-gcloud-vm-setup.md`, and 
 
 The VM replaces passive response processing with a fixed live JSONL profile:
 `-jsonl -silent -nc -duc -no-interactsh -disable-redirects`, server-owned templates
-via `-t`, tags `tech,exposure,misconfig`, excluded tags
+via `-t`, tags `tech,misconfig`, excluded tags
 `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`, severities `info,low,medium`, then
 `-pt http` to restrict execution to HTTP templates, concurrency 5, timeout 10
 seconds and zero retries. The sole target is appended with `-u`;

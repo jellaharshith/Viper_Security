@@ -14,6 +14,21 @@ TERMINAL = {"done", "failed", "killed"}
 MAX_OUTPUT = 1024 * 1024
 
 
+# Hard wall-clock limit per job. nuclei needs longer than nmap: the frozen profile (tech,misconfig) is about
+# 1,636 requests on a default template set (measured on a live VM), which is ~330 s at the default 5 req/s.
+JOB_TIMEOUTS = {"nmap": 300, "nuclei": 900}
+DEFAULT_JOB_TIMEOUT = 300
+
+
+def job_timeout(command) -> int:
+    """Seconds a job may run, chosen by the program name only (never by request data)."""
+    try:
+        program = os.path.basename(str(command[0]))
+    except (IndexError, TypeError):
+        return DEFAULT_JOB_TIMEOUT
+    return JOB_TIMEOUTS.get(program, DEFAULT_JOB_TIMEOUT)
+
+
 @dataclass
 class Job:
     job_id: str
@@ -111,7 +126,7 @@ class JobRegistry:
 
     def _watch(self, job: Job):
         try:
-            job.process.wait(timeout=300)
+            job.process.wait(timeout=job_timeout(job.process.args))
             with job.control:
                 if self.group_alive(job.process.pid):
                     self._kill(job)
