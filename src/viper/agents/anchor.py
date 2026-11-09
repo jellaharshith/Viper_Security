@@ -56,7 +56,7 @@ class AnchorReceipt(BaseModel):
 def _post(
     head: str, endpoint: str, allow_network: bool, transport: httpx.BaseTransport | None,
     *, content: bytes | None = None, json: dict[str, Any] | None = None,
-    content_type: str = "application/json",
+    content_type: str = "application/json", allow_http: bool = False,
 ) -> bytes:
     if not allow_network:
         raise AnchorError("External anchoring requires explicit network opt-in")
@@ -64,8 +64,9 @@ def _post(
         raise AnchorError("Invalid SHA-256 audit head")
     try:
         url = httpx.URL(endpoint)
-        if url.scheme != "https" or not url.host or url.userinfo or url.fragment:
-            raise AnchorError("Anchor endpoint must be HTTPS without credentials or fragments")
+        schemes = {"http", "https"} if allow_http else {"https"}
+        if url.scheme not in schemes or not url.host or url.userinfo or url.fragment:
+            raise AnchorError("Anchor endpoint uses a forbidden scheme, credentials or fragment")
         with httpx.Client(transport=transport, timeout=10, follow_redirects=False, trust_env=False) as client:
             with client.stream("POST", url, content=content, json=json,
                                headers={"Content-Type": content_type}) as response:
@@ -91,13 +92,19 @@ def submit_tsa(
 
     certReq=True; no nonce (the verifier must authenticate the signed imprint,
     timestamp and trusted certificate chain). HTTP success is not TSA success.
+    HTTP or HTTPS is accepted because the payload contains only a SHA-256 digest,
+    not audit contents or credentials, and the signed token is self-authenticating
+    only after offline verification against the chosen trust store. An attacker
+    on an HTTP path can deny service but cannot forge a token that passes that
+    verification. Callers must verify the returned opaque reply; transport is
+    never proof. The offline verifier does not check CRL/OCSP revocation.
     """
     if not _valid_head(head_hash):
         raise AnchorError("Invalid SHA-256 audit head")
     request = (bytes.fromhex("30390201013031300d060960864801650304020105000420")
                + bytes.fromhex(head_hash) + bytes.fromhex("0101ff"))
     return _post(head_hash, endpoint, allow_network, transport, content=request,
-                 content_type="application/timestamp-query")
+                 content_type="application/timestamp-query", allow_http=True)
 
 
 def submit_rekor(
