@@ -228,3 +228,35 @@ lab host `scanme.nmap.org` only, then deleted everything (total cost: minutes of
   with `VIPER_ALLOW_ACTIVE_TESTING` unset, cert and token deleted. Only the user's own `kali-vm` remains.
 - **Follow-ups:** external TSA/Rekor anchoring needs a trusted offline verifier; noVNC takeover; nuclei is
   not installed on the Ubuntu image (apt has no nuclei), so only nmap was exercised live.
+
+## V1 BUILD - 2026-11-08 (offline definition of done met; second live validation pending)
+Four-session herdr crew on branch `v1/finish` (claude-v1 scope reader + rehearsal test, codex-v1 VM `nuclei`
+profile + bootstrap + security review, agy-v1 weekly workflow + docs, coordinator planner/CLI/wiring).
+718 tests + 64 VM-API tests, ruff and mypy clean.
+- **Planner <-> VM consistency:** `NmapArgs.ports` is validated exactly like the VM; arguments are strict (no
+  `"true"`/`1` booleans, no `"5"` rates, no explicit null ports) because the ORIGINAL args are dispatched; the
+  planner prompt carries the exact allowed hosts and argument formats, and a real-tool target must be an exact
+  egress host, so a bad plan fails at plan time instead of after a human approved it.
+- **Live nuclei profile:** `-passive` is gone. Frozen argv: JSONL, tags `tech,exposure,misconfig`, excluded tags
+  `dos,fuzz,intrusive,bruteforce,rce,sqli,xss`, severities `info,low,medium`, `-pt http`, `-rl`, `-c 5`,
+  `-timeout 10`, `-retries 0`. The template directory comes only from `VIPER_EXEC_NUCLEI_TEMPLATES` on the VM,
+  never from request arguments. All 15 flags were checked against the pinned nuclei 3.3.10 documentation.
+- **Scope reader:** `viper scope draft` (model drafts a scope + ambiguities from pasted program rules) and
+  `viper scope approve --confirm <project>`. A draft carries `status: DRAFT`, which the strict `Scope` model
+  rejects, so an agent can never run on it. Approval validates in memory, appends the `scope_approved` audit
+  event, then publishes the file all-or-nothing (fsynced temp file + exclusive link). Rehearsed against the real
+  Foundation-Sec model on the lab host's usage rules: a single-host scope, DoS and repetitive scanning forbidden,
+  and the right ambiguities raised (are tools other than Nmap allowed; what is "hammering").
+- **Weekly KB refresh:** `.github/workflows/kb-weekly.yml` (schedule + manual only, read-only permissions,
+  SHA-pinned actions, checksum-verified Ollama archive, one queueing concurrency group). It needs the repository
+  secrets `SUPABASE_URL` and `SUPABASE_SECRET_KEY`; without them it ends cleanly. Staging collections get a random
+  suffix so concurrent runs cannot share one.
+- **Reproducible VM:** `deploy/vm-bootstrap.sh` (unprivileged `viper-vmapi` user, checksum-verified nuclei,
+  root-owned templates, TLS + token never printed) with static safety tests.
+- **Independent security review:** 9 findings in the first pass (scope-draft IP aliases and public-suffix wildcards,
+  scope written before its audit event, unverified Ollama archive, workflow concurrency, nuclei not protocol-
+  restricted, runbook `User=root`, ambiguities displacing mandatory warnings, client/VM validation drift) plus 4
+  residuals in the re-review (partial scope write, bootstrap allowlist newline injection, README/CHANGELOG
+  accuracy). All fixed and re-verified.
+- **Deferred to v1.1 (docs/v1-scope.md):** OWASP ZAP, noVNC desktop, real RFC-3161 anchoring, scope rate-limit
+  fields, SSH takeover shell, NVD source, PostgreSQL operational tables, multi-job dispatch.
