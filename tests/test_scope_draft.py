@@ -291,3 +291,81 @@ def test_round_trip_is_stable_when_evidence_ref_is_empty() -> None:
 def test_wildcard_over_an_ip_is_rejected() -> None:
     with pytest.raises(ScopeDraftError):
         _draft(_reply(in_scope=["*.10.0.0.1"]))
+
+
+# ------------------------------------------------------------------ round 3: review findings
+@pytest.mark.parametrize(
+    "entry",
+    ["127.1", "0x7f.1", "127.0.0x0.1", "2130706433", "010.0.0.1", "1.2.3", "0x7f.0.0.1",
+     "*.127.1", "0177.0.0.1", "10.1", "a.b.0x10", "example.com.1"],
+)
+@pytest.mark.parametrize("field", ["in_scope", "exclusions"])
+def test_ambiguous_numeric_hosts_are_rejected(entry: str, field: str) -> None:
+    reply = _reply(**{field: ["scanme.nmap.org" if field == "exclusions" else "ok.example.com",
+                              entry]})
+    if field == "exclusions":
+        reply = _reply(exclusions=[entry])
+    with pytest.raises(ScopeDraftError):
+        _draft(reply)
+
+
+def test_canonical_ips_are_accepted_and_kept_canonical() -> None:
+    d = _draft(_reply(in_scope=["192.0.2.1", "2001:DB8::1", "1password.example.com",
+                                "a1.example.com"], exclusions=[]))
+    assert d.scope.in_scope == ("192.0.2.1", "2001:db8::1", "1password.example.com",
+                                "a1.example.com")
+
+
+@pytest.mark.parametrize(
+    "entry",
+    ["*.co.uk", "co.uk", "*.github.io", "github.io", "*.com.au", "*.amazonaws.com",
+     "s3.amazonaws.com", "*.s3.amazonaws.com", "*.herokuapp.com", "*.CO.UK.", "*.pages.dev",
+     "*.blogspot.com", "*.vercel.app", "*.web.app"],
+)
+def test_public_suffix_entries_are_rejected(entry: str) -> None:
+    with pytest.raises(ScopeDraftError):
+        _draft(_reply(in_scope=[entry], exclusions=[]))
+
+
+def test_registrable_names_under_public_suffixes_are_accepted() -> None:
+    d = _draft(_reply(in_scope=["*.example.co.uk", "myorg.github.io", "*.myorg.github.io",
+                                "shop.example.com.au"], exclusions=[]))
+    assert len(d.scope.in_scope) == 4
+
+
+def test_public_suffix_list_is_a_pinned_frozen_set() -> None:
+    from viper.policy.scope_draft import PUBLIC_SUFFIXES
+
+    assert isinstance(PUBLIC_SUFFIXES, frozenset)
+    assert {"co.uk", "github.io", "s3.amazonaws.com", "herokuapp.com"} <= PUBLIC_SUFFIXES
+
+
+def test_model_ambiguities_cannot_push_out_the_missing_evidence_warning() -> None:
+    d = _draft(_reply(evidence_ref="", ambiguities=[f"q{i}" for i in range(50)]))
+    assert d.ambiguities[0].startswith("No evidence_ref")
+    assert d.ambiguities[1:] == [f"q{i}" for i in range(50)]
+
+
+def test_model_ambiguities_cannot_push_out_the_truncation_warning() -> None:
+    d = draft_scope("a" * (MAX_PROGRAM_CHARS + 1), Chat(_reply(ambiguities=[f"q{i}" for i in
+                    range(50)])), project_id=PID)
+    assert any("truncat" in a.lower() for a in d.ambiguities)
+    assert len(d.ambiguities) == 51
+
+
+def test_more_than_the_model_cap_of_ambiguities_still_fails_closed() -> None:
+    with pytest.raises(ScopeDraftError):
+        _draft(_reply(ambiguities=[f"q{i}" for i in range(51)]))
+
+
+def test_mandatory_warnings_survive_a_dump_load_round_trip_at_the_cap() -> None:
+    d = draft_scope("a" * (MAX_PROGRAM_CHARS + 1), Chat(_reply(
+        evidence_ref="", ambiguities=[f"q{i}" for i in range(50)])), project_id=PID)
+    assert len(d.ambiguities) == 52
+    assert load_draft(dump_draft(d)) == d
+
+
+def test_a_model_ambiguity_duplicating_a_warning_is_not_doubled() -> None:
+    first = _draft(_reply(evidence_ref="", ambiguities=[]))
+    d = _draft(_reply(evidence_ref="", ambiguities=[first.ambiguities[0]]))
+    assert d.ambiguities == first.ambiguities
