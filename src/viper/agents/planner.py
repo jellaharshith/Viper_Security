@@ -125,7 +125,7 @@ class LLMPlanner:
                 target = action.args.get("target")
                 if not isinstance(target, str) or not target:
                     raise PlannerError(f"{action.tool_name}: a string target is required")
-                if target.lower() not in allowed:
+                if target not in allowed:  # exact match, like the VM: mixed case is refused there
                     raise PlannerError(
                         f"{action.tool_name}: target {target!r} is not an exact egress host; "
                         f"allowed: {sorted(allowed)}")

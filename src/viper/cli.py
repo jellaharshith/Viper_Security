@@ -7,6 +7,7 @@ import getpass
 import json
 import logging
 import re
+import secrets
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -110,7 +111,8 @@ def cmd_kb(settings: Settings, args: argparse.Namespace) -> int:
     qembed = PrefixEmbedder(llm, settings.embed_query_prefix)
     base = open_store(settings, reg.active or "")
     active = base
-    staging = base.view(f"kb_{settings.kb_version}_{datetime.now(UTC):%Y%m%d%H%M%S}")
+    # A random suffix keeps two runs that start in the same second from sharing (and dropping) a collection.
+    staging = base.view(f"kb_{settings.kb_version}_{datetime.now(UTC):%Y%m%d%H%M%S}_{secrets.token_hex(3)}")
     cases = load_retrieval()
 
     def recall(store: Store) -> float:
@@ -324,13 +326,17 @@ def cmd_scope(settings: Settings, args: argparse.Namespace) -> int:
             print(f"Not approved. To approve exactly this scope run again with: --confirm {project}")
             return 1
         final = draft_path.with_name(f"{project}.scope.yaml")
-        with final.open("x", encoding="utf-8", newline="\n") as handle:  # never overwrites a scope
-            handle.write(scope_draft.finalize(draft))
-        scope = runner.load_scope(final)  # the approved file must load under the strict model
+        if final.exists():
+            raise FileExistsError("a scope file already exists for this project")
+        text = scope_draft.finalize(draft)
+        scope = runner.scope_from_text(text)  # must load under the strict model BEFORE anything is published
+        # Audit first: a scope file must never exist without its durable approval record.
         AuditLog(settings, project).append(
             thread_id="scope", event="scope_approved", actor="human",
             detail={"scope_revision": scope.revision, "approver": getpass.getuser(),
                     "count": len(scope.in_scope)})
+        with final.open("x", encoding="utf-8", newline="\n") as handle:  # never overwrites a scope
+            handle.write(text)
         print(f"approved: {final} (revision {scope.revision[:12]})")
         return 0
     except Exception as exc:  # noqa: BLE001 - class only; never echo details

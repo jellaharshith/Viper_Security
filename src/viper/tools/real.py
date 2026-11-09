@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from viper.policy.models import RiskLevel
 from viper.tools.registry import DryRunResult, Tool, default_registry
@@ -35,8 +35,18 @@ class NmapArgs(BaseModel):
         default=None,
         description="Comma-separated explicit TCP ports, at most 32, each 1-65535, for example 22,80,443. "
                     "No ranges (1-1000), no spaces, no flags.")
-    service_detection: bool = Field(default=False, description="Probe service versions (-sV).")
-    skip_discovery: bool = Field(default=False, description="Skip host discovery (-Pn).")
+    service_detection: bool = Field(default=False, strict=True,
+                                    description="Probe service versions (-sV).")
+    skip_discovery: bool = Field(default=False, strict=True,
+                                 description="Skip host discovery (-Pn).")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_explicit_null_ports(cls, data: Any) -> Any:
+        # The ORIGINAL args are dispatched and the VM refuses a present-but-null "ports": omit the key.
+        if isinstance(data, dict) and "ports" in data and data["ports"] is None:
+            raise ValueError("omit ports instead of sending null")
+        return data
 
     @field_validator("ports")
     @classmethod
@@ -54,7 +64,7 @@ class NucleiArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     target: str = Field(description="Exact hostname or IP address; must be one of allowed_hosts.")
-    rate_limit: int = Field(default=5, ge=1, le=10, description="Requests per second, 1-10.")
+    rate_limit: int = Field(default=5, ge=1, le=10, strict=True, description="Requests per second, 1-10.")
 
 
 def _nmap_dry_run(args: dict[str, Any]) -> DryRunResult:

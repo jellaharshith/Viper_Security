@@ -53,7 +53,7 @@ def test_nuclei_rate_limit_is_bounded() -> None:
         NucleiArgs(target="scanme.nmap.org", rate_limit=99)
 
 
-@pytest.mark.parametrize("ports", [None, "22", "22,80,443", ",".join(str(p) for p in range(1, 33))])
+@pytest.mark.parametrize("ports", ["22", "22,80,443", ",".join(str(p) for p in range(1, 33))])
 def test_nmap_accepts_the_same_ports_the_vm_accepts(ports) -> None:
     assert NmapArgs(target="scanme.nmap.org", ports=ports).ports == ports
 
@@ -75,3 +75,28 @@ def test_every_nmap_field_carries_a_format_hint_for_the_planner() -> None:
 
 def test_nuclei_default_rate_limit_is_within_the_vm_bounds() -> None:
     assert 1 <= NucleiArgs(target="scanme.nmap.org").rate_limit <= 10
+
+
+# --- v1 review #9: validation must reject exactly what the VM rejects (the ORIGINAL args are dispatched) ---
+
+@pytest.mark.parametrize("kwargs", [
+    {"service_detection": "true"}, {"service_detection": 1}, {"skip_discovery": "yes"},
+    {"skip_discovery": 0},
+])
+def test_nmap_booleans_are_strict(kwargs) -> None:
+    with pytest.raises(ValidationError):
+        NmapArgs(target="scanme.nmap.org", **kwargs)
+
+
+def test_an_explicit_null_ports_is_rejected_but_omitting_it_is_fine() -> None:
+    assert NmapArgs(target="scanme.nmap.org").ports is None
+    with pytest.raises(ValidationError):
+        NmapArgs(target="scanme.nmap.org", ports=None)
+    with pytest.raises(ValidationError):
+        NmapArgs.model_validate({"target": "scanme.nmap.org", "ports": None})
+
+
+@pytest.mark.parametrize("rate", ["5", True, 5.0, 5.5])
+def test_nuclei_rate_limit_is_a_strict_int(rate) -> None:
+    with pytest.raises(ValidationError):
+        NucleiArgs(target="scanme.nmap.org", rate_limit=rate)
