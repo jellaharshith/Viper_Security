@@ -122,7 +122,7 @@ cat projects/drafts/myproject.draft.yaml
 python -m viper.cli scope approve --draft projects/drafts/myproject.draft.yaml --confirm myproject
 ```
 
-The model drafts the scope from program rules, but the resulting draft is **inert** (`status: DRAFT`) and cannot be used by the agent runner. It becomes active only after a human reviews it and runs `scope approve --confirm <project>`, which records an immutable `scope_approved` event in the audit log before publishing the final `.scope.yaml` file.
+The model drafts the scope from program rules, but the resulting draft is **inert** (`status: DRAFT`) and cannot be used by the agent runner. It becomes active only after a human reviews it and runs `scope approve --confirm <project>`, which records a `scope_approved` event in the tamper-evident (hash-chained) audit log before publishing the final `.scope.yaml` file.
 
 ### Run an agent workflow (dry-run by default)
 
