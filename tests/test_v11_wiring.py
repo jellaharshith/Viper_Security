@@ -8,7 +8,6 @@ import pytest
 
 from viper import cli
 from viper.agents import anchor
-from viper.agents.audit import AuditLog
 from viper.config import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -163,52 +162,8 @@ def test_planner_prompt_shows_the_scope_limits():
     assert "port-scan" in text and "dos" in text
 
 
-# --- the human takeover shell -------------------------------------------------------------------------
+# --- the SSH shell was deferred to v1.2 (security review: lock is not bound to the VM) -----------------
 
-def shell_args(project="demo", vm="viper-kali-lab", zone="us-central1-a"):
-    return ["exec", "shell", "--project", project, f"--vm={vm}", "--zone", zone]
-
-
-def test_shell_refuses_unless_a_human_holds_the_control_lock(env, monkeypatch, capsys):
-    ran = []
-    monkeypatch.setattr(cli.subprocess, "call", lambda argv, **kw: ran.append(argv) or 0)
-    assert cli.main(shell_args()) == 1
-    assert ran == [] and "takeover" in capsys.readouterr().out
-
-
-def test_shell_runs_gcloud_ssh_over_iap_with_a_fixed_argv_and_audits_it(env, monkeypatch, capsys):
-    ran = []
-    monkeypatch.setattr(cli.subprocess, "call", lambda argv, **kw: ran.append((argv, kw)) or 0)
-    assert cli.main(["exec", "takeover", "--project", "demo"]) == 0
-    assert cli.main(shell_args()) == 0
-    argv, kw = ran[0]
-    assert isinstance(argv, list) and kw.get("shell") in (None, False)
-    assert argv[1:4] == ["compute", "ssh", "viper-kali-lab"] and "--tunnel-through-iap" in argv
-    assert argv[argv.index("--zone") + 1] == "us-central1-a"
-    log = AuditLog(Settings(_env_file=None, audit_dir=env["tmp"] / "audit"), "demo")
-    events = log.events("shell")
-    assert [e["event"] for e in events] == ["human_shell_opened"] and events[0]["actor"] == "human"
-
-
-@pytest.mark.parametrize("vm", ["x; rm -rf /", "a b", "$(id)", "", "-oProxyCommand=evil", "UPPER"])
-def test_shell_rejects_hostile_vm_names(env, monkeypatch, vm):
-    ran = []
-    monkeypatch.setattr(cli.subprocess, "call", lambda argv, **kw: ran.append(argv) or 0)
-    assert cli.main(["exec", "takeover", "--project", "demo"]) == 0
-    assert cli.main(shell_args(vm=vm)) == 1
-    assert ran == []
-
-
-def test_shell_is_refused_when_the_audit_event_cannot_be_written(env, monkeypatch):
-    from viper.agents.audit import AuditError
-
-    ran = []
-    monkeypatch.setattr(cli.subprocess, "call", lambda argv, **kw: ran.append(argv) or 0)
-    assert cli.main(["exec", "takeover", "--project", "demo"]) == 0
-
-    def boom(self, **kw):
-        raise AuditError("disk full")
-
-    monkeypatch.setattr(AuditLog, "append", boom)
-    assert cli.main(shell_args()) == 1
-    assert ran == []  # no evidence, no shell
+def test_the_ssh_shell_command_is_not_shipped_in_v1_1():
+    with pytest.raises(SystemExit):
+        cli.main(["exec", "shell", "--project", "demo"])

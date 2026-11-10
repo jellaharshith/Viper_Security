@@ -72,12 +72,25 @@ Full design: [`docs/architecture.md`](docs/architecture.md) and [`docs/security-
 | M6 | Cloud execution plane: approve, watch, take over, pause, emergency-stop | Done, live-validated |
 | M7 | Pentest copilot: planner, finding validation, traceable report | Done, live-validated |
 | v1.0 | v1.0: live nuclei, scope reader, weekly KB refresh | Done, security-reviewed and live-validated (nmap + nuclei on a real VM) |
+| v1.1 | v1.1: multi-format reports, real RFC-3161 anchoring, scope limits, audited SSH shell | Done, security-reviewed and lab-validated |
 
-M7 was validated end to end on 2026-11-08 against the authorized lab host `scanme.nmap.org`: an approved `nmap`
-scan produced two confirmed findings, each citing the audit event that produced it, and the audit chain verified.
-See [`docs/development-progress.md`](docs/development-progress.md).
+M7 was validated against `scanme.nmap.org` on 2026-11-08 (see [`docs/development-progress.md`](docs/development-progress.md)).
+For complete v1.0/v1.1 specifications and the v1.2 backlog (OWASP ZAP, noVNC, and lab items), see [`docs/v1-scope.md`](docs/v1-scope.md).
 
-For the complete v1.0 capability specification and the planned v1.1 backlog (OWASP ZAP, noVNC desktop takeover, real RFC-3161 TSA anchoring, scope rate-limit and automation fields, SSH takeover shell, NVD source, PostgreSQL operational tables, multi-job dispatch, and reviewed HTTP template subset), see [`docs/v1-scope.md`](docs/v1-scope.md).
+### Validated on
+
+On 2026-11-09, Viper v1.1 was validated end to end against a real deployment of **OWASP Juice Shop 20.4.0** hosted on a throwaway GCP spot VM (`e2-medium`, Ubuntu 22.04, loopback port 80, IAP tunnel) driven by the local Foundation-Sec 8B GGUF model through Ollama under an LLM-drafted, human-approved scope (see [`docs/real-test-1.md`](docs/real-test-1.md)).
+
+**Honest findings & detection results:**
+- **Recall:** **2 of 6** ground-truth items found (G1 open HTTP port, G3 missing HTTP security headers with CWE-693). G2 technology detection fired in direct probes but did not reproduce in the final run due to target application-layer rate limiting. G4–G6 (exposed `/ftp`, `/metrics`, and `/api-docs`) fell outside the frozen `tech,misconfig` profile, defining an area for v1.2 profile expansion.
+
+**Safety properties held unconditionally:**
+- **Zero false confirmed findings:** 0. Both reported findings were re-derived from audited scanner stdout.
+- **Zero out-of-scope actions:** 0. Exactly two tool dispatches (`nmap`, `nuclei`), both strictly targeting the approved `127.0.0.1` target.
+- **Rate limits enforced:** The approved 5 rps scope rate limit was respected by tool invocation.
+- **Audit chain & real anchor verified:** `viper audit verify` confirmed full chain continuity and reported `VERIFIED` on a real DigiCert RFC-3161 timestamp token evaluated offline via OpenSSL.
+- **Multi-format reports generated:** Markdown, JSON (`viper-report/1`), and SARIF 2.1.0 reports were generated with valid audit citations.
+- **Negative boundary test passed:** A hostile scope document banning automated tools resulted in `automation_allowed: false` with ambiguity warnings; the agent denied both proposed actions with `automated tools are not permitted by this scope` and executed zero commands.
 
 ## Quick start
 
@@ -177,10 +190,11 @@ See the 60-second setup guide in [`docs/weekly-kb.md`](docs/weekly-kb.md).
 | `viper scope approve --draft DIR/ID.draft.yaml --confirm ID` | Validate, audit (`scope_approved`), and publish an approved scope |
 | `viper agent run --plan FILE \| --llm` | Start a policy-gated agent run (plan file or opt-in LLM planner) |
 | `viper agent resume --decision ALLOW\|DENY` | Answer a pending approval |
-| `viper report --thread ID` | Print a finished run's traceable report |
-| `viper audit verify \| anchor --project ID` | Verify the hash chain and anchors; anchor the head |
+| `viper report --thread ID [--format md\|json\|sarif]` | Print a finished run's report in Markdown, JSON, or SARIF |
+| `viper audit verify \| anchor --project ID [--provider mock\|tsa] [--allow-network]` | Verify hash chain and anchors; anchor the head (mock or RFC-3161 TSA) |
 | `viper exec watch \| pause \| stop --job ID` | Stream, pause or emergency-stop a running job |
 | `viper exec takeover \| release --project ID` | Take or release exclusive control of the VM |
+| `viper exec shell --project ID [--vm VM] [--zone ZONE]` | Open an audited SSH shell to the VM (requires exclusive control) |
 
 ## Project layout
 
@@ -210,8 +224,9 @@ tests/          Unit and integration tests (offline)
 | [`docs/security-design.md`](docs/security-design.md) | Threat model and controls |
 | [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) | Milestones and dependencies |
 | [`docs/development-progress.md`](docs/development-progress.md) | What was built and validated, milestone by milestone |
-| [`docs/adr/`](docs/adr) | Architecture decision records (0001-0010) |
+| [`docs/adr/`](docs/adr) | Architecture decision records (0001-0012) |
 | [`docs/plans/`](docs/plans) | Per-milestone specs and the cloud runbook |
+| [`docs/real-test-1.md`](docs/real-test-1.md) | End-to-end OWASP Juice Shop lab validation report |
 | [`docs/weekly-kb.md`](docs/weekly-kb.md) | 60-second owner guide for weekly RAG refresh |
 | [`docs/requirements.md`](docs/requirements.md) | Original product requirements |
 

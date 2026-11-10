@@ -82,6 +82,7 @@ class Scope(BaseModel):
     # slug (see KNOWN_TECHNIQUES), so old entries such as "INTRUSIVE" stay readable but inert.
     forbidden_techniques: tuple[str, ...] = ()
     # v1.1 limits (additive: old scope files keep loading with these defaults)
+    # HTTP request-rate cap (nuclei). Tools with no rate argument (nmap) are NOT bounded by it; see ADR 0012.
     max_rate_rps: int | None = Field(default=None, ge=1, le=1000, strict=True)
     automation_allowed: bool = Field(default=True, strict=True)
     permitted_techniques: tuple[str, ...] = ()  # empty = no restriction; else only these slugs

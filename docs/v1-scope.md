@@ -1,6 +1,6 @@
-# Viper v1.0 Scope & v1.1 Backlog
+# Viper Release Scope: v1.0, v1.1 Shipped & v1.2 Backlog
 
-This document establishes the authoritative functional boundary of the **Viper v1.0** release (Milestones M0 through M7) and details the prioritized **v1.1 backlog**, including the architectural and operational reasons why each backlog item was deferred.
+This document establishes the authoritative functional boundary of the **Viper v1.0** and **v1.1** releases and details the prioritized **v1.2 backlog**, including the architectural and operational reasons why each backlog item was deferred.
 
 ---
 
@@ -82,51 +82,78 @@ Viper v1.0 delivers an end-to-end, safety-first autonomous cybersecurity copilot
 
 ---
 
-## 2. The Viper v1.1 Backlog
+## 2. What Viper v1.1 Delivered (Shipped)
 
-The following features were evaluated during v1.0 design and deliberately deferred to v1.1. Each entry details the functionality, operational value, and the technical reason for deferral.
+The following features were completed, validated, and shipped in the **Viper v1.1** release:
 
-### 2.1 OWASP ZAP (Zed Attack Proxy) Integration
+### 2.1 Multi-Format Reports & Finding Enrichment
+- **Description:** Complete reporting overhaul delivering stakeholder-ready Markdown, machine-readable JSON (`viper-report/1`), and industry-standard OASIS SARIF 2.1.0 exports (`viper report --format md|json|sarif`), alongside deterministic offline finding enrichment.
+- **Implementation:** `viper.report.generator.render_report`, `viper.report.formats.render_json`, `viper.report.formats.render_sarif`, and `viper.findings.enrich.enrich`. Findings carry additive `description` and `cwe` fields. Reports include executive summary matrices, tool-grouped sections, and dynamic backtick fences outgrowing hostile scanner backticks. All three formats are automatically persisted to `data/reports/` on agent run completion.
+
+### 2.2 Real RFC-3161 TSA External Anchoring
+- **Description:** Cryptographic anchoring of audit log head hashes to external public or private Timestamp Authorities (RFC-3161 TSAs over HTTPS) with offline signature, certificate path, and digest verification via OpenSSL (`openssl ts`).
+- **Implementation:** `verify_tsa_token` and `make_tsa_verifier` in `viper.agents.anchor`. Uses OS OpenSSL subprocess with `-attime <epoch>` historical timestamp validation (ensuring tokens verify after short-lived TSA signing certificates expire), `certifi` Mozilla CA trust store, configurable enterprise CA roots, and fail-closed error handling (see ADR 0011). Verified receipts vouched by a trusted root earn authoritative `VERIFIED` status in `viper audit verify`.
+
+### 2.3 Scope Rate-Limits & Automation Policy Fields
+- **Description:** Extension of the `Scope` model and policy engine to store and enforce program-specific request rate limits (`max_rate_rps`), automation permissions (`automation_allowed`), and technique constraints (`permitted_techniques`, `forbidden_techniques`).
+- **Implementation:** Additive fields on `Scope`, registry-owned `ToolInfo.techniques` tags and `default_rate_rps`, fail-closed policy engine evaluations with exact contract deny strings, and deterministic pattern-based automation ban detection in `viper.policy.scope_draft` (see ADR 0012).
+
+### 2.4 Audited SSH Takeover Shell
+- **Description:** Interactive operator terminal connection to execution VM over Google Cloud IAP tunnel (`gcloud compute ssh --tunnel-through-iap`).
+- **Implementation:** `viper exec shell --project <id> [--vm <vm>] [--zone <zone>]`. Gated by active exclusive control lock (`human:...`), strictly auditing `human_shell_opened` before launch, and running via fixed argument list without shell interpretation.
+
+### 2.5 Scope Reader Hardening
+- **Description:** Real-world resilience fixes for the LLM scope drafting assistant (`viper.policy.scope_draft`) identified during live lab testing.
+- **Implementation:** Strips `host:port` entries (e.g. `127.0.0.1:3000`) and records a human note; ignores rate phrases in the automation ban detector to prevent false-positive bans; updates the model prompt to extract v1.1 fields (`max_rate_rps`, `automation_allowed`, `permitted_techniques`); and enforces mandatory ambiguity warnings on unmapped techniques.
+
+### 2.6 Weekly KB Refresh Automation & CI Concurrency
+- **Description:** 60-second owner guide for weekly knowledge base refresh (`docs/weekly-kb.md`), offline CI workflow assertions (`tests/test_workflows.py`), and concurrency controls in `.github/workflows/ci.yml` and `security.yml`.
+
+---
+
+## 3. The Viper v1.2 Backlog (Deferred Features)
+
+The following features and improvements are deferred to the **Viper v1.2** milestone:
+
+### 3.1 OWASP ZAP (Zed Attack Proxy) Integration
 - **Description:** Headless web application vulnerability scanning using OWASP ZAP's daemon mode and automation framework (spidering, passive inspection, active scanning).
 - **Motivation:** Provides in-depth, authenticated application-layer testing (XSS, CSRF, header security, API analysis) beyond Nuclei's template-driven checks.
-- **Reason Deferred from v1.0:** ZAP runs as a persistent JVM daemon exposing a REST/WebSocket API rather than a standalone CLI binary. Managing daemon startup, session contexts, memory overhead (1–2 GB RAM), and complex policy configurations would have added substantial operational overhead to the lightweight single-binary execution model established for Nmap and Nuclei in v1.0.
+- **Reason Deferred to v1.2:** ZAP runs as a persistent JVM daemon exposing a REST/WebSocket API rather than a standalone CLI binary. Managing daemon startup, session contexts, memory overhead (1–2 GB RAM), and complex policy configurations adds substantial operational overhead. Nuclei and Nmap provided lightweight single-binary execution optimal for v1.0/v1.1.
 
-### 2.2 noVNC Browser Remote Desktop & Graphical Takeover
+### 3.2 noVNC Browser Remote Desktop & Graphical Takeover
 - **Description:** A web-based graphical desktop streaming interface (noVNC / TigerVNC) embedded into the cloud Kali VM, allowing operators to visually inspect and manipulate GUI security tools (e.g., Burp Suite, browser DevTools) through a browser.
 - **Motivation:** Enables manual inspection and exploitation tasks requiring browser interactions or desktop GUIs directly within the isolated cloud execution environment.
-- **Reason Deferred from v1.0:** Running a full X11/XFCE desktop environment and VNC-to-WebSocket bridge significantly increases VM compute and memory consumption (necessitating larger VM instances), expands the attack surface, and complicates authentication across the IAP tunnel. The headless HTTPS/SSE API with CLI process controls (`pause`, `stop`, `takeover`) achieved all core automation and emergency-stop requirements at zero GUI overhead.
+- **Reason Deferred to v1.2:** Running a full X11/XFCE desktop environment and VNC-to-WebSocket bridge significantly increases VM compute and memory consumption (necessitating larger VM instances), expands the attack surface, and complicates authentication across the IAP tunnel. The headless HTTPS/SSE API with CLI process controls (`pause`, `stop`, `takeover`, `shell`) achieved all core automation and emergency-stop requirements at zero GUI overhead.
 
-### 2.3 Real RFC-3161 TSA External Anchoring (Delivered in v1.1)
-- **Description:** Cryptographic anchoring of audit log head hashes to external public or private Timestamp Authorities (RFC-3161 TSAs over HTTPS) with offline signature, certificate path, and digest verification via OpenSSL (`openssl ts`).
-- **Motivation:** Provides indisputable, third-party cryptographic proof that audit records and pentest evidence existed at a specific time and have not been altered since the assessment.
-- **Implementation in v1.1:** Fully delivered in v1.1 via `verify_tsa_token` and `make_tsa_verifier` in `viper.agents.anchor`. Uses OS OpenSSL subprocess with `-attime <epoch>` historical timestamp validation, `certifi` Mozilla CA trust store, configurable enterprise CA roots, and fail-closed error handling (see ADR 0011). Sigstore Rekor inclusion proof anchoring remains in the backlog for future cloud-native workflows.
+### 3.3 Real Test 1 Lab Backlog Items (`docs/real-test-1.md`)
+Identified during the end-to-end OWASP Juice Shop lab validation:
+1. **Thread-Namespaced Job IDs:** Execution plane job IDs currently collide if an action ID (e.g. `nmap_scan`) is reused across runs before `vmapi` service restart, returning HTTP 409. v1.2 will namespace job IDs by thread ID (`{thread}_{action_id}`).
+2. **Spot VM Preemption Resilience:** Spot instance reclamation mid-scan currently surfaces as a generic `ReadTimeout`. v1.2 will distinguish "execution plane unreachable" and offer transparent job resumption upon VM recreation.
+3. **Approval Expiry Messaging:** The 15-minute approval checkpoint window currently raises an unhelpful `ValueError` upon expiry. v1.2 will provide clear human-facing expiration diagnostics and clean state recovery.
+4. **Per-Run Scanner Metrics:** To diagnose variance on rate-limited targets (e.g. Juice Shop application-layer throttling), v1.2 will record executed template counts and wire request counts per run in audit results.
+5. **Expanded Profile Coverage:** Detection of exposed directories (`/ftp`), Prometheus endpoints (`/metrics`), and API documentation (`/api-docs`) requires expanding Nuclei template profiles to include benign exposure checks or integrating ZAP's spider.
+6. **Planner Target Hardening:** Hardening LLM planner prompts and output validators to prevent URL scheme/path targets on the host-only execution plane.
 
-### 2.4 Scope Rate-Limit & Automation Policy Fields (Delivered in v1.1)
-- **Description:** Extension of the `Scope` model and policy engine to store and enforce program-specific request rate limits (`max_rate_rps`), automation permissions (`automation_allowed`), and technique constraints (`permitted_techniques`, `forbidden_techniques`).
-- **Motivation:** Allows automated, fail-closed enforcement of explicit bug bounty program rules that restrict scanning speeds, forbid automated scanning tools, or constrain allowed testing techniques.
-- **Implementation in v1.1:** Fully delivered in v1.1 via additive fields on `Scope`, registry-owned `ToolInfo.techniques` tags and `default_rate_rps`, fail-closed policy engine evaluations with exact deny strings, and deterministic pattern-based automation ban detection in `viper.policy.scope_draft` (see ADR 0012).
-
-### 2.5 Integrated SSH Takeover Shell
-- **Description:** A native CLI command (`viper exec shell --project <id>`) that establishes an interactive terminal (PTY) session directly into the cloud Kali VM through the IAP tunnel, automatically acquiring the exclusive control lock.
-- **Motivation:** Streamlines operator takeover when manual command-line exploration is needed, eliminating the need to manually invoke `gcloud compute ssh` and run lock commands separately.
-- **Reason Deferred from v1.0:** Operators can already execute manual terminal commands via the standard Google Cloud SDK (`gcloud compute ssh --tunnel-through-iap`) alongside `viper exec takeover`. Implementing a cross-platform interactive PTY client inside the Viper CLI requires handling OS-specific terminal control sequences (Windows console modes vs. POSIX termios), which was deferred in favor of standard tooling.
-
-### 2.6 National Vulnerability Database (NVD) CVE Feed Ingestion
+### 3.4 National Vulnerability Database (NVD) CVE Feed Ingestion
 - **Description:** Ingestion and vector embedding of the full National Vulnerability Database (NVD) CVE API 2.0 / JSON feeds into the Viper RAG knowledge base.
 - **Motivation:** Broadens knowledge base coverage to encompass historical CVEs and vulnerabilities that have not been cataloged in CISA KEV.
-- **Reason Deferred from v1.0:** The complete NVD corpus exceeds 250,000 records. Ingesting and embedding this volume would significantly inflate the vector database footprint (increasing storage costs and retrieval latency) and introduce noise into retrieval queries. Furthermore, the NVD API 2.0 enforces strict rate limits. CISA KEV, MITRE ATT&CK, and OWASP Top 10 provided high-signal, zero-noise vulnerability coverage optimal for v1.0.
+- **Reason Deferred to v1.2:** The complete NVD corpus exceeds 250,000 records. Ingesting and embedding this volume would significantly inflate the vector database footprint (increasing storage costs and retrieval latency) and introduce noise into retrieval queries. CISA KEV, MITRE ATT&CK, and OWASP Top 10 provide high-signal, zero-noise vulnerability coverage optimal for v1.0/v1.1.
 
-### 2.7 PostgreSQL Operational Tables
+### 3.5 PostgreSQL Operational Tables
 - **Description:** Migration of agent checkpoints, control locks, and run metadata from local SQLite databases (`data/checkpoints/`) into centralized PostgreSQL tables (e.g., hosted on Supabase alongside pgvector).
 - **Motivation:** Enables centralized, multi-operator concurrent access, persistent state sharing across developer machines, and web dashboard integrations.
-- **Reason Deferred from v1.0:** Viper v1.0 was intentionally architected for single-operator local use with zero mandatory server infrastructure beyond the optional Supabase vector store. Local SQLite checkpoints provide instantaneous, zero-latency atomic transactions with no database network dependencies or migration overhead.
+- **Reason Deferred to v1.2:** Viper is intentionally architected for single-operator local use with zero mandatory server infrastructure beyond the optional Supabase vector store. Local SQLite checkpoints provide instantaneous, zero-latency atomic transactions with no database network dependencies or migration overhead.
 
-### 2.8 Multi-Job Dispatch & Parallel Execution
+### 3.6 Multi-Job Dispatch & Parallel Execution
 - **Description:** Capability for the agent or operator to dispatch and manage multiple concurrent security scanner jobs on the execution plane simultaneously (e.g., running Nmap and Nuclei in parallel).
 - **Motivation:** Reduces total engagement execution time by executing complementary passive and active reconnaissance tasks concurrently.
-- **Reason Deferred from v1.0:** Concurrent job execution on a single target introduces risks of rate-limit exhaustion, network contention, and out-of-order target impacts. Furthermore, managing process-group signals (SIGSTOP, SIGKILL) and multiplexed SSE output streams for concurrent processes increases execution engine complexity. Single-job dispatch ensured deterministic audit trails, straightforward stream capture, and reliable emergency stopping.
+- **Reason Deferred to v1.2:** Concurrent job execution on a single target introduces risks of rate-limit exhaustion, network contention, and out-of-order target impacts. Furthermore, managing process-group signals (SIGSTOP, SIGKILL) and multiplexed SSE output streams for concurrent processes increases execution engine complexity. Single-job dispatch ensures deterministic audit trails, straightforward stream capture, and reliable emergency stopping.
 
-### 2.9 Reviewed HTTP Nuclei Template Subset & Template Pinning
+### 3.7 Reviewed HTTP Nuclei Template Subset & Template Pinning
 - **Description:** Curation, offline security auditing, and cryptographic hash-pinning of a minimal, reviewed subset of Nuclei HTTP templates strictly restricted to benign technology and exposure checks, packaged directly with the deployment rather than relying on broad community template updates.
-- **Motivation:** While v1.0 enforces `-pt http`, tag allowlists (`tech,misconfig`), and tag denylists (`dos,fuzz,intrusive,...`), community template updates can introduce new or modified templates with unexpected network behaviors or payloads.
-- **Reason Deferred from v1.0:** In v1.0, the combination of fixed CLI flags (`-pt http`, `-tags`, `-etags`, `-severity info,low,medium`, `-no-interactsh`, `-disable-redirects`), unprivileged service execution, and root-owned read-only `/opt/viper/nuclei-templates` provides robust runtime containment. Manually auditing and maintaining an in-tree curated catalog of thousands of individual YAML templates is deferred to v1.1.
+- **Motivation:** While v1.0/v1.1 enforce `-pt http`, tag allowlists (`tech,misconfig`), and tag denylists (`dos,fuzz,intrusive,...`), community template updates can introduce new or modified templates with unexpected network behaviors or payloads.
+- **Reason Deferred to v1.2:** The combination of fixed CLI flags (`-pt http`, `-tags`, `-etags`, `-severity info,low,medium`, `-no-interactsh`, `-disable-redirects`), unprivileged service execution, and root-owned read-only `/opt/viper/nuclei-templates` provides robust runtime containment. Manually auditing and maintaining an in-tree curated catalog of thousands of individual YAML templates is deferred to v1.2.
+
+### 3.8 Sigstore Rekor External Transparency Log Anchoring
+- **Description:** Anchoring audit log head hashes to the public Sigstore Rekor transparency ledger with inclusion proof verification.
+- **Reason Deferred to v1.2:** RFC-3161 TSA anchoring provides robust, standardized, offline-verifiable cryptographic timestamping with standard OS OpenSSL tooling. Rekor inclusion verification requires specialized Sigstore client libraries and public ledger dependencies, deferred to v1.2.

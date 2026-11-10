@@ -9,8 +9,6 @@ import logging
 import os
 import re
 import secrets
-import shutil
-import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -422,43 +420,8 @@ def _exec_client(settings: Settings) -> tuple[Any, dict[str, str]]:
     return client, headers
 
 
-_VM_NAME = re.compile(r"[a-z]([-a-z0-9]{0,61}[a-z0-9])?")
-_ZONE = re.compile(r"[a-z]+-[a-z]+[0-9]-[a-z]")
-
-
-def _exec_shell(settings: Settings, args: argparse.Namespace) -> int:
-    """Interactive SSH to the execution VM over IAP, only for a human who holds exclusive control.
-
-    The agent cannot dispatch while the human holds the lock, so the shell and the agent never drive the
-    VM at once. The command is a fixed argument list (no shell), the names are validated, and the opening is
-    audited BEFORE the session starts: no evidence, no shell.
-    """
-    from viper.agents.audit import AuditLog
-
-    if not (_PROJECT.fullmatch(args.project) and _VM_NAME.fullmatch(args.vm) and _ZONE.fullmatch(args.zone)):
-        print("shell error: invalid project, vm or zone name")
-        return 1
-    holder = _control_lock(settings, args.project).holder()
-    if not (holder or "").startswith("human:"):
-        print("shell error: a human must hold exclusive control first: "
-              f"viper exec takeover --project {args.project}")
-        return 1
-    try:
-        AuditLog(settings, args.project).append(
-            thread_id="shell", event="human_shell_opened", actor="human",
-            detail={"message": f"ssh {args.vm} {args.zone}", "approver": getpass.getuser()})
-    except Exception as exc:  # noqa: BLE001 - class only
-        print(f"shell error: audit event could not be written ({type(exc).__name__}); no shell opened")
-        return 1
-    gcloud = shutil.which("gcloud") or "gcloud"
-    argv = [gcloud, "compute", "ssh", args.vm, "--zone", args.zone, "--tunnel-through-iap"]
-    return 0 if subprocess.call(argv) == 0 else 1  # noqa: S603 - fixed argv, validated names, no shell
-
-
 def cmd_exec(settings: Settings, args: argparse.Namespace) -> int:
     # Offline, control-lock verbs: a human taking/releasing exclusive control of the VM.
-    if args.exec_cmd == "shell":
-        return _exec_shell(settings, args)
     if args.exec_cmd in ("takeover", "release"):
         who = f"human:{getpass.getuser()}"
         lock = _control_lock(settings, args.project)
@@ -567,10 +530,6 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("takeover", "release"):
         px = xsub.add_parser(name, help=f"{name} exclusive control of a project's VM")
         px.add_argument("--project", required=True)
-    psh = xsub.add_parser("shell", help="open an SSH shell on the VM (a human must hold exclusive control)")
-    psh.add_argument("--project", required=True)
-    psh.add_argument("--vm", default="viper-kali-lab")
-    psh.add_argument("--zone", default="us-central1-a")
     for name, helptext in (("watch", "stream a job's output"),
                            ("pause", "pause a running job"),
                            ("stop", "emergency-stop a job (kill its process tree)")):

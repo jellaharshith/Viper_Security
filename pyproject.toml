@@ -1,6 +1,6 @@
 [project]
 name = "viper"
-version = "1.0.0"
+version = "1.1.0"
 description = "Human-controlled AI copilot for authorized penetration testing and bug-bounty research"
 readme = "README.md"
 requires-python = ">=3.12"
