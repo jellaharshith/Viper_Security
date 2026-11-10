@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- **Execution plane job ids:** the remote client now sends a per-dispatch job id (`<action_id>-<12 hex>`, valid for the VM's `^[a-zA-Z0-9_-]{1,128}$`), so reusing an action id across runs no longer returns HTTP 409 until `vmapi` restarts. The single-use dispatch claim still blocks double sends.
+- **Spot preemption:** transport errors while dispatching, polling or streaming raise `ExecutionPlaneUnreachable` (a `RemoteJobError`) stating the VM may have been preempted and the job state is unknown, instead of a bare `ReadTimeout`. Automatic resume after VM recreation is not implemented.
+- **Approval expiry:** an expired checkpoint raises `ApprovalExpired` naming the action and how overdue it is; the resumed run finishes REJECTED, dispatches nothing, keeps the `approval_expired` audit event and prints how to re-request approval.
+- **Planner targets:** the planner prompt and validator reject URL schemes, paths, ports and malformed hosts for real tools, even when no egress allowlist is configured.
+
+### Added
+- **Per-run scanner metrics:** executed nuclei template count and request count are parsed into the run result and shown in the Markdown report, the JSON export (`scanner_metrics`) and SARIF run properties. Missing data renders as `unknown`, never `0`.
+
+### Known limits
+- Exposure checks for `/ftp`, `/metrics` and `/api-docs` are still not in the frozen nuclei profile. The broad `exposure` tag was rejected on purpose (about 6,600 extra requests, roughly 28 minutes at 5 req/s against a 900 s limit); see `docs/v1-scope.md` section 3.4.
+
 ## [1.1.0] - 2026-11-09 - v1.1: Multi-format reports, real RFC-3161 anchoring, scope limits
 
 ### Added

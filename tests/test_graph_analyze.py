@@ -117,7 +117,7 @@ def test_report_lists_denied_actions_with_their_reasons(tmp_path):
     assert "active testing is disabled" in out["report"]
 
 
-def test_hostile_action_ids_are_rejected_before_anything_runs(tmp_path):  # codex R4
+def test_hostile_action_ids_are_rejected_before_anything_runs(tmp_path):  # security review R4
     esc = chr(27)
     for bad in (f"x{esc}]52;c;AAAA", "x`](http://evil)", "a b", "", "x" * 200):
         nasty = Action(action_id=bad, tool_name="nmap", args={"target": "evil.com"})

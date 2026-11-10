@@ -150,7 +150,7 @@ def test_an_exact_egress_host_is_accepted() -> None:
     assert actions[0].args["target"] == "scanme.nmap.org"
 
 
-def test_a_mixed_case_target_is_rejected_because_the_vm_matches_exactly() -> None:  # codex v1 #9
+def test_a_mixed_case_target_is_rejected_because_the_vm_matches_exactly() -> None:  # v1 review #9
     with pytest.raises(PlannerError, match="egress"):
         egress_planner(nmap_for("ScanMe.Nmap.Org"), ["scanme.nmap.org"])("scan")
 

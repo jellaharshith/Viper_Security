@@ -119,7 +119,7 @@ def test_terminal_output_is_stripped_of_control_characters(env, monkeypatch, cap
     assert chr(27) not in out and chr(7) not in out and chr(0x202E) not in out
 
 
-def test_a_failed_audit_append_leaves_no_usable_scope(env, monkeypatch, capsys):  # codex v1 #1
+def test_a_failed_audit_append_leaves_no_usable_scope(env, monkeypatch, capsys):  # v1 review #1
     from viper.agents.audit import AuditError
 
     assert draft(env) == 0
@@ -142,7 +142,7 @@ def test_an_existing_scope_blocks_approval_before_anything_is_audited(env):
     assert (env["tmp"] / "scopes" / "acme.scope.yaml").read_text(encoding="utf-8") == "planted"
 
 
-# --- codex v1 re-review R1: publication must be all-or-nothing -------------------------------------
+# --- v1 re-review R1: publication must be all-or-nothing -------------------------------------
 
 def _leftovers(env):
     return sorted(p.name for p in (env["tmp"] / "scopes").iterdir() if not p.name.endswith(".draft.yaml"))

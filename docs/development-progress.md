@@ -56,7 +56,7 @@ Remaining in M3 (needs decisions): scheduling/persistent Qdrant, extra sources (
 dataset v2 so the gate covers them.
 
 ## M3b/c/d - Multi-source KB, dataset v2, pgvector backend (2026-11-06, branch `m3/integration`)
-Built by three parallel lanes (Claude subagent, Codex, Antigravity), each in its own worktree; the lead re-ran
+Built by three parallel lanes, each in its own worktree; the lead re-ran
 pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and mypy strict clean.
 - **M3b** (`rag/sources.py`, `attack.py`, `owasp.py`): MITRE ATT&CK v20.1 (706 active techniques) and OWASP Top 10 2025
   (40 chunks, pinned to a commit SHA). A failed source is carried over from the live collection and flagged;
@@ -131,7 +131,7 @@ pytest/ruff/mypy for every lane and merged A -> C -> B. 127 tests pass; ruff and
   Not done: an LLM-backed planner (a JSON plan file stands in), CLI repair command for a damaged audit log, external anchoring of the audit head (M6).
 
 ## M6 — Cloud Kali execution plane, headless-first (2026-11-07)
-Built by a three-agent herdr crew (claude-m6 client, codex-m6 VM server, agy-m6 docs) with the
+Built by a three-agent herdr crew (lane-A-m6 client, lane-B-m6 VM server, lane-C-m6 docs) with the
 coordinator wiring and merging. **Headless execution plane built and wired in dry-run; the paid GCP
 Kali VM and the one live scan are a gated on-demand step** (see `docs/plans/m6-gcloud-vm-setup.md`).
 - **Orchestrator client** (`src/viper/execution/remote.py`, `factory.py`): `RemoteExecutor` posts an
@@ -168,7 +168,7 @@ authorized target `scanme.nmap.org`, then tore everything down (total cost a few
   internet, IAP-SSH-only firewall; `vmapi` under systemd bound to `127.0.0.1:8443` (TLS + bearer token);
   reached from the workstation via an **SSH port-forward over IAP** (`-L 8443:localhost:8443`) — the
   `start-iap-tunnel` method fails here because the server binds loopback by design.
-- **Pre-deploy gate:** codex's 3 Linux-only process-tree-kill tests (plus the rest) — **30 passed on the VM**.
+- **Pre-deploy gate:** the VM lane's 3 Linux-only process-tree-kill tests (plus the rest) — **30 passed on the VM**.
 - **The five verbs, live:**
   1. *Approve* — `nmap` (ACTIVE) paused at the approval checkpoint; `agent resume --decision ALLOW`.
   2. *Watch* — `viper exec watch` streamed real nmap output: `scanme.nmap.org (45.33.32.156)` 22/tcp ssh,
@@ -184,8 +184,8 @@ authorized target `scanme.nmap.org`, then tore everything down (total cost a few
   `tool_dry_run`; external audit-head anchoring still open.
 
 ## M7 BUILD — 2026-11-08 (offline definition of done met; live run pending)
-Three-agent herdr crew on branch `m7/pentest-copilot` (claude-m7 parsers + stream capture, codex-m7
-report + anchoring + security review, agy-m7 docs; coordinator wiring). 465 tests, ruff + mypy clean.
+Three-agent herdr crew on branch `m7/pentest-copilot` (lane-A-m7 parsers + stream capture, lane-B-m7
+report + anchoring + security review, lane-C-m7 docs; coordinator wiring). 465 tests, ruff + mypy clean.
 - **Findings** (`viper.findings`): Finding schema v1; deterministic nmap/nuclei parsers. `confirmed` only
   from parser evidence, never from LLM text. Bounded, control/bidi-neutralised, shell-quoted repro.
 - **LLM planner** (`agents/planner.py`): opt-in `agent run --llm`; strict fail-closed parsing, size and
@@ -200,7 +200,7 @@ report + anchoring + security review, agy-m7 docs; coordinator wiring). 465 test
 - **Anchoring**: `viper audit anchor` (mock) + `audit verify` anchor verdicts (CONSISTENT_ONLY,
   VERIFIED, UNVERIFIED, TAMPERED, MALFORMED, MISMATCH) with chain coverage. Real TSA/Rekor receipts stay
   UNVERIFIED until a trusted offline verifier is wired in (documented limitation).
-- **Security review**: codex reviewed `376c255..HEAD` (10 medium findings), all fixed; re-review found
+- **Security review**: an independent reviewer covered `376c255..HEAD` (10 medium findings), all fixed; re-review found
   7 fixed / 3 partial + 4 residuals, all fixed in round 5.
 - **Not done**: noVNC takeover and multi-job dispatch stay deferred (see live validation below for the run).
 
@@ -230,8 +230,8 @@ lab host `scanme.nmap.org` only, then deleted everything (total cost: minutes of
   not installed on the Ubuntu image (apt has no nuclei), so only nmap was exercised live.
 
 ## V1 BUILD - 2026-11-08 (offline definition of done met; live-validated, see below)
-Four-session herdr crew on branch `v1/finish` (claude-v1 scope reader + rehearsal test, codex-v1 VM `nuclei`
-profile + bootstrap + security review, agy-v1 weekly workflow + docs, coordinator planner/CLI/wiring).
+Four-session herdr crew on branch `v1/finish` (lane-A-v1 scope reader + rehearsal test, lane-B-v1 VM `nuclei`
+profile + bootstrap + security review, lane-C-v1 weekly workflow + docs, coordinator planner/CLI/wiring).
 718 tests + 64 VM-API tests, ruff and mypy clean.
 - **Planner <-> VM consistency:** `NmapArgs.ports` is validated exactly like the VM; arguments are strict (no
   `"true"`/`1` booleans, no `"5"` rates, no explicit null ports) because the ORIGINAL args are dispatched; the

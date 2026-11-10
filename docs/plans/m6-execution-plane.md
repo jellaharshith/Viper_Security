@@ -379,12 +379,12 @@ Follow the steps in `docs/plans/m6-gcloud-vm-setup.md`:
    - Architectural Decision Record (`docs/adr/0009-execution-plane.md`).
    - Authoritative scope for `scanme.nmap.org` (`projects/lab-scanme/scope.yaml`).
 
-2. **M6-2: Remote Client & Fail-Safe Selector (`claude-m6`)**
+2. **M6-2: Remote Client & Fail-Safe Selector (`lane-A-m6`)**
    - Implement `RemoteExecutor` in `src/viper/execution/remote.py`.
    - Implement `make_executor` selector in `src/viper/execution/factory.py`.
    - Test client with mocked responses and assert selector failsafe behavior (`tests/test_remote_executor.py`).
 
-3. **M6-3: VM Execution API Server (`codex-m6`)**
+3. **M6-3: VM Execution API Server (`lane-B-m6`)**
    - Implement FastAPI server under `vmapi/` (`app.py`, `auth.py`, `jobs.py`, `toolrunner.py`).
    - Process group isolation, signal-based pause/stop, argument allowlisting.
    - Comprehensive test suite under `vmapi/tests/test_vmapi.py`.

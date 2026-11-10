@@ -56,7 +56,7 @@ def test_intent_event_is_not_evidence():
     assert findings == [] and any("no audited" in w or "without" in w for w in warnings)
 
 
-def test_edited_target_in_checkpoint_args_is_rejected():  # codex R1
+def test_edited_target_in_checkpoint_args_is_rejected():  # security review R1
     forged = result(args={**ARGS, "target": "evil.example"})
     findings, warnings = run([forged], [event()])
     assert findings == [] and warnings
@@ -68,17 +68,17 @@ def test_edited_action_in_checkpoint_is_rejected():
     assert findings == [] and warnings
 
 
-def test_flipping_simulated_in_checkpoint_does_not_create_findings():  # codex R1
+def test_flipping_simulated_in_checkpoint_does_not_create_findings():  # security review R1
     findings, warnings = run([result(simulated=True)], [event()])
     assert findings == [] and warnings
 
 
-def test_clearing_truncated_in_checkpoint_cannot_hide_the_warning():  # codex R1
+def test_clearing_truncated_in_checkpoint_cannot_hide_the_warning():  # security review R1
     _, warnings = run([result(truncated=False)], [event(truncated=True)])
     assert any("truncated" in w for w in warnings)
 
 
-def test_removing_a_checkpoint_result_is_detected_not_clean():  # codex R2
+def test_removing_a_checkpoint_result_is_detected_not_clean():  # security review R2
     findings, warnings = run([], [event()])
     assert findings == [] and any("missing" in w for w in warnings)
 

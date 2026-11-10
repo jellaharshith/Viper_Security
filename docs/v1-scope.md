@@ -127,6 +127,8 @@ The following features and improvements are deferred to the **Viper v1.2** miles
 - **Reason Deferred to v1.2:** The v1.1 security review demonstrated that a one-time SQLite lock check at shell invocation was not bound to the VM resource and did not atomically reserve control for the lifetime of the interactive session (an operator could release the lock or an agent could dispatch concurrently while the shell remained active). Operators continue to safely use standard `gcloud compute ssh --tunnel-through-iap` alongside `viper exec takeover`. Implementing a session-bound lease and mutual exclusion between interactive shells and agent dispatch is deferred to v1.2.
 
 ### 3.4 Real Test 1 Lab Backlog Items (`docs/real-test-1.md`)
+**Status (2026-11-10):** items 1, 2 (distinct unreachable-plane error only; no automatic resume), 3, 4 and 6 are fixed on `main` (see CHANGELOG `[Unreleased]`). Item 5 stays open: the broad nuclei `exposure` tag was rejected because it adds about 6,600 requests (roughly 28 minutes at 5 req/s) against the 900 s limit and probes for leaked files. The next step is a reviewed, pinned list of specific templates for those three paths, verified against a real VM, or the ZAP spider.
+
 Identified during the end-to-end OWASP Juice Shop lab validation:
 1. **Thread-Namespaced Job IDs:** Execution plane job IDs currently collide if an action ID (e.g. `nmap_scan`) is reused across runs before `vmapi` service restart, returning HTTP 409. v1.2 will namespace job IDs by thread ID (`{thread}_{action_id}`).
 2. **Spot VM Preemption Resilience:** Spot instance reclamation mid-scan currently surfaces as a generic `ReadTimeout`. v1.2 will distinguish "execution plane unreachable" and offer transparent job resumption upon VM recreation.
