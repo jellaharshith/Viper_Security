@@ -26,6 +26,16 @@ Audit citations identify supplied events; chain integrity must be verified separ
 | low | {{ low_confirmed }} | {{ low_hypothesis }} |
 | info | {{ info_confirmed }} | {{ info_hypothesis }} |
 
+## Scanner metrics
+
+| Tool | Action | Executed templates | Requests |
+|---|---|---:|---:|
+| nuclei | {{ action_id }} | {{ executed_template_count }} | {{ request_count }} |
+
+<!-- If scanner metrics are missing: -->
+<!-- - Executed templates: unknown -->
+<!-- - Requests: unknown -->
+
 ## Confirmed findings
 
 <!-- Findings are grouped by tool (e.g. nmap, nuclei) -->
@@ -136,6 +146,14 @@ Top-level object conforming to schema `"viper-report/1"`:
       "info": {"confirmed": 1, "hypothesis": 0}
     }
   },
+  "scanner_metrics": [
+    {
+      "tool": "nuclei",
+      "action_id": "scan_nuclei_1",
+      "template_count": 42,
+      "request_count": 150
+    }
+  ],
   "findings": [
     {
       "id": "f-nmap-22-scan1",
@@ -183,7 +201,7 @@ OASIS Static Analysis Results Interchange Format (SARIF) v2.1.0 export:
   - `critical` -> `"error"`
 - **Message:** `message.text` contains finding title.
 - **Locations:** Logical location name matches `affected_asset`.
-- **Properties:** Preserves `confidence`, `severity`, `source_action_id`, and `audit_refs`.
+- **Properties:** Preserves `confidence`, `severity`, `source_action_id`, `audit_refs`, and run-level `scanner_metrics`.
 - **Fingerprints:** `partialFingerprints["viperFindingId/v1"]` binds finding identifier.
 
 ---

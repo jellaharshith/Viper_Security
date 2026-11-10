@@ -438,3 +438,86 @@ def parse_nuclei(
     output: str, *, action_id: str, target: str, audit_refs: list[str]
 ) -> list[Finding]:
     return parse_nuclei_ex(output, action_id=action_id, target=target, audit_refs=audit_refs)[0]
+
+
+_RE_REQUESTS = re.compile(
+    r"(?:(?:\|\s*)?Requests:\s*(\d+)|\b(?:requests?|reqs?)\s*[:=]\s*(\d+)\b)",
+    re.IGNORECASE,
+)
+_RE_TEMPLATES = re.compile(
+    r"(?:(?:\|\s*)?Templates:\s*(\d+)|\b(?:templates?|tpls?)\s*[:=]\s*(\d+)\b)",
+    re.IGNORECASE,
+)
+
+
+def parse_nuclei_metrics(output: str) -> dict[str, int | None]:
+    """Extract per-run scanner metrics: executed template count and request count.
+
+    Parses explicit stats records or counts executed template IDs from output lines.
+    Returns integer counts when present, or None if missing (never defaults to 0).
+    """
+    if not output:
+        return {"template_count": None, "request_count": None}
+    lines, _ = _lines(output)
+    stat_templates: int | None = None
+    stat_requests: int | None = None
+    seen_templates: set[str] = set()
+
+    for line in lines:
+        if line.startswith("{"):
+            if not _json_depth_ok(line):
+                continue
+            try:
+                d = json.loads(line)
+            except Exception:  # noqa: BLE001, S112
+                continue
+            if not isinstance(d, dict):
+                continue
+
+            for key in ("requests", "request_count", "reqs"):
+                val = d.get(key)
+                if isinstance(val, int) and not isinstance(val, bool) and val >= 0:
+                    stat_requests = val
+                    break
+                if isinstance(val, str) and val.isdigit():
+                    stat_requests = int(val)
+                    break
+
+            for key in ("templates", "template_count", "executed_templates", "tpls"):
+                val = d.get(key)
+                if isinstance(val, int) and not isinstance(val, bool) and val >= 0:
+                    stat_templates = val
+                    break
+                if isinstance(val, str) and val.isdigit():
+                    stat_templates = int(val)
+                    break
+
+            tpl = d.get("template-id")
+            if isinstance(tpl, str) and _TEMPLATE_ID.match(tpl):
+                seen_templates.add(tpl)
+        else:
+            m_req = _RE_REQUESTS.search(line)
+            if m_req:
+                val_str = m_req.group(1) or m_req.group(2)
+                if val_str and val_str.isdigit():
+                    stat_requests = int(val_str)
+
+            m_tpl = _RE_TEMPLATES.search(line)
+            if m_tpl:
+                val_str = m_tpl.group(1) or m_tpl.group(2)
+                if val_str and val_str.isdigit():
+                    stat_templates = int(val_str)
+
+            m_rec = _NUCLEI_TEXT.match(line)
+            if m_rec:
+                tpl = m_rec["tpl"]
+                if _TEMPLATE_ID.match(tpl):
+                    seen_templates.add(tpl)
+
+    final_templates = (
+        stat_templates
+        if stat_templates is not None
+        else (len(seen_templates) if seen_templates else None)
+    )
+    final_requests = stat_requests
+    return {"template_count": final_templates, "request_count": final_requests}

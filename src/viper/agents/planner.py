@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
+from ipaddress import ip_address
 from typing import Any
 
 from pydantic import ValidationError
@@ -18,6 +19,7 @@ from viper.policy.models import Action, Scope
 from viper.tools.registry import ToolRegistry
 
 _ACTION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+_HOST_LABEL = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
 MAX_REPLY_CHARS = 65_536  # a plan is a few lines; refuse to parse anything bigger
 MAX_DECODE_ATTEMPTS = 50
 MAX_ACTIONS = 8  # a plan is a handful of scans, not a campaign; humans approve each ACTIVE one
@@ -34,10 +36,28 @@ _SYSTEM = (
     "test plan as a JSON array and nothing else. Each item must be exactly "
     '{"action_id": "<unique short id>", "tool_name": "<one of the tools below>", '
     '"args": {...}}. Use only the listed tools and their listed arguments. Targets MUST be '
-    "taken from the in-scope list; never invent targets. Do not include risk levels, approvals "
+    "taken from the in-scope list; never invent targets. For execution tools, target must be a "
+    "bare hostname or IP address, with no URL scheme, path, port, query or fragment. "
+    "Use an exact allowed_hosts entry when supplied. Put scan ports in the tool's ports argument, "
+    "never in target. Do not include risk levels, approvals "
     "or any other keys: a deterministic policy engine decides what runs and a human approves "
     "active tests. Prefer the least intrusive plan that answers the request."
 )
+
+
+def _bare_host(target: Any) -> bool:
+    """Validate host syntax without resolving DNS or widening the egress allowlist."""
+    if not isinstance(target, str) or not target or "%" in target:
+        return False
+    try:
+        ip_address(target)
+        return True
+    except ValueError:
+        pass
+    # Numeric dotted strings must be valid IPs, rather than ambiguous DNS names.
+    if re.fullmatch(r"[0-9.]+", target):
+        return False
+    return len(target) <= 253 and all(_HOST_LABEL.fullmatch(p) for p in target.split("."))
 
 
 def _first_array(text: str) -> list[Any]:
@@ -124,11 +144,13 @@ class LLMPlanner:
             tool = self._registry.get(action.tool_name)
             if tool is None:
                 raise PlannerError(f"unknown tool proposed: {action.tool_name!r}")
-            if allowed and not tool.dry_run_only:  # a real tool will be sent to the VM
+            if not tool.dry_run_only:  # a real tool will be sent to the VM
                 target = action.args.get("target")
-                if not isinstance(target, str) or not target:
-                    raise PlannerError(f"{action.tool_name}: a string target is required")
-                if target not in allowed:  # exact match, like the VM: mixed case is refused there
+                if not _bare_host(target):
+                    raise PlannerError(
+                        f"{action.tool_name}: target must be a bare hostname or IP address; "
+                        "URL schemes, paths, ports and malformed hosts are not supported")
+                if allowed and target not in allowed:  # exact match, like the VM
                     raise PlannerError(
                         f"{action.tool_name}: target {target!r} is not an exact egress host; "
                         f"allowed: {sorted(allowed)}")

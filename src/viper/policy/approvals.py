@@ -35,6 +35,20 @@ class PendingApproval(BaseModel):
     consumed: bool = False
 
 
+class ApprovalExpired(ValueError):
+    """A checkpoint approval passed its deadline; it cannot authorize dispatch."""
+
+    recovery = ("To re-request approval, use viper agent run with the same scope and plan "
+                "and a new --thread id, then review and approve the fresh request.")
+
+    def __init__(self, pending: PendingApproval, now: datetime) -> None:
+        self.action_id = pending.action_id
+        self.expires_at = pending.expires_at
+        self.overdue_seconds = max(0, int((now - pending.expires_at).total_seconds()))
+        super().__init__(f"approval expired for action {self.action_id}, "
+                         f"{self.overdue_seconds} seconds past deadline")
+
+
 class ResumePayload(BaseModel):
     """What the trusted local CLI sends on resume. Unknown keys are rejected."""
 
@@ -72,7 +86,7 @@ def revalidate(
     if pending.scope_revision != scope_revision:
         return "scope changed since approval"
     if now >= pending.expires_at:
-        return "approval expired before dispatch"
+        return str(ApprovalExpired(pending, now))
     return None
 
 

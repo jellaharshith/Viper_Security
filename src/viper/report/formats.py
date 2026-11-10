@@ -6,11 +6,39 @@ import json
 from typing import Any
 
 from viper.findings.models import Finding
-from viper.report.common import citations_for, counts, neutralize, rule_id
+from viper.report.common import (
+    citations_for,
+    counts,
+    extract_scanner_metrics,
+    neutralize,
+    rule_id,
+)
 
 
 def _dump(data: dict[str, Any]) -> str:
     return json.dumps(neutralize(data), ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+
+
+def _format_scanner_metrics(
+    audit_events: list[dict[str, Any]], findings: list[Finding]
+) -> list[dict[str, Any]]:
+    metrics = extract_scanner_metrics(audit_events, findings)
+    if not metrics:
+        return [{
+            "tool": "nuclei",
+            "action_id": "unknown",
+            "template_count": "unknown",
+            "request_count": "unknown",
+        }]
+    return [
+        {
+            "tool": m["tool"],
+            "action_id": m["action_id"],
+            "template_count": m["template_count"] if m["template_count"] is not None else "unknown",
+            "request_count": m["request_count"] if m["request_count"] is not None else "unknown",
+        }
+        for m in metrics
+    ]
 
 
 def render_json(
@@ -19,6 +47,7 @@ def render_json(
     """Export findings and contextual citation status, not a claim of audit-chain verification."""
     return _dump({"schema": "viper-report/1", "project_id": project_id, "thread_id": thread_id,
                   "counts": counts(findings),
+                  "scanner_metrics": _format_scanner_metrics(audit_events, findings),
                   "findings": [finding.model_dump(mode="json") for finding in findings],
                   "audit_citations": [citation for finding in findings
                                       for citation in citations_for(finding, audit_events, thread_id)]})
@@ -45,7 +74,19 @@ def render_sarif(
             "locations": [{"logicalLocations": [{"name": finding.affected_asset}]}],
             "partialFingerprints": {"viperFindingId/v1": finding.id},
         })
-    return _dump({"$schema": "https://json.schemastore.org/sarif-2.1.0.json", "version": "2.1.0",
-                  "runs": [{"tool": {"driver": {"name": "Viper", "rules": list(rules.values())}},
-                            "properties": {"project_id": project_id, "thread_id": thread_id,
-                                           "counts": counts(findings)}, "results": results}]})
+    return _dump({
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {"driver": {"name": "Viper", "rules": list(rules.values())}},
+                "properties": {
+                    "project_id": project_id,
+                    "thread_id": thread_id,
+                    "counts": counts(findings),
+                    "scanner_metrics": _format_scanner_metrics(audit_events, findings),
+                },
+                "results": results,
+            }
+        ],
+    })

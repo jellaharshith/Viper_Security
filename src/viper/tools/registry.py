@@ -11,7 +11,7 @@ import builtins
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from viper.policy.models import KNOWN_TECHNIQUES, RiskLevel, ToolInfo
 
@@ -27,6 +27,23 @@ class DryRunResult(BaseModel):
     simulated: bool = True
     truncated: bool = False  # True when captured output was cut by a client-side limit
     output: str = ""  # captured tool stdout (real execution only); stubs leave it empty
+    template_count: int | None = None
+    request_count: int | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_scanner_metrics(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("tool") == "nuclei":
+            output = data.get("output")
+            if isinstance(output, str) and output:
+                from viper.findings.parsers import parse_nuclei_metrics
+
+                parsed = parse_nuclei_metrics(output)
+                if data.get("template_count") is None:
+                    data["template_count"] = parsed["template_count"]
+                if data.get("request_count") is None:
+                    data["request_count"] = parsed["request_count"]
+        return data
 
 
 # Registry-owned technique tags and default request rates (F3). A model can never supply these;
