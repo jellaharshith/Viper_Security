@@ -72,7 +72,7 @@ Full design: [`docs/architecture.md`](docs/architecture.md) and [`docs/security-
 | M6 | Cloud execution plane: approve, watch, take over, pause, emergency-stop | Done, live-validated |
 | M7 | Pentest copilot: planner, finding validation, traceable report | Done, live-validated |
 | v1.0 | v1.0: live nuclei, scope reader, weekly KB refresh | Done, security-reviewed and live-validated (nmap + nuclei on a real VM) |
-| v1.1 | v1.1: multi-format reports, real RFC-3161 anchoring, scope limits, audited SSH shell | Done, security-reviewed and lab-validated |
+| v1.1 | v1.1: multi-format reports, real RFC-3161 anchoring, scope limits | Done, security-reviewed and lab-validated |
 
 M7 was validated against `scanme.nmap.org` on 2026-11-08 (see [`docs/development-progress.md`](docs/development-progress.md)).
 For complete v1.0/v1.1 specifications and the v1.2 backlog (OWASP ZAP, noVNC, and lab items), see [`docs/v1-scope.md`](docs/v1-scope.md).
@@ -194,7 +194,6 @@ See the 60-second setup guide in [`docs/weekly-kb.md`](docs/weekly-kb.md).
 | `viper audit verify \| anchor --project ID [--provider mock\|tsa] [--allow-network]` | Verify hash chain and anchors; anchor the head (mock or RFC-3161 TSA) |
 | `viper exec watch \| pause \| stop --job ID` | Stream, pause or emergency-stop a running job |
 | `viper exec takeover \| release --project ID` | Take or release exclusive control of the VM |
-| `viper exec shell --project ID [--vm VM] [--zone ZONE]` | Open an audited SSH shell to the VM (requires exclusive control) |
 
 ## Project layout
 

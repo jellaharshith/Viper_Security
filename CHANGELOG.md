@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-11-09 - v1.1: Multi-format reports, real RFC-3161 anchoring, scope limits, SSH takeover shell
+## [1.1.0] - 2026-11-09 - v1.1: Multi-format reports, real RFC-3161 anchoring, scope limits
 
 ### Added
 - **Multi-Format Stakeholder & Machine Reports:**
@@ -22,11 +22,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   - Verified receipts vouched by a trusted root earn authoritative `VERIFIED` status in `viper audit verify`.
 - **Enforced Scope Limits & Registry-Owned Techniques:**
   - Additive `Scope` model fields: `max_rate_rps`, `automation_allowed`, and `permitted_techniques` (lowercase technique slugs).
+  - Rate limiting bounds HTTP scanner traffic (`nuclei`); `nmap` has no rate argument and runs under host/IP boundaries.
   - Registry-owned tool technique tags (`nmap` = `port-scan`, `service-detection`; `nuclei` = `web-scan`, `template-scan`) and default request rates.
   - Deterministic, fail-closed policy engine evaluations with exact contract deny strings for rate exceeding, automation bans, forbidden techniques, and unpermitted technique deviations.
-- **Audited SSH Takeover Shell (`viper exec shell`):**
-  - Interactive operator terminal connection to execution VM over IAP (`gcloud compute ssh --tunnel-through-iap`).
-  - Gated by active exclusive control lock (`human:...`), strictly auditing `human_shell_opened` before launch, and running via fixed argument list without shell interpretation.
 - **Scope Reader Hardening (`viper.policy.scope_draft`):**
   - Model prompt updated to extract v1.1 fields (`max_rate_rps`, `automation_allowed`, `permitted_techniques`).
   - Strips `host:port` entries (e.g. `127.0.0.1:3000`) and records a human note instead of failing the draft.
@@ -42,6 +40,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Dependency bumps: updated build and development dependencies (setuptools >=84.2.1, pytest >=9.2.0, ruff >=0.17.3, mypy >=2.4.1, pydantic-settings >=2.16.2).
 
 ### Deferred to v1.2
+- **Audited SSH Takeover Shell (`viper exec shell`):** Deferred to v1.2 after security review found the one-time lock check was not bound to the execution VM resource and did not reserve exclusive control for the full lifetime of the interactive session. Operators continue to use standard `gcloud compute ssh --tunnel-through-iap` alongside `viper exec takeover`.
 - **OWASP ZAP Integration (F4):** Headless web application scanner daemon deferred to v1.2.
 - **noVNC Browser Remote Desktop (F5b):** Embedded GUI streaming interface deferred to v1.2.
 - **Real Test 1 Lab Backlog Items (`docs/real-test-1.md`):**
