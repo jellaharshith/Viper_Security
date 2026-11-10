@@ -39,6 +39,7 @@ In v1.1, Viper introduces deterministic, fail-closed enforcement of operational 
    - **Automation Check:** If `tool.risk == RiskLevel.ACTIVE and not scope.automation_allowed`:
      DENY with `"automated tools are not permitted by this scope"`.
    - **Rate Limit Check:** If `scope.max_rate_rps is not None`:
+     - The rate cap explicitly bounds HTTP scanner traffic (`nuclei`) via its `-rl` argument. `nmap` has no rate argument and runs under port and target host scope.
      - Missing action `rate_limit` defaults to `tool.default_rate_rps`.
      - Invalid rates (null, boolean, string, or < 1) fail closed with `"rate <value!r> is not a valid rate_limit"`.
      - If rate exceeds `scope.max_rate_rps`:
