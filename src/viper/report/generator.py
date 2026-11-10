@@ -8,7 +8,16 @@ import re
 from typing import Any
 
 from viper.findings.models import Finding
-from viper.report.common import SEVERITIES, citations_for, counts, neutralize, small_json, visible
+from viper.report.common import (
+    SEVERITIES,
+    citations_for,
+    counts,
+    extract_scanner_metrics,
+    format_metric,
+    neutralize,
+    small_json,
+    visible,
+)
 
 
 def _plain(text: str) -> str:
@@ -49,6 +58,20 @@ def render_report(
     lines += ["", "Assets are supplied as in-scope by the caller; scope is enforced upstream.",
               "Confirmed denotes parser evidence of the stated condition, not proof of exploitability.",
               "Audit citations identify supplied events; chain integrity must be verified separately.", ""]
+    scanner_records = extract_scanner_metrics(audit_events, findings)
+    lines += ["## Scanner metrics", ""]
+    if scanner_records:
+        lines += ["| Tool | Action | Executed templates | Requests |",
+                  "|---|---|---:|---:|"]
+        for m in scanner_records:
+            t = _plain(m["tool"])
+            a = _plain(m["action_id"])
+            tc = format_metric(m["template_count"])
+            rc = format_metric(m["request_count"])
+            lines.append(f"| {t} | {a} | {tc} | {rc} |")
+    else:
+        lines += ["- Executed templates: unknown", "- Requests: unknown"]
+    lines.append("")
     index: list[str] = []
     for confidence, heading in [("confirmed", "Confirmed findings"), ("hypothesis", "Hypotheses")]:
         lines += [f"## {heading}", ""]

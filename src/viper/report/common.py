@@ -73,6 +73,86 @@ def citations_for(
     return citations or [{"finding_id": finding.id, "reference": None, "status": "unresolved"}]
 
 
+def format_metric(value: int | None) -> str:
+    """Format a scanner metric: integer count as string, missing data as 'unknown' (never '0')."""
+    if value is None:
+        return "unknown"
+    return str(value)
+
+
+def extract_scanner_metrics(
+    audit_events: list[dict[str, Any]], findings: list[Finding] | None = None
+) -> list[dict[str, Any]]:
+    """Extract per-run scanner metrics from audit events (and findings fallback).
+
+    Returns a list of dicts:
+    [{"tool": "nuclei", "action_id": "...", "template_count": int | None, "request_count": int | None}]
+    """
+    records: list[dict[str, Any]] = []
+    seen_actions: set[str] = set()
+
+    for ev in audit_events:
+        if ev.get("event") != "tool_result":
+            continue
+        detail = ev.get("detail")
+        if not isinstance(detail, dict):
+            continue
+        tool = str(detail.get("tool", ""))
+        if tool != "nuclei":
+            continue
+        action_id = str(detail.get("action_id", "unknown"))
+        seen_actions.add(action_id)
+
+        tpl_cnt: int | None = None
+        for key in ("template_count", "executed_templates", "templates"):
+            val = detail.get(key)
+            if isinstance(val, int) and not isinstance(val, bool) and val >= 0:
+                tpl_cnt = val
+                break
+            if isinstance(val, str) and val.isdigit():
+                tpl_cnt = int(val)
+                break
+        if tpl_cnt is None and isinstance(detail.get("metrics"), dict):
+            m_val = detail["metrics"].get("template_count")
+            if isinstance(m_val, int) and not isinstance(m_val, bool) and m_val >= 0:
+                tpl_cnt = m_val
+
+        req_cnt: int | None = None
+        for key in ("request_count", "requests", "reqs"):
+            val = detail.get(key)
+            if isinstance(val, int) and not isinstance(val, bool) and val >= 0:
+                req_cnt = val
+                break
+            if isinstance(val, str) and val.isdigit():
+                req_cnt = int(val)
+                break
+        if req_cnt is None and isinstance(detail.get("metrics"), dict):
+            m_val = detail["metrics"].get("request_count")
+            if isinstance(m_val, int) and not isinstance(m_val, bool) and m_val >= 0:
+                req_cnt = m_val
+
+        records.append({
+            "tool": tool,
+            "action_id": action_id,
+            "template_count": tpl_cnt,
+            "request_count": req_cnt,
+        })
+
+    if not records and findings:
+        for f in findings:
+            if f.source_tool == "nuclei" and f.source_action_id not in seen_actions:
+                seen_actions.add(f.source_action_id)
+                records.append({
+                    "tool": "nuclei",
+                    "action_id": f.source_action_id,
+                    "template_count": None,
+                    "request_count": None,
+                })
+
+    return records
+
+
+
 def small_json(evidence: str) -> Any:
     """Parse only small JSON evidence; malformed/deep/non-finite input stays raw."""
     if len(evidence.encode("utf-8", errors="surrogatepass")) >= 8192:
