@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 import math
 import os
 import re
@@ -30,6 +31,8 @@ from typing import Any, Literal
 import certifi
 import httpx
 from pydantic import BaseModel, ConfigDict
+
+log = logging.getLogger(__name__)
 
 Submit = Callable[[str], bytes]
 Verifier = Callable[[str, str, bytes], bool]
@@ -180,7 +183,9 @@ def verify_anchor(receipt: AnchorReceipt, head_hash: str, *, verifier: Verifier 
     except (ValueError, binascii.Error):
         return False
     except Exception:
-        return False  # trust or decoding failures cannot turn into verification success
+        # Trust or decoding failures cannot turn into verification success.
+        log.debug("anchor verifier raised; treating receipt as unverified", exc_info=True)
+        return False
 
 
 def _openssl_output(argv: list[str], timeout: float, runner: ProcessRunner, config: Path) -> str | None:
@@ -211,6 +216,8 @@ def _openssl_output(argv: list[str], timeout: float, runner: ProcessRunner, conf
         result = runner(argv, shell=False, stdin=subprocess.DEVNULL, stdout=write_fd,
                         stderr=subprocess.STDOUT, env=env, timeout=timeout, check=False)
     except Exception:
+        # e.g. openssl missing or timed out: visible in debug logs, unlike a plainly bad token.
+        log.debug("openssl invocation failed", exc_info=True)
         failed.set()
     finally:
         os.close(write_fd)

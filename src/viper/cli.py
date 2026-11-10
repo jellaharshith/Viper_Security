@@ -462,6 +462,7 @@ def cmd_exec(settings: Settings, args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="viper")
+    parser.add_argument("--version", action="version", version=f"viper {__version__}")
     parser.add_argument("--health", action="store_true", help="print redacted config and exit")
     sub = parser.add_subparsers(dest="command")
     p_ing = sub.add_parser("ingest-kev", help="download and index CISA KEV")
