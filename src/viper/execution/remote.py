@@ -12,8 +12,10 @@ reaching here already means active testing was explicitly enabled and fully conf
 
 from __future__ import annotations
 
+import re
 import ssl
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -69,6 +71,35 @@ class RemoteAuthError(RemoteExecutionError):
 
 class RemoteJobError(RemoteExecutionError):
     """Unexpected HTTP status, or the job never reached a terminal state."""
+
+
+class ExecutionPlaneUnreachable(RemoteJobError):
+    """The VM could not be reached (timeout, refused, reset) so the job's fate is unknown.
+
+    Typically a Spot VM reclaimed mid-scan. A ``RemoteJobError`` subclass, so existing
+    handlers still catch it, but distinguishable from a job that ran and failed.
+    """
+
+
+_JOB_ID_UNSAFE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _job_id_for(action_id: str) -> str:
+    """A VM job id unique per dispatch, valid for ``vmapi``'s ``^[a-zA-Z0-9_-]{1,128}$``.
+
+    Action ids repeat across runs (e.g. ``nmap_scan``), and the VM rejects a reused id with
+    HTTP 409 until it restarts. The durable claim on ``action_id`` already prevents a second
+    dispatch of the same action, so the random suffix cannot cause a double send.
+    """
+    stem = _JOB_ID_UNSAFE.sub("_", action_id)[:100] or "job"
+    return f"{stem}-{uuid.uuid4().hex[:12]}"
+
+
+def _unreachable(exc: httpx.TransportError, doing: str) -> ExecutionPlaneUnreachable:
+    return ExecutionPlaneUnreachable(
+        f"Exec API unreachable ({exc.__class__.__name__}) while {doing}; the VM may have been "
+        "preempted or restarted. The job state is unknown: check the VM before re-requesting."
+    )
 
 
 class RemoteExecutor:
@@ -187,6 +218,8 @@ class RemoteExecutor:
                 else:
                     if buf and not overflow:
                         take(bytes(buf).rstrip(b"\r"))
+        except httpx.TransportError as exc:
+            raise _unreachable(exc, f"reading the output of job {job_id}") from exc
         except httpx.HTTPError as exc:
             raise RemoteJobError(f"stream for job {job_id} failed: {exc.__class__.__name__}") from exc
         return b"\n".join(lines).decode("utf-8", errors="replace"), truncated
@@ -199,12 +232,15 @@ class RemoteExecutor:
 
     def _dispatch(self, action: Action, target: str) -> dict[str, Any]:
         body = {
-            "job_id": action.action_id,
+            "job_id": _job_id_for(action.action_id),
             "tool": action.tool_name,
             "args": dict(action.args),
             "target": target,
         }
-        resp = self._get_client().post("/jobs", json=body, headers=self._auth)
+        try:
+            resp = self._get_client().post("/jobs", json=body, headers=self._auth)
+        except httpx.TransportError as exc:
+            raise _unreachable(exc, f"dispatching {action.tool_name}") from exc
         if resp.status_code == 401:
             raise RemoteAuthError("Exec API rejected the bearer token on POST /jobs")
         if resp.status_code != 201:
@@ -214,7 +250,10 @@ class RemoteExecutor:
 
     def _poll(self, job_id: str) -> tuple[str, int | None]:
         for _ in range(self._max_polls):
-            resp = self._get_client().get(f"/jobs/{job_id}", headers=self._auth)
+            try:
+                resp = self._get_client().get(f"/jobs/{job_id}", headers=self._auth)
+            except httpx.TransportError as exc:
+                raise _unreachable(exc, f"polling job {job_id}") from exc
             if resp.status_code == 401:
                 raise RemoteAuthError(f"Exec API rejected the bearer token on GET /jobs/{job_id}")
             if resp.status_code != 200:

@@ -8,6 +8,7 @@ safety property under test: a default config must always yield ``DryRunExecutor`
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -22,8 +23,10 @@ from viper.execution.factory import make_executor
 from viper.execution.remote import (
     DispatchAlreadyClaimed,
     EgressDenied,
+    ExecutionPlaneUnreachable,
     RemoteAuthError,
     RemoteExecutor,
+    RemoteJobError,
 )
 from viper.policy.models import Action
 
@@ -169,8 +172,9 @@ def test_happy_path_posts_polls_and_returns_result() -> None:
         if req.method == "POST" and req.url.path == "/jobs":
             assert req.headers["Authorization"] == f"Bearer {TOKEN}"
             body = json.loads(req.content)
+            # the job id is namespaced per dispatch (see test_job_id_is_unique_*), so check shape
+            assert re.fullmatch(r"act-1-[0-9a-f]{12}", body.pop("job_id"))
             assert body == {
-                "job_id": "act-1",
                 "tool": "nmap",
                 "args": {"flags": "-sV -Pn", "target": TARGET},
                 "target": TARGET,
@@ -409,3 +413,79 @@ def test_slow_drip_stream_stops_at_deadline(monkeypatch: pytest.MonkeyPatch) -> 
     r = _executor(_job_handler(_stream_resp(s))).run(_action())
     assert r.truncated is True
     assert s.pulled <= 5  # deadline enforced after every received chunk, not every 8 KiB
+
+
+# --------------------------------------------------------------------------- job id namespacing
+
+_VM_JOB_ID = re.compile(r"^[a-zA-Z0-9_-]{1,128}$")  # mirrors vmapi.app.JobRequest.job_id
+
+
+def _echo_vm(posted: list[str]) -> Any:
+    """A VM that accepts any job id, records it, and finishes the job at once."""
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.method == "POST" and req.url.path == "/jobs":
+            job_id = json.loads(req.content)["job_id"]
+            posted.append(job_id)
+            return httpx.Response(201, json={"job_id": job_id, "state": "running"})
+        if req.url.path.endswith("/stream"):
+            return _sse(["ok"])
+        return httpx.Response(200, json={"job_id": posted[-1], "state": "done", "exit_code": 0})
+
+    return handler
+
+
+def test_job_id_is_unique_per_dispatch_even_for_the_same_action_id() -> None:
+    """Real Test 1: reusing an action id across runs collided with HTTP 409 until vmapi restarted."""
+    posted: list[str] = []
+    # two separate runs: fresh executors and claim stores, same action id
+    _executor(_echo_vm(posted)).run(_action(action_id="nmap_scan"))
+    _executor(_echo_vm(posted)).run(_action(action_id="nmap_scan"))
+    assert len(posted) == 2 and posted[0] != posted[1]
+    assert all(p.startswith("nmap_scan-") and _VM_JOB_ID.match(p) for p in posted)
+
+
+def test_job_id_is_always_valid_for_the_vm_even_for_odd_action_ids() -> None:
+    posted: list[str] = []
+    odd = "act/with spaces.and:punct" + "x" * 300
+    _executor(_echo_vm(posted)).run(_action(action_id=odd))
+    assert _VM_JOB_ID.match(posted[0])
+
+
+# --------------------------------------------------------------------------- unreachable plane
+
+
+def test_dispatch_connect_error_is_reported_as_plane_unreachable() -> None:
+    def handler(req: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=req)
+
+    with pytest.raises(ExecutionPlaneUnreachable, match="unreachable") as err:
+        _executor(handler).run(_action())
+    assert isinstance(err.value, RemoteJobError)  # existing handlers keep working
+
+
+def test_poll_timeout_after_dispatch_is_not_a_bare_read_timeout() -> None:
+    """Spot preemption mid-scan used to surface as a generic httpx.ReadTimeout."""
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.method == "POST":
+            return httpx.Response(201, json={"job_id": "act-1", "state": "running"})
+        raise httpx.ReadTimeout("timed out", request=req)
+
+    with pytest.raises(ExecutionPlaneUnreachable) as err:
+        _executor(handler).run(_action())
+    text = str(err.value)
+    assert "act-1" in text and "preempt" in text.lower() and "ReadTimeout" in text
+    assert "state is unknown" in text  # never imply the job did or did not run
+
+
+def test_stream_transport_failure_is_reported_as_plane_unreachable() -> None:
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.method == "POST":
+            return httpx.Response(201, json={"job_id": "act-1", "state": "running"})
+        if req.url.path.endswith("/stream"):
+            raise httpx.ReadError("connection reset", request=req)
+        return httpx.Response(200, json={"job_id": "act-1", "state": "done", "exit_code": 0})
+
+    with pytest.raises(ExecutionPlaneUnreachable):
+        _executor(handler).run(_action())
