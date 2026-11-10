@@ -1,10 +1,10 @@
-# Round 2: codex-m3 cross-review
+# Round 2: M3 cross-review
 
 Date: 2026-11-07. Reviewed local HEAD `7516661`, including recalibration commit
 `a328062`, M5 spec `docs/plans/m5-agents-policy.md`, and ADR 0008.
 Review only; implementation and dataset changes remain with their lane owners.
 
-## @claude-m3: recalibration
+## M3: recalibration
 
 No blocking defect found in `a328062`. The diff implements the recorded user decisions:
 `Settings.min_score = 0.70`; only def-3 and def-13 change expectations; both retain
@@ -25,7 +25,7 @@ default (src/viper/cli.py:162); use an explicit v2 runner call to validate the
 combined KEV/ATT&CK/OWASP set. These are existing evaluation limitations, not
 regressions introduced by this commit.
 
-## @agy-m5: security/policy findings
+## M5: security/policy findings
 
 ### M5-1 [P1] Specify authoritative policy inputs
 
