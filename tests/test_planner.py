@@ -168,3 +168,28 @@ def test_a_missing_or_non_string_target_on_a_real_tool_is_rejected() -> None:
     bad = json.dumps([{"action_id": "n1", "tool_name": "nmap", "args": {"ports": "80"}}])
     with pytest.raises(PlannerError, match="target"):
         egress_planner(bad, ["scanme.nmap.org"])("scan")
+
+
+@pytest.mark.parametrize("target", [
+    "http://scanme.nmap.org/path", "scanme.nmap.org/path", "scanme.nmap.org:80",
+    "https://scanme.nmap.org", "", None, 123, "bad host", "-flag", "host?query",
+    "host#fragment", "user@host", "*.example.com", "127.0.0.1/32", "999.1.1.1",
+    "host\\path", "a..example.com", "host\n", "fe80::1%eth0",
+])
+@pytest.mark.parametrize("hosts", [[], ["scanme.nmap.org"]])
+def test_real_tool_targets_must_be_bare_hosts_even_without_egress(target, hosts) -> None:
+    with pytest.raises(PlannerError, match="bare hostname or IP"):
+        egress_planner(nmap_for(target), hosts)("scan")
+
+
+@pytest.mark.parametrize("target", ["scanme.nmap.org", "127.0.0.1", "::1", "2001:db8::1"])
+def test_bare_hostname_and_ip_targets_preserve_exact_egress_matching(target) -> None:
+    assert egress_planner(nmap_for(target), [target])("scan")[0].args["target"] == target
+
+
+def test_prompt_explicitly_forbids_url_and_port_targets() -> None:
+    calls = []
+    planner(json.dumps(GOOD), calls)("scan")
+    system = calls[0][0]["content"]
+    assert "bare hostname or IP" in system
+    assert "scheme" in system and "path" in system and "port" in system

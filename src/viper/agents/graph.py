@@ -25,6 +25,7 @@ from viper.execution.control import AGENT, ControlLock
 from viper.execution.executor import DryRunExecutor
 from viper.execution.factory import Executor
 from viper.policy.approvals import (
+    ApprovalExpired,
     PendingApproval,
     ResumePayload,
     action_hash,
@@ -170,6 +171,10 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
             else:
                 new, reason = consume(record, payload, now=deps.now(), thread_id=state["thread_id"],
                                       scope_revision=scope.revision)
+            expired = reason == "approval expired"
+            if expired:
+                reason = str(ApprovalExpired(record, deps.now()))
+                new = record.model_copy(update={"consumed": True})
             updated[pid] = new.model_dump(mode="json")
             if reason is None and payload is not None:
                 audit(state, "approval_granted", "human",
@@ -177,9 +182,10 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                 audit(state, "approval_consumed", "policy", detail={"pending_approval_id": pid})
             else:
                 rejected = True
-                event = "approval_expired" if reason == "approval expired" else "approval_denied"
+                event = "approval_expired" if expired else "approval_denied"
                 audit(state, event, "human" if payload else "policy",
-                      detail={"pending_approval_id": pid, "reason": reason})
+                      detail={"pending_approval_id": pid,
+                              "reason": "approval expired" if expired else reason})
                 d = decisions[record.action_id]
                 decisions[record.action_id] = {**d, "type": "DENY", "reason": reason}
         # Any refused approval halts the whole run: nothing executes after a human "no".
@@ -297,6 +303,9 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any]) -> CompiledS
                      + "\n\n" + "\n".join(f"- {_safe(w)}" for w in warnings))
         if lines:  # a reader of the report must see what was refused and why, not just a count
             text += "\n\n" + "## Denied actions" + "\n\n" + "\n".join(lines)
+        if any(str(d.get("reason", "")).startswith("approval expired")
+               for d in state.get("decisions", {}).values()):
+            text += "\n\n" + ApprovalExpired.recovery
         return {"report": text + "\n\n" + "---" + "\n" + "Run summary: " + summary + "\n",
                 "findings": [f.model_dump(mode="json") for f in findings]}
 
