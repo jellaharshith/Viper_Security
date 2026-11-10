@@ -5,7 +5,16 @@ from __future__ import annotations
 import ipaddress
 from typing import TYPE_CHECKING
 
-from viper.policy.models import Action, Decision, DecisionType, RiskLevel, Scope, ToolInfo
+from viper.policy.models import (
+    KNOWN_TECHNIQUES,
+    Action,
+    Decision,
+    DecisionType,
+    RiskLevel,
+    Scope,
+    ToolInfo,
+    normalize_technique,
+)
 
 if TYPE_CHECKING:
     from viper.config import Settings
@@ -62,6 +71,35 @@ def evaluate(action: Action, tool: ToolInfo | None, scope: Scope | None, setting
         return _deny(action, "policy evaluation error")
 
 
+def _scope_limit_reason(action: Action, tool: ToolInfo, scope: Scope) -> str | None:
+    """First scope limit the action breaks (automation, rate, techniques), or None. Fail-closed.
+
+    Forbidden entries are slug-normalised and only those naming a KNOWN technique are enforced;
+    free text such as "INTRUSIVE" is kept for humans and ignored here. Technique tags come from
+    the registry (``ToolInfo.techniques``), never from the action.
+    """
+    if tool.risk == RiskLevel.ACTIVE and not scope.automation_allowed:
+        return "automated tools are not permitted by this scope"
+    if scope.max_rate_rps is not None:
+        # An explicit value (even null) is checked as given; an omitted one means the tool default.
+        rate: object = action.args["rate_limit"] if "rate_limit" in action.args else tool.default_rate_rps
+        if "rate_limit" in action.args or rate is not None:
+            if isinstance(rate, bool) or not isinstance(rate, int) or rate < 1:
+                return f"rate {rate!r} is not a valid rate_limit"
+            if rate > scope.max_rate_rps:
+                return f"rate {rate} exceeds scope limit {scope.max_rate_rps} rps"
+    forbidden = {normalize_technique(t) for t in scope.forbidden_techniques} & KNOWN_TECHNIQUES
+    for technique in sorted(tool.techniques):
+        if technique in forbidden:
+            return f"technique '{technique}' is forbidden by scope"
+    if scope.permitted_techniques:
+        permitted = {normalize_technique(t) for t in scope.permitted_techniques}
+        for technique in sorted(tool.techniques):
+            if technique not in permitted:
+                return f"technique '{technique}' is not in the scope's permitted techniques"
+    return None
+
+
 def _evaluate(action: Action, tool: ToolInfo | None, scope: Scope | None, settings: Settings) -> Decision:
     if tool is None or tool.name != action.tool_name:
         return _deny(action, "unknown tool")
@@ -76,6 +114,9 @@ def _evaluate(action: Action, tool: ToolInfo | None, scope: Scope | None, settin
     target = action.args.get("target")
     if not isinstance(target, str) or not in_scope(target, scope):
         return _deny(action, "target missing, excluded or out of scope", risk)
+    limit = _scope_limit_reason(action, tool, scope)
+    if limit is not None:
+        return _deny(action, limit, risk)
     if risk == RiskLevel.PASSIVE:
         return Decision(action_id=action.action_id, type=DecisionType.ALLOW,
                         reason="passive action on in-scope target", risk=risk)

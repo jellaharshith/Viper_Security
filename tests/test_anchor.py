@@ -112,7 +112,7 @@ def test_rekor_only_posts_signed_entry_binding_requested_head() -> None:
                      allow_network=True, transport=transport)
 
 
-@pytest.mark.parametrize("endpoint", ["http://tsa.example/", "https://user:pass@tsa.example/",
+@pytest.mark.parametrize("endpoint", ["ftp://tsa.example/", "https://user:pass@tsa.example/",
                                      "https://tsa.example/#fragment"])
 def test_external_adapter_rejects_unsafe_endpoint(endpoint: str) -> None:
     with pytest.raises(AnchorError):
@@ -125,3 +125,82 @@ def test_tsa_does_not_follow_redirects_or_accept_error_response(status: int) -> 
         status, headers={"location": "https://other.example/"}, content=b"error"))
     with pytest.raises(AnchorError):
         submit_tsa(HEAD, endpoint="https://tsa.example/", allow_network=True, transport=transport)
+
+
+def _adapter(provider, endpoint, transport, *, allow_network=True):
+    if provider == "tsa":
+        return submit_tsa(HEAD, endpoint=endpoint, transport=transport, allow_network=allow_network)
+    entry = {"apiVersion": "0.0.1", "kind": "hashedrekord", "spec": {
+        "data": {"hash": {"algorithm": "sha256", "value": HEAD}},
+        "signature": {"content": "c2ln", "publicKey": {"content": "a2V5"}},
+    }}
+    return submit_rekor(HEAD, entry=entry, endpoint=endpoint, transport=transport,
+                        allow_network=allow_network)
+
+
+@pytest.mark.parametrize("scheme", ["http", "https"])
+def test_tsa_accepts_both_schemes_without_proxy_or_redirects(scheme, monkeypatch):
+    client = httpx.Client
+
+    def guarded_client(**kwargs):
+        assert kwargs["trust_env"] is False
+        assert kwargs["follow_redirects"] is False
+        assert kwargs["timeout"] == 10
+        return client(**kwargs)
+
+    monkeypatch.setattr("viper.agents.anchor.httpx.Client", guarded_client)
+
+    def handle(request):
+        assert request.url.scheme == scheme
+        assert request.content == (
+            bytes.fromhex("30390201013031300d060960864801650304020105000420")
+            + bytes.fromhex(HEAD) + bytes.fromhex("0101ff")
+        )
+        return httpx.Response(200, content=b"opaque-signed-token")
+
+    assert submit_tsa(HEAD, endpoint=f"{scheme}://tsa.example/", allow_network=True,
+                      transport=httpx.MockTransport(handle)) == b"opaque-signed-token"
+
+
+@pytest.mark.parametrize("provider", ["tsa", "rekor"])
+@pytest.mark.parametrize("scheme", ["http", "https"])
+@pytest.mark.parametrize("part", ["user:pass@provider.example/", "provider.example/#fragment"])
+def test_both_adapters_reject_credentials_and_fragments_before_sending(provider, scheme, part):
+    def handle(request):
+        pytest.fail("unsafe endpoint must be refused before transport")
+
+    with pytest.raises(AnchorError):
+        _adapter(provider, f"{scheme}://{part}", httpx.MockTransport(handle))
+
+
+def test_rekor_stays_https_only():
+    def handle(request):
+        pytest.fail("plain HTTP Rekor request must never be sent")
+
+    with pytest.raises(AnchorError):
+        _adapter("rekor", "http://rekor.example/api/v1/log/entries", httpx.MockTransport(handle))
+
+
+@pytest.mark.parametrize("provider,scheme", [("tsa", "http"), ("tsa", "https"), ("rekor", "https")])
+def test_opt_in_and_redirect_rejection_remain_provider_independent(provider, scheme):
+    calls = []
+
+    def handle(request):
+        calls.append(str(request.url))
+        return httpx.Response(302, headers={"location": "https://elsewhere.example/"}, content=b"redirect")
+
+    transport = httpx.MockTransport(handle)
+    endpoint = f"{scheme}://provider.example/"
+    with pytest.raises(AnchorError, match="opt-in"):
+        _adapter(provider, endpoint, transport, allow_network=False)
+    assert calls == []
+    with pytest.raises(AnchorError):
+        _adapter(provider, endpoint, transport)
+    assert calls == [endpoint]
+
+
+@pytest.mark.parametrize("provider,scheme", [("tsa", "http"), ("rekor", "https")])
+def test_response_size_limit_is_retained(provider, scheme):
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, content=b"x" * (4 * 1024 * 1024 + 1)))
+    with pytest.raises(AnchorError, match="size limit"):
+        _adapter(provider, f"{scheme}://provider.example/", transport)

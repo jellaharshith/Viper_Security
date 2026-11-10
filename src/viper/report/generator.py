@@ -1,100 +1,90 @@
-"""Render schema-v1 findings without interpreting tool evidence as Markdown.
-
-The caller enforces asset scope and supplies parser-produced findings. Citations
-resolve only to real tool results within the requested thread/action/tool;
-this renderer does not verify the audit chain or evidence digest itself.
-"""
+"""Markdown reports with inert evidence and citations bound to real tool results."""
 
 from __future__ import annotations
 
 import html
+import json
 import re
 from typing import Any
 
 from viper.findings.models import Finding
-
-_DIRECTIONAL = frozenset({0x061C, 0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x2070)})
-
-
-def _visible(text: str) -> str:
-    """Expose control bytes and Unicode direction changes instead of executing them."""
-    parts = []
-    for char in text:
-        code = ord(char)
-        if code < 32 or 127 <= code <= 159:
-            parts.append(f"\\x{code:02x}")
-        elif code in _DIRECTIONAL:
-            parts.append(f"\\u{code:04x}")
-        else:
-            parts.append(char)
-    return "".join(parts)
+from viper.report.common import SEVERITIES, citations_for, counts, neutralize, small_json, visible
 
 
 def _plain(text: str) -> str:
-    escaped = html.escape(_visible(text), quote=True)
+    escaped = html.escape(visible(text), quote=True)
     return re.sub(r"([\\`*_{}\[\]()#+!|>~])", r"\\\1", escaped)
+
+
+def _evidence(evidence: str) -> list[str]:
+    language = ""
+    try:
+        content = json.dumps(neutralize(small_json(evidence)), ensure_ascii=False, indent=2, allow_nan=False)
+        language = "json"
+    except (ValueError, RecursionError):
+        # Original line endings remain visibly represented, plus layout for readability.
+        content = "\\x0a\n".join(visible(line) for line in evidence.split("\n"))
+    longest = max((len(run) for run in re.findall(r"`+", content)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return [fence + language, content, fence]
 
 
 def render_report(
     findings: list[Finding], audit_events: list[dict[str, Any]], *, project_id: str, thread_id: str,
 ) -> str:
-    """Produce Markdown; absent/ambiguous/foreign citations stay unresolved.
+    """Render parser findings; citation context is checked, not chain integrity or exploitability.
 
-    Confirmed means the supplied deterministic parser observed the described
-    condition, not that an exploit or security impact was independently proven.
-    Audit payloads are deliberately not reproduced (they may contain secrets).
+    Audit event payloads are never reproduced. Evidence is literal code, not HTML
+    or Markdown, with a fence longer than every backtick run in the content.
     """
+    totals = counts(findings)
     lines = ["# Viper assessment report", "", f"Project: {_plain(project_id)}",
-             f"Thread: {_plain(thread_id)}", "",
-             "Assets below are supplied as in-scope by the caller; scope is enforced upstream.",
-             "Confirmed denotes parser evidence of the stated condition, not proof of exploitability.",
-             "Audit citations identify supplied events; chain integrity must be verified separately.", ""]
-    citations: list[str] = []
+             f"Thread: {_plain(thread_id)}", "", "## Executive summary", "",
+             f"{totals['total']} findings: {totals['confirmed']} confirmed "
+             f"and {totals['hypothesis']} hypotheses.",
+             "", "| Severity | Confirmed | Hypothesis |", "|---|---:|---:|"]
+    for severity in SEVERITIES:
+        row = totals["by_severity_and_confidence"][severity]
+        lines.append(f"| {severity} | {row['confirmed']} | {row['hypothesis']} |")
+    lines += ["", "Assets are supplied as in-scope by the caller; scope is enforced upstream.",
+              "Confirmed denotes parser evidence of the stated condition, not proof of exploitability.",
+              "Audit citations identify supplied events; chain integrity must be verified separately.", ""]
+    index: list[str] = []
     for confidence, heading in [("confirmed", "Confirmed findings"), ("hypothesis", "Hypotheses")]:
         lines += [f"## {heading}", ""]
         group = [finding for finding in findings if finding.confidence == confidence]
         if not group:
             lines += ["No confirmed findings." if confidence == "confirmed" else "No hypotheses.", ""]
-        for finding in group:
-            lines += [f"### {_plain(finding.id)}: {_plain(finding.title)}", ""]
-            for label, value in [
-                ("In-scope asset", finding.affected_asset), ("Source tool", finding.source_tool),
-                ("Source action", finding.source_action_id), ("Severity", finding.severity),
-                ("Severity rationale", finding.severity_rationale), ("Confidence", finding.confidence),
-                ("Reproducibility", finding.reproducibility), ("Remediation", finding.remediation),
-            ]:
-                lines += [f"{label}: {_plain(value)}", ""]
-            # Indented blocks cannot be terminated by attacker-controlled fences.
-            lines += ["Evidence (raw excerpt):", ""]
-            # Preserve evidence line layout while showing each original LF visibly.
-            evidence_lines = finding.evidence.split("\n")
-            for index, line in enumerate(evidence_lines):
-                suffix = r"\x0a" if index < len(evidence_lines) - 1 else ""
-                lines += ["    " + html.escape(_visible(line) + suffix)]
-            lines += ["", "References:", ""]
-            lines += [f"- {_plain(ref)}" for ref in finding.references] or ["- None supplied."]
-            lines += ["", "Audit citations:", ""]
-            for ref in finding.audit_refs:
-                matches = [e for e in audit_events if e.get("hash") == ref]
-                event = matches[0] if len(matches) == 1 else {}
-                detail = event.get("detail")
-                if (not re.fullmatch(r"[a-f0-9]{64}", ref)
-                        or event.get("event") != "tool_result"
-                        or event.get("thread_id") != thread_id
-                        or not isinstance(detail, dict)
-                        or detail.get("action_id") != finding.source_action_id
-                        or detail.get("tool") != finding.source_tool
-                        or detail.get("simulated") is not False):
-                    lines += [f"- Unresolved audit reference: {_plain(ref)}"]
-                    continue
-                number = len(citations) + 1
-                lines += [f"- [audit-{number}](#audit-{number}): `{ref}`"]
-                kind = _plain(str(event.get("event", "unknown")))
-                citations += [f'- <a id="audit-{number}"></a>[audit-{number}]: `{ref}`; event {kind}; '
-                              f"sequence {_plain(str(event.get('seq', 'unknown')))}; "
-                              f"action {_plain(finding.source_action_id)}"]
-            if not finding.audit_refs:
-                lines += ["- Unresolved: no audit references supplied."]
-            lines += [""]
-    lines += ["## Audit event index", ""] + (citations or ["No resolved audit citations."])
+        for tool in sorted({finding.source_tool for finding in group}):
+            lines += [f"### {_plain(tool)}", ""]
+            for finding in (finding for finding in group if finding.source_tool == tool):
+                lines += [f"#### {_plain(finding.id)}: {_plain(finding.title)}", ""]
+                fields = [("In-scope asset", finding.affected_asset), ("Source tool", finding.source_tool),
+                          ("Source action", finding.source_action_id), ("Severity", finding.severity),
+                          ("Severity rationale", finding.severity_rationale),
+                          ("Confidence", finding.confidence),
+                          ("Reproducibility", finding.reproducibility), ("Remediation", finding.remediation)]
+                if finding.description:
+                    fields.append(("Description", finding.description))
+                if finding.cwe:
+                    fields.append(("CWE", ", ".join(finding.cwe)))
+                for label, value in fields:
+                    lines += [f"{label}: {_plain(value)}", ""]
+                lines += ["Evidence (raw excerpt):", "", *_evidence(finding.evidence), "", "References:", ""]
+                lines += [f"- {_plain(ref)}" for ref in finding.references] or ["- None supplied."]
+                lines += ["", "Audit citations:", ""]
+                for citation in citations_for(finding, audit_events, thread_id):
+                    ref = citation["reference"]
+                    if citation["status"] != "resolved":
+                        lines.append(f"- Unresolved audit reference: {_plain(ref)}" if ref is not None
+                                     else "- Unresolved: no audit references supplied.")
+                        continue
+                    number = len(index) + 1
+                    lines.append(f"- [audit-{number}](#audit-{number}): `{ref}`")
+                    index.append(f'- <a id="audit-{number}"></a>[audit-{number}]: `{ref}`; '
+                                 f"event {_plain(citation['event'])}; "
+                                 f"sequence {_plain(str(citation['sequence']))}; "
+                                 f"action {_plain(finding.source_action_id)}")
+                lines += [""]
+    lines += ["## Audit event index", ""] + (index or ["No resolved audit citations."])
     return "\n".join(lines) + "\n"

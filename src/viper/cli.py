@@ -224,20 +224,23 @@ def cmd_audit(settings: Settings, args: argparse.Namespace) -> int:
     anchors = settings.audit_dir / f"{args.project}.anchors.jsonl"
     try:
         if args.audit_cmd == "anchor":
-            return _audit_anchor(settings, args.project, anchors)
+            return _audit_anchor(settings, args.project, anchors, args.provider, args.allow_network)
         broken = verify(path)
         print("audit log OK" if broken is None else f"audit log BROKEN at seq {broken}")
         if broken is not None:
             return 2
-        return _verify_anchors(AuditLog(settings, args.project), anchors)
+        return _verify_anchors(settings, AuditLog(settings, args.project), anchors)
     except Exception as exc:  # noqa: BLE001
         print(f"audit error: {type(exc).__name__}")
         return 1
 
 
-def _audit_anchor(settings: Settings, project: str, anchors: Path) -> int:
-    """Anchor the current audit head. Mock only for now: real TSA/Rekor needs a trusted verifier."""
-    from viper.agents.anchor import anchor_head
+def _audit_anchor(settings: Settings, project: str, anchors: Path, provider: str = "mock",
+                  allow_network: bool = False) -> int:
+    """Anchor the current audit head: a local mock, or a real RFC-3161 token from a timestamp authority."""
+    import functools
+
+    from viper.agents import anchor as anchor_mod
     from viper.agents.audit import AuditLog
 
     log = AuditLog(settings, project)
@@ -245,19 +248,35 @@ def _audit_anchor(settings: Settings, project: str, anchors: Path) -> int:
     if head is None:
         print("audit error: nothing to anchor (empty log)")
         return 1
-    receipt = anchor_head(head, provider="mock")
+    if provider == "tsa":
+        if not allow_network:
+            print("audit error: tsa anchoring contacts a public timestamp service; "
+                  "pass --allow-network to opt in")
+            return 1
+        submit = functools.partial(anchor_mod.submit_tsa, endpoint=settings.anchor_tsa_url,
+                                   allow_network=True)
+        receipt = anchor_mod.anchor_head(head, provider="tsa", allow_network=True, submit=submit)
+    else:
+        receipt = anchor_mod.anchor_head(head, provider="mock")
     anchors.parent.mkdir(parents=True, exist_ok=True)
     with anchors.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(receipt.model_dump_json() + "\n")
     log.append(thread_id="anchor", event="audit_anchored", actor="agent",
                detail={"count": 1, "message": f"mock anchor of {head[:12]}"})
-    print(f"anchored head {head[:12]} (mock: consistency only, not external proof)")
+    if provider == "tsa":
+        print(f"anchored head {head[:12]} with an RFC-3161 token from {settings.anchor_tsa_url}; "
+              "run `viper audit verify` to check it offline")
+    else:
+        print(f"anchored head {head[:12]} (mock: consistency only, not external proof)")
     return 0
 
 
-def _verify_anchors(log: Any, anchors: Path) -> int:
-    from viper.agents.anchor import AnchorReceipt, verify_anchor
+def _verify_anchors(settings: Settings, log: Any, anchors: Path) -> int:
+    from viper.agents import anchor as anchor_mod
+    from viper.agents.anchor import AnchorReceipt
     from viper.agents.anchor_check import anchor_verdict
+
+    verifier = anchor_mod.make_tsa_verifier(settings.anchor_tsa_ca)  # offline: openssl + the trust store
 
     if not anchors.exists():
         print("anchors: none recorded")
@@ -268,7 +287,8 @@ def _verify_anchors(log: Any, anchors: Path) -> int:
     for line in anchors.read_text(encoding="utf-8").splitlines():
         receipt = AnchorReceipt.model_validate_json(line)
         label, failed = anchor_verdict(receipt, in_chain=receipt.head_hash in chain,
-                                       token_ok=verify_anchor(receipt, receipt.head_hash))
+                                       token_ok=anchor_mod.verify_anchor(receipt, receipt.head_hash,
+                                                                         verifier=verifier))
         seq = chain.get(receipt.head_hash)
         cover = f" covers seq 0-{seq} of {last}" if seq is not None else ""
         print(f"anchor {receipt.provider} head={receipt.head_hash[:12]}{cover}: {label}")
@@ -371,7 +391,7 @@ def cmd_report(settings: Settings, args: argparse.Namespace) -> int:
     from viper.agents.runner import report_path
 
     try:
-        print(terminal_safe(report_path(settings, args.thread).read_text(encoding="utf-8")))
+        print(terminal_safe(report_path(settings, args.thread, args.format).read_text(encoding="utf-8")))
     except Exception as exc:  # noqa: BLE001 - class only
         print(f"report error: {type(exc).__name__}")
         return 1
@@ -442,6 +462,7 @@ def cmd_exec(settings: Settings, args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="viper")
+    parser.add_argument("--version", action="version", version=f"viper {__version__}")
     parser.add_argument("--health", action="store_true", help="print redacted config and exit")
     sub = parser.add_subparsers(dest="command")
     p_ing = sub.add_parser("ingest-kev", help="download and index CISA KEV")
@@ -485,8 +506,12 @@ def main(argv: list[str] | None = None) -> int:
     usub = p_audit.add_subparsers(dest="audit_cmd", required=True)
     p_ver = usub.add_parser("verify", help="check the hash chain (and any anchors) of a project log")
     p_ver.add_argument("--project", required=True)
-    p_anc = usub.add_parser("anchor", help="anchor the current audit head (mock; M7)")
+    p_anc = usub.add_parser("anchor", help="anchor the audit head (mock, or a real RFC-3161 timestamp)")
     p_anc.add_argument("--project", required=True)
+    p_anc.add_argument("--provider", choices=("mock", "tsa"), default="mock",
+                       help="tsa asks a public timestamp authority (needs --allow-network)")
+    p_anc.add_argument("--allow-network", action="store_true",
+                       help="permit the one outbound request to the timestamp service")
     p_scope = sub.add_parser("scope", help="draft a scope from program rules; you approve it")
     ssub = p_scope.add_subparsers(dest="scope_cmd", required=True)
     p_sd = ssub.add_parser("draft", help="model drafts a scope from text (inactive until approved)")
@@ -499,6 +524,8 @@ def main(argv: list[str] | None = None) -> int:
     p_sa.add_argument("--confirm", default="", help="type the project id to approve exactly this scope")
     p_rep = sub.add_parser("report", help="print the saved report for a finished agent thread (M7)")
     p_rep.add_argument("--thread", required=True)
+    p_rep.add_argument("--format", choices=("md", "json", "sarif"), default="md",
+                       help="markdown (default), the viper-report/1 JSON, or SARIF 2.1.0")
     p_exec = sub.add_parser("exec", help="drive the execution plane: watch/pause/stop/takeover (M6)")
     xsub = p_exec.add_subparsers(dest="exec_cmd", required=True)
     for name in ("takeover", "release"):

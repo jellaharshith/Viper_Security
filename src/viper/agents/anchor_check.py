@@ -14,7 +14,7 @@ def anchor_verdict(receipt: AnchorReceipt, *, in_chain: bool, token_ok: bool) ->
     in_chain: the receipt's head hash is a record in the verified local chain.
     token_ok: ``verify_anchor`` accepted the token. For ``mock`` that only means the token is
               self-consistent; for ``tsa``/``rekor`` it is False unless a trusted verifier
-              vouched for it (none is wired yet, so external receipts arrive as False).
+              vouched for it. The caller supplies its explicit trust configuration.
     """
     if not in_chain:
         return "MISMATCH", True  # the anchored head is not in this log: rewritten or wrong file
@@ -27,6 +27,5 @@ def anchor_verdict(receipt: AnchorReceipt, *, in_chain: bool, token_ok: bool) ->
         return ("CONSISTENT_ONLY", False) if token_ok else ("TAMPERED", True)
     if token_ok:
         return "VERIFIED", False  # a trusted verifier vouched for the external receipt
-    # External receipt, no trusted verifier wired in yet. Honest but unproven: report it plainly,
-    # but do not fail every audit verify until a verifier exists.
+    # External receipt without accepted proof: preserve the selected honest UNVERIFIED policy.
     return "UNVERIFIED", False

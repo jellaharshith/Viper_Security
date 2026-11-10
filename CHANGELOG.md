@@ -6,13 +6,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-09 - v1.1: Multi-format reports, real RFC-3161 anchoring, scope limits
+
 ### Added
-- Weekly knowledge-base refresh owner guide (`docs/weekly-kb.md`): 60-second setup covering repository secrets (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), manual `workflow_dispatch` execution, outcome interpretation, and artifact downloads.
-- Workflow guard tests (`tests/test_workflows.py`): offline YAML assertions ensuring full commit SHA action pinning, least-privilege permissions, absence of `pull_request_target`, schedule/dispatch triggers for weekly KB updates, and stability of required status check job names.
+- **Multi-Format Stakeholder & Machine Reports:**
+  - Enhanced Markdown reports (`viper report --format md`): executive summary severity x confidence matrix, tool-level finding grouping, dynamic backtick code fences outgrowing hostile scanner backticks, pretty-printed JSON evidence (for valid JSON < 8 KiB), and sanitized visible control/bidi character escaping.
+  - Machine-readable JSON export (`viper report --format json`): top-level `"schema": "viper-report/1"` with summary metrics, structured findings, and resolved audit citations.
+  - OASIS SARIF 2.1.0 export (`viper report --format sarif`): rule deduplication by template ID/port, mapped severity levels (`note`, `warning`, `error`), and `viperFindingId/v1` fingerprints.
+  - Finding Schema v1.1 (`viper.findings.models.Finding`): additive backward-compatible fields `description: str = ""` and `cwe: list[str] = []`.
+  - Deterministic finding enrichment (`viper.findings.enrich`): offline pure table filling generic descriptions, CWE classifications, and vendor references for Nuclei templates and Nmap ports without mutating parser-extracted specifics.
+- **Real RFC-3161 Audit Anchoring (`viper audit anchor --provider tsa --allow-network`):**
+  - SHA-256 message imprint timestamping over HTTPS, retaining opaque DER response in base64-encoded `AnchorReceipt`.
+  - Offline cryptographic verification via OpenSSL CLI (`openssl ts -reply`, `openssl ts -verify`) using `certifi` CA bundle or enterprise roots.
+  - Mandatory historical verification via `-attime <epoch>` to validate tokens as of their generation timestamp, preventing expiration failures on short-lived TSA signing certificates.
+  - Verified receipts vouched by a trusted root earn authoritative `VERIFIED` status in `viper audit verify`.
+- **Enforced Scope Limits & Registry-Owned Techniques:**
+  - Additive `Scope` model fields: `max_rate_rps`, `automation_allowed`, and `permitted_techniques` (lowercase technique slugs).
+  - Rate limiting bounds HTTP scanner traffic (`nuclei`); `nmap` has no rate argument and runs under host/IP boundaries.
+  - Registry-owned tool technique tags (`nmap` = `port-scan`, `service-detection`; `nuclei` = `web-scan`, `template-scan`) and default request rates.
+  - Deterministic, fail-closed policy engine evaluations with exact contract deny strings for rate exceeding, automation bans, forbidden techniques, and unpermitted technique deviations.
+- **Scope Reader Hardening (`viper.policy.scope_draft`):**
+  - Model prompt updated to extract v1.1 fields (`max_rate_rps`, `automation_allowed`, `permitted_techniques`).
+  - Strips `host:port` entries (e.g. `127.0.0.1:3000`) and records a human note instead of failing the draft.
+  - Ignores rate phrases (e.g. "no more than 5 requests per second") in the automation ban detector to prevent false-positive bans while catching real automation bans.
+  - Mandatory ambiguity warnings on unmapped techniques and conservative `automation_allowed = False` defaults when automated tools are restricted.
+- **Weekly KB Automation & CI Hardening:**
+  - 60-second owner guide for weekly knowledge base refresh (`docs/weekly-kb.md`).
+  - Offline CI workflow assertions (`tests/test_workflows.py`) guarding SHA-256 action pins, least-privilege permissions, and required job names.
+  - Concurrency controls in `ci.yml` and `security.yml` canceling superseded PR runs while serializing main runs.
 
 ### Changed
-- CI workflow health and concurrency: `.github/workflows/ci.yml` and `security.yml` configure concurrency to cancel superseded pull request runs while preserving push runs to main, declare explicit permissions, and harden status check aggregation.
-- Dependency bumps: updated build and development dependencies including setuptools, pytest, ruff, mypy, and pydantic-settings.
+- `viper agent run` automatically renders and persists all three report formats (`.md`, `.json`, `.sarif`) to `data/reports/` upon completion.
+- Dependency bumps: updated build and development dependencies (setuptools >=84.2.1, pytest >=9.2.0, ruff >=0.17.3, mypy >=2.4.1, pydantic-settings >=2.16.2).
+
+### Deferred to v1.2
+- **Audited SSH Takeover Shell (`viper exec shell`):** Deferred to v1.2 after security review found the one-time lock check was not bound to the execution VM resource and did not reserve exclusive control for the full lifetime of the interactive session. Operators continue to use standard `gcloud compute ssh --tunnel-through-iap` alongside `viper exec takeover`.
+- **OWASP ZAP Integration (F4):** Headless web application scanner daemon deferred to v1.2.
+- **noVNC Browser Remote Desktop (F5b):** Embedded GUI streaming interface deferred to v1.2.
+- **Real Test 1 Lab Backlog Items (`docs/real-test-1.md`):**
+  - Namespaced execution plane job IDs by thread to prevent HTTP 409 collisions on re-runs.
+  - Spot VM preemption detection with distinct unreachable-plane error handling and resume.
+  - Human approval checkpoint timeout UX improvements (clearer error on 15-minute expiry).
+  - Nuclei template and request counters per run to diagnose variance on rate-limited targets.
+  - Expanded template profile coverage (exposures / spidering for `/ftp`, `/metrics`, and API documentation).
+  - Planner target formatting hardening to reject URL inputs on host-only execution plane.
 
 ## [1.0.0] - 2026-11-08 - v1.0: Live nuclei, scope reader, weekly KB refresh (security-reviewed)
 

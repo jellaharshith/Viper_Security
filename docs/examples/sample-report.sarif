@@ -1,0 +1,119 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Viper",
+          "informationUri": "https://github.com/jellaharshith/Viper",
+          "rules": [
+            {
+              "id": "22",
+              "shortDescription": {
+                "text": "Open TCP port 22 (ssh)"
+              },
+              "helpUri": "https://nmap.org/book/man-version-detection.html"
+            },
+            {
+              "id": "http-missing-security-headers",
+              "shortDescription": {
+                "text": "Missing HTTP Security Headers"
+              },
+              "helpUri": "https://owasp.org/www-project-secure-headers/"
+            },
+            {
+              "id": "80",
+              "shortDescription": {
+                "text": "Filtered HTTP port (80/tcp)"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "22",
+          "level": "note",
+          "message": {
+            "text": "Open TCP port 22 (ssh)"
+          },
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "name": "scanme.nmap.org"
+                }
+              ]
+            }
+          ],
+          "properties": {
+            "confidence": "confirmed",
+            "severity": "info",
+            "source_action_id": "scan_nmap_1",
+            "audit_refs": [
+              "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0"
+            ]
+          },
+          "partialFingerprints": {
+            "viperFindingId/v1": "f-nmap-22-scan1"
+          }
+        },
+        {
+          "ruleId": "http-missing-security-headers",
+          "level": "warning",
+          "message": {
+            "text": "Missing HTTP Security Headers (http-missing-security-headers)"
+          },
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "name": "scanme.nmap.org"
+                }
+              ]
+            }
+          ],
+          "properties": {
+            "confidence": "confirmed",
+            "severity": "medium",
+            "source_action_id": "scan_nuclei_2",
+            "audit_refs": [
+              "b2c3d4e5f6a7890123456789abcdef0123456789abcdef0123456789abcdef01"
+            ]
+          },
+          "partialFingerprints": {
+            "viperFindingId/v1": "f-nuclei-headers-scan2"
+          }
+        },
+        {
+          "ruleId": "80",
+          "level": "note",
+          "message": {
+            "text": "Filtered HTTP port (80/tcp)"
+          },
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "name": "scanme.nmap.org"
+                }
+              ]
+            }
+          ],
+          "properties": {
+            "confidence": "hypothesis",
+            "severity": "info",
+            "source_action_id": "scan_nmap_1",
+            "audit_refs": [
+              "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0"
+            ]
+          },
+          "partialFingerprints": {
+            "viperFindingId/v1": "f-nmap-80-filtered"
+          }
+        }
+      ]
+    }
+  ]
+}

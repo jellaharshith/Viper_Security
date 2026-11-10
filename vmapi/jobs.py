@@ -1,5 +1,6 @@
 """Single-worker, in-memory registry with bounded capture and process-group control."""
 
+import logging
 import os
 import signal
 import threading
@@ -9,6 +10,8 @@ from pathlib import Path
 from subprocess import Popen
 
 from vmapi.toolrunner import spawn
+
+log = logging.getLogger(__name__)
 
 TERMINAL = {"done", "failed", "killed"}
 MAX_OUTPUT = 1024 * 1024
@@ -141,6 +144,7 @@ class JobRegistry:
             try:
                 self.stop(job)
             except Exception:
+                log.exception("failed to stop job after watcher error; marking failed")
                 with job.changed:
                     job.state = "failed"
                     job.changed.notify_all()

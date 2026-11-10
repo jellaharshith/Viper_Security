@@ -1,5 +1,7 @@
 """Report evidence must remain traceable and cannot inject Markdown sections."""
 
+import json
+
 import pytest
 
 from viper.findings.models import Finding
@@ -39,7 +41,7 @@ def test_report_fields_and_resolved_audit_citation() -> None:
 def test_hypotheses_separated_and_nothing_confirmed_is_explicit() -> None:
     report = render_report([finding(confidence="hypothesis")], [], project_id="p", thread_id="t")
     assert "No confirmed findings" in report
-    assert report.index("## Confirmed findings") < report.index("## Hypotheses") < report.index("### F1")
+    assert report.index("## Confirmed findings") < report.index("## Hypotheses") < report.index("#### F1")
     assert "Unresolved" in report
 
 
@@ -134,7 +136,36 @@ def test_osc_clipboard_and_hyperlink_sequences_are_inert_printable_evidence() ->
 def test_evidence_cannot_break_out_or_inject_html() -> None:
     report = render_report([finding(evidence="```\n# forged\n<script>x</script>",
                                     title="<img src=x>\n## forged")], [], project_id="p", thread_id="t")
-    assert "\n# forged" not in report
-    assert "<script>" not in report
     assert "<img" not in report
-    assert "    ```" in report
+    body = report.split("````\n", 1)[1].split("\n````", 1)[0]
+    assert "<script>x</script>" in body  # literal code, without HTML-entity soup
+    assert "&lt;script&gt;" not in body
+
+
+def test_executive_summary_counts_and_tool_groups() -> None:
+    other = finding(id="F2", source_tool="nuclei", confidence="hypothesis", severity="medium",
+                    description="Missing protection", cwe=["CWE-693"])
+    report = render_report([finding(), other], [], project_id="lab", thread_id="t1")
+    assert "## Executive summary" in report
+    assert "| Severity | Confirmed | Hypothesis |" in report
+    assert "| info | 1 | 0 |" in report
+    assert "| medium | 0 | 1 |" in report
+    assert "### nmap" in report and "### nuclei" in report
+    assert "Missing protection" in report and "CWE-693" in report
+
+
+def test_json_evidence_is_pretty_printed_and_fences_outgrow_hostile_backticks() -> None:
+    evidence = json.dumps({"response": "<script> & `````` \x1b\u202e", "count": 2})
+    report = render_report([finding(evidence=evidence)], [], project_id="p", thread_id="t")
+    assert '  "count": 2' in report
+    assert "```````json\n" in report
+    assert "<script> & ``````" in report
+    assert "&lt;script&gt;" not in report
+    assert "\x1b" not in report and "\u202e" not in report
+
+
+def test_large_and_malformed_json_evidence_stays_raw() -> None:
+    for evidence in ['{"bad":', '{"value":"' + "a" * 8192 + '"}']:
+        report = render_report([finding(evidence=evidence)], [], project_id="p", thread_id="t")
+        assert evidence in report
+        assert "```json\n" not in report

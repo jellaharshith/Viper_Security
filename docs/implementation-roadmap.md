@@ -17,4 +17,4 @@ Rules: one milestone at a time; tests green before moving on; explicit approval 
 M2 needs M1. M4 needs M2 (baseline) and a verified model license. M5 needs M1. M6 needs M5's policy engine. M7 needs M5 + M6.
 
 ## Next step
-v1.0 release packaging complete (M0–M7). Next priorities: v1.1 backlog items (see docs/v1-scope.md) including OWASP ZAP, noVNC desktop takeover, and real RFC-3161 TSA anchoring.
+v1.1 is released (RFC-3161 TSA anchoring, enforced scope limits). Next priorities: the v1.2 backlog (see CHANGELOG "Deferred to v1.2" and docs/v1-scope.md §3), including the SSH shell, OWASP ZAP and noVNC desktop takeover.

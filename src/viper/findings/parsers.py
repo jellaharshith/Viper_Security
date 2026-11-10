@@ -266,6 +266,8 @@ def _nuclei_finding(
     action_id: str,
     target: str,
     audit_refs: list[str],
+    description: str = "",
+    cwe: list[str] | None = None,
 ) -> Finding | None:
     """Build a finding from validated-shape inputs, or None if the record is unusable."""
     if not _TEMPLATE_ID.match(tpl) or sev.lower() not in _NUCLEI_SEVERITIES:
@@ -322,6 +324,8 @@ def _nuclei_finding(
         or f"Review the matched resource and apply the vendor fix for {tpl}.",
         references=references,
         audit_refs=list(audit_refs),
+        description=description,
+        cwe=list(cwe or []),
     )
 
 
@@ -345,6 +349,23 @@ def _nuclei_text(line: str, action_id: str, target: str, audit_refs: list[str]) 
 
 class _NotAMatch(Exception):  # noqa: N818 - control-flow marker, not an error
     """A well-formed record that nuclei itself says did not match (not counted as skipped)."""
+
+
+_CWE_ID = re.compile(r"(?i)cwe-(\d{1,5})")
+MAX_CWE = 10
+
+
+def _nuclei_cwe(info: dict[str, object]) -> list[str]:
+    """CWE ids from ``info.classification.cwe-id`` (string or list); malformed values dropped."""
+    classification = info.get("classification")
+    raw = classification.get("cwe-id") if isinstance(classification, dict) else None
+    values = raw if isinstance(raw, list) else [raw]
+    out: list[str] = []
+    for v in values[:MAX_CWE * 2]:
+        m = _CWE_ID.fullmatch(v.strip()) if isinstance(v, str) else None
+        if m and f"CWE-{int(m[1])}" not in out and len(out) < MAX_CWE:
+            out.append(f"CWE-{int(m[1])}")
+    return out
 
 
 def _nuclei_json(line: str, action_id: str, target: str, audit_refs: list[str]) -> Finding | None:
@@ -379,6 +400,8 @@ def _nuclei_json(line: str, action_id: str, target: str, audit_refs: list[str]) 
         action_id=action_id,
         target=target,
         audit_refs=audit_refs,
+        description=_field(info["description"]) if isinstance(info.get("description"), str) else "",
+        cwe=_nuclei_cwe(info),
     )
 
 

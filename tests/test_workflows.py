@@ -83,7 +83,7 @@ def test_ci_aggregator_propagates_windows_and_other_job_failures(windows, other,
     assert workflow["jobs"]["test-windows"]["if"] == "github.event_name == 'push'"
     aggregator = workflow["jobs"]["ci-pass"]
     assert aggregator["if"] == "always()"
-    assert set(aggregator["needs"]) == {"lint", "types", "test", "test-windows"}
+    assert set(aggregator["needs"]) == {"lint", "types", "test", "test-vmapi", "test-windows"}
     results = {job: {"result": windows if job == "test-windows" else other}
                for job in aggregator["needs"]}
     script = "\n".join(step["run"] for step in aggregator["steps"] if "run" in step)

@@ -14,6 +14,7 @@ import hashlib
 from collections.abc import Callable
 from typing import Any
 
+from viper.findings.enrich import enrich
 from viper.findings.models import Finding
 from viper.findings.parsers import parse_nmap_ex, parse_nuclei_ex
 
@@ -68,7 +69,7 @@ def rederive(
             parsed, skipped = parser(output, action_id=action_id,
                                      target=str(action.get("args", {}).get("target", "")),
                                      audit_refs=[ev_hash])
-            findings += parsed
+            findings += [enrich(f) for f in parsed]  # deterministic; never changes severity or confidence
             if skipped:
                 warnings.append(
                     f"{action_id}: {skipped} record(s) skipped as malformed; analysis is incomplete")
