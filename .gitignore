@@ -30,3 +30,6 @@ htmlcov/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# public trust anchors used as test fixtures (not secrets)
+!tests/fixtures/anchor/*.pem
