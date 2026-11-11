@@ -27,6 +27,11 @@ class DecisionType(StrEnum):
 KNOWN_TECHNIQUES = frozenset({
     "port-scan", "service-detection", "web-scan", "template-scan", "passive-scan", "spider",
     "brute-force", "dos", "exploit",
+    # v1.2: distinct from "brute-force" on purpose — an asset's scope can invite OTP-code
+    # rate-limit/bypass testing without ever implying account-credential brute forcing.
+    "otp-bypass", "upload-bypass", "injection-test",
+    # CRYPTO-H1 round 1: secret_scan (PASSIVE) and graphql_introspect (ACTIVE).
+    "secret-scan", "graphql-introspection",
 })
 _SLUG = re.compile(r"[a-z0-9-]{1,64}")
 MAX_PERMITTED_TECHNIQUES = 20
@@ -68,6 +73,27 @@ class Decision(BaseModel):
     risk: RiskLevel | None = None
 
 
+class AssetTechniqueLimit(BaseModel):
+    """Narrows (never widens) which techniques apply to actions targeting one exact host.
+
+    Absent entry for a host: that host keeps the scope's global technique rules, unchanged.
+    Empty ``permitted_techniques`` on a present entry: a no-op, never an accidental grant.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    host: str
+    permitted_techniques: tuple[str, ...] = ()
+    forbidden_techniques: tuple[str, ...] = ()
+
+    @field_validator("permitted_techniques", "forbidden_techniques")
+    @classmethod
+    def _slugs_only(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(value) > MAX_PERMITTED_TECHNIQUES or any(not _SLUG.fullmatch(t) for t in value):
+            raise ValueError("technique lists must be a short list of lowercase [a-z0-9-] slugs")
+        return value
+
+
 class Scope(BaseModel):
     """Authoritative engagement scope, loaded from a validated file, never from model text."""
 
@@ -86,6 +112,8 @@ class Scope(BaseModel):
     max_rate_rps: int | None = Field(default=None, ge=1, le=1000, strict=True)
     automation_allowed: bool = Field(default=True, strict=True)
     permitted_techniques: tuple[str, ...] = ()  # empty = no restriction; else only these slugs
+    # v1.2: per-host narrowing (additive; old scope files keep loading with none, i.e. unchanged).
+    asset_technique_limits: tuple[AssetTechniqueLimit, ...] = ()
 
     @field_validator("permitted_techniques")
     @classmethod
