@@ -22,6 +22,7 @@ in_scope:
   - og.com
   - nadex.com
   - merchant.crypto.com
+  - pay.crypto.com
 exclusions: []
 forbidden_techniques:
   - brute-force
@@ -159,6 +160,12 @@ asset_technique_limits:
       - injection-test
       - secret-scan
       - graphql-introspection
+  - host: pay.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - passive-scan
+      - graphql-introspection
 status: DRAFT
 ambiguities:
   - >-
@@ -189,3 +196,13 @@ ambiguities:
     involve flooding or load testing. Therefore, graphql-introspection is explicitly kept
     in permitted_techniques globally and for merchant.crypto.com, while dos remains
     globally forbidden.
+  - >-
+    pay.crypto.com was added after merchant.crypto.com's own JS bundle
+    (/static/js/main.a1bb00b3.js) revealed its GraphQL endpoint lives at
+    https://pay.crypto.com/graphql, not on merchant.crypto.com itself (which serves a
+    generic SPA catch-all for every path, including /graphql). Falls under the program's
+    own *.crypto.com wildcard tier. Scoped narrowly: port-scan/service-detection/
+    passive-scan for basic recon plus graphql-introspection (the one technique with a
+    concrete, found reason) only - injection-test, secret-scan, upload-bypass and
+    otp-bypass are deliberately NOT granted for this one host given it is a payment
+    subdomain, to keep this addition minimal and tied to the actual discovery.
