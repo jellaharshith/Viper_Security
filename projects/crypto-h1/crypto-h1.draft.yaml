@@ -1,0 +1,191 @@
+project_id: crypto-h1
+program_url: https://hackerone.com/crypto
+evidence_ref: >-
+  HackerOne Crypto.com program scope pages (hackerone.com/crypto and
+  hackerone.com/crypto/policy_scopes), checked 2026-11-11. Signal requirement: -1.0 or
+  higher (trial reports used below it). Program rules state: "No draining another user's
+  funds or blocking their access — automatic disqualification." Hard rules forbid:
+  targeting users/employees/staff, social engineering, malware, unauthorized data
+  collection, live trading, transfers, or fund movement. Three URL-type assets
+  (crypto.com/price, crypto.com/nft, crypto.com/exchange public surface) are noted in
+  the policy but not encoded in in_scope as Scope.in_scope expects bare hostnames.
+in_scope:
+  - js.crypto.com
+  - developer.crypto.com
+  - developer-api.crypto.com
+  - developer-platform-api.crypto.com
+  - travel.crypto.com
+  - tickets.crypto.com
+  - tax.crypto.com
+  - experiences.crypto.com
+  - web.crypto.com
+  - og.com
+  - nadex.com
+  - merchant.crypto.com
+exclusions: []
+forbidden_techniques:
+  - brute-force
+  - dos
+  - exploit
+max_rate_rps: 4
+automation_allowed: true
+permitted_techniques:
+  - port-scan
+  - service-detection
+  - web-scan
+  - template-scan
+  - passive-scan
+  - injection-test
+  - secret-scan
+  - graphql-introspection
+asset_technique_limits:
+  - host: js.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: developer.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: developer-api.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: developer-platform-api.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: travel.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: tickets.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: tax.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: experiences.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: web.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: og.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: nadex.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+  - host: merchant.crypto.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - passive-scan
+      - injection-test
+      - secret-scan
+      - graphql-introspection
+status: DRAFT
+ambiguities:
+  - >-
+    The two account-requiring Extreme-tier assets ("mobile app APIs that require an
+    account" and "Exchange APIs that require an account") as well as deep authenticated
+    crypto.com/exchange flows are deliberately excluded from this scope pending the
+    operator supplying their own authenticated session later.
+  - >-
+    Smart-contract assets (two mainnet contracts on Cronos and Ethereum CDCETH) require
+    Slither/Mythril/Foundry-class tooling Viper does not currently have, and are not
+    attempted this round.
+  - >-
+    Mobile app assets (com.monaco.mobile for iOS and co.mona.android for Android)
+    require dedicated APK/IPA reverse engineering and dynamic instrumentation tooling
+    (such as Frida), not attempted this round.
+  - >-
+    Excluded assets designated by the program (GitHub source repositories
+    swap-contracts-*, cro-staking, chain-desktop-wallet; Crypto.com Wallet Extension;
+    and com.defi.wallet) are explicitly out of scope and never included.
+  - >-
+    The three URL-type assets (crypto.com/price, crypto.com/nft, and crypto.com/exchange
+    public surface) are noted from the program scope table but not encoded into in_scope
+    because Scope.in_scope expects exact hostnames or wildcards per the existing model.
+  - >-
+    Regarding GraphQL introspection on merchant.crypto.com: While the program policy
+    notes that GraphQL DoS is capped at $200, confirming GraphQL is an acknowledged
+    attack surface, single-query schema introspection is non-destructive and does not
+    involve flooding or load testing. Therefore, graphql-introspection is explicitly kept
+    in permitted_techniques globally and for merchant.crypto.com, while dos remains
+    globally forbidden.
