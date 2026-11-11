@@ -12,10 +12,14 @@ NUCLEI_VERSION=${NUCLEI_VERSION:-3.3.10}
 [[ $NUCLEI_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "invalid NUCLEI_VERSION"
 EGRESS_ALLOWLIST=${1:-scanme.nmap.org}
 UPLOAD_DIR=/tmp/vmapi-upload
-for module in app.py auth.py jobs.py toolrunner.py requirements.txt; do
+for module in app.py auth.py jobs.py toolrunner.py requirements.txt \
+  probes/__init__.py probes/_common.py probes/otp_2fa_probe.py \
+  probes/upload_bypass_probe.py probes/injection_probe.py \
+  probes/secret_scan.py probes/graphql_introspect.py; do
   [[ -f "$UPLOAD_DIR/$module" && ! -L "$UPLOAD_DIR/$module" ]] || die "missing trusted upload: $module"
 done
-[[ ! -L "$UPLOAD_DIR" && ! -L /opt/viper && ! -L /opt/viper/vmapi ]] || die "symlink deployment path"
+[[ ! -L "$UPLOAD_DIR" && ! -L /opt/viper && ! -L /opt/viper/vmapi && ! -L /opt/viper/probes ]] \
+  || die "symlink deployment path"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
@@ -55,6 +59,7 @@ fi
 install -d -o viper-vmapi -g viper-vmapi -m 0700 /var/lib/viper-vmapi
 install -d -o root -g root -m 0755 /opt/viper
 install -d -o root -g viper-vmapi -m 0750 /opt/viper/vmapi
+install -d -o root -g viper-vmapi -m 0750 /opt/viper/probes
 install -d -o root -g viper-vmapi -m 0755 /etc/viper /etc/viper/certs
 
 # Reruns update only after existing jobs have been terminated by systemd's cgroup cleanup.
@@ -64,10 +69,14 @@ fi
 for module in app.py auth.py jobs.py toolrunner.py requirements.txt; do
   install -o root -g viper-vmapi -m 0640 "$UPLOAD_DIR/$module" "/opt/viper/vmapi/$module"
 done
+for module in __init__.py _common.py otp_2fa_probe.py upload_bypass_probe.py injection_probe.py \
+  secret_scan.py graphql_introspect.py; do
+  install -o root -g viper-vmapi -m 0640 "$UPLOAD_DIR/probes/$module" "/opt/viper/probes/$module"
+done
 python3 -m venv /opt/viper/vmapi/.venv
 /opt/viper/vmapi/.venv/bin/python -m pip install -r /opt/viper/vmapi/requirements.txt
-chown -R root:viper-vmapi /opt/viper/vmapi
-chmod -R u=rwX,g=rX,o= /opt/viper/vmapi
+chown -R root:viper-vmapi /opt/viper/vmapi /opt/viper/probes
+chmod -R u=rwX,g=rX,o= /opt/viper/vmapi /opt/viper/probes
 
 work_dir=$(mktemp -d /tmp/viper-bootstrap.XXXXXXXX)
 trap 'rm -rf -- "$work_dir"' EXIT
