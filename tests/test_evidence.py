@@ -5,7 +5,10 @@ exactly one checkpoint result with the same binding, digest and arguments.
 """
 
 import hashlib
+import json
 from pathlib import Path
+
+import pytest
 
 from viper.agents.evidence import digest, rederive
 
@@ -108,3 +111,44 @@ def test_skipped_records_are_reported_not_silently_dropped():
            "output": out, "action_id": "u1", "audit_hash": "h1", "truncated": False}
     findings, warnings = run([res], [ev], actions=[nuclei])
     assert findings and any("skipped" in w for w in warnings)
+
+
+def test_injection_probe_tool_results_are_actually_parsed_into_findings():
+    """Found live against the real ALSCO VM: injection_probe/otp_2fa_probe/upload_bypass_probe
+    were added to findings/parsers.py but never registered in evidence.py's _PARSERS, so a real,
+    audited, non-simulated run of any of them silently produced zero findings and zero warnings."""
+    out = ('{"tool":"injection_probe","technique":"xss_reflected_marker","endpoint_path":"/search.php",'
+           '"param_name":"q","target":"sandbox-royal.securegateway.com","status_code":200,'
+           '"marker_reflected_unescaped":true}')
+    action = {"action_id": "i1", "tool_name": "injection_probe",
+              "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/search.php",
+                       "param_name": "q", "technique": "xss_reflected_marker"}}
+    ev = {"hash": "h1", "event": "tool_result", "action_hash": bind(action),
+          "detail": {"action_id": "i1", "tool": "injection_probe", "digest": digest(out),
+                     "simulated": False, "truncated": False}}
+    res = {"tool": "injection_probe", "args": dict(action["args"]), "simulated": False,
+           "output": out, "action_id": "i1", "audit_hash": "h1", "truncated": False}
+    findings, warnings = run([res], [ev], actions=[action])
+    assert findings and warnings == []
+    assert findings[0].confidence == "confirmed"
+
+
+@pytest.mark.parametrize("tool,path,signal", [
+    ("secret_scan", "/app.js", {"matches": [
+        {"pattern_name": "aws_access_key", "redacted_snippet": "AKIA...ABCD"}]}),
+    ("graphql_introspect", "/graphql", {"introspection_enabled": True, "schema_type_count": 12}),
+])
+def test_crypto_tool_results_are_actually_parsed_into_findings(tool, path, signal):
+    out = json.dumps({"tool": tool, "target": "sandbox.securegateway.com", "path": path,
+                      "status_code": 200, "response_headers": {}, **signal})
+    action = {"action_id": "c1", "tool_name": tool,
+              "args": {"target": "sandbox.securegateway.com", "path": path}}
+    ev = {"hash": "h1", "event": "tool_result", "action_hash": bind(action),
+          "detail": {"action_id": "c1", "tool": tool, "digest": digest(out),
+                     "simulated": False, "truncated": False}}
+    res = {"tool": tool, "args": dict(action["args"]), "simulated": False,
+           "output": out, "action_id": "c1", "audit_hash": "h1", "truncated": False}
+    findings, warnings = run([res], [ev], actions=[action])
+    assert len(findings) == 1 and warnings == []
+    assert findings[0].confidence == "confirmed" and findings[0].audit_refs == ["h1"]
+    assert findings[0].source_tool == tool

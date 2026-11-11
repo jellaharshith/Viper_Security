@@ -16,9 +16,23 @@ from typing import Any
 
 from viper.findings.enrich import enrich
 from viper.findings.models import Finding
-from viper.findings.parsers import parse_nmap_ex, parse_nuclei_ex
+from viper.findings.parsers import (
+    parse_graphql_introspect_ex,
+    parse_injection_probe_ex,
+    parse_nmap_ex,
+    parse_nuclei_ex,
+    parse_otp_probe_ex,
+    parse_secret_scan_ex,
+    parse_upload_probe_ex,
+)
 
-_PARSERS = {"nmap": parse_nmap_ex, "nuclei": parse_nuclei_ex}
+_PARSERS = {
+    "nmap": parse_nmap_ex, "nuclei": parse_nuclei_ex,
+    "otp_2fa_probe": parse_otp_probe_ex, "upload_bypass_probe": parse_upload_probe_ex,
+    "injection_probe": parse_injection_probe_ex,
+    "secret_scan": parse_secret_scan_ex,
+    "graphql_introspect": parse_graphql_introspect_ex,
+}
 
 
 def digest(output: str) -> str:
