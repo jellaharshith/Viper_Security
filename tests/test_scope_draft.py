@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from viper.agents.runner import load_scope
+from viper.policy.models import AssetTechniqueLimit, Scope
 from viper.policy.scope_draft import (
     MAX_PROGRAM_CHARS,
     ScopeDraft,
@@ -415,6 +416,59 @@ def test_all_permitted_unmapped_is_flagged_as_not_enforced() -> None:
     d = _draft(_limits(permitted_techniques=["fuzzing"]))
     assert d.scope.permitted_techniques == ()
     assert any("fuzzing" in a and "not enforced" in a.lower() for a in d.ambiguities)
+
+
+@pytest.mark.parametrize("phrase,slug", [
+    ("OTP bypass", "otp-bypass"), ("2fa bypass", "otp-bypass"), ("otp rate limit bypass", "otp-bypass"),
+    ("upload bypass", "upload-bypass"), ("file upload bypass", "upload-bypass"),
+    ("xss", "injection-test"), ("sqli", "injection-test"), ("sql injection", "injection-test"),
+    ("command injection", "injection-test"), ("rce", "injection-test"),
+    ("remote code execution", "injection-test"), ("privilege escalation", "injection-test"),
+])
+def test_v1_2_technique_aliases_map_to_new_slugs(phrase: str, slug: str) -> None:
+    d = _draft(_limits(permitted_techniques=[phrase]))
+    assert d.scope.permitted_techniques == (slug,)
+
+
+@pytest.mark.parametrize("phrase,slug", [
+    ("secret-scan", "secret-scan"), ("secret scan", "secret-scan"),
+    ("secret scanning", "secret-scan"), ("exposed credentials scan", "secret-scan"),
+    ("graphql-introspection", "graphql-introspection"),
+    ("graphql introspection", "graphql-introspection"),
+    ("graphql schema introspection", "graphql-introspection"),
+])
+def test_crypto_h1_technique_aliases_map_to_new_slugs(phrase: str, slug: str) -> None:
+    """secret-scan/graphql-introspection were added to KNOWN_TECHNIQUES (policy/models.py) but
+    _TECHNIQUE_ALIASES here was never updated to match - every other known slug has at least a
+    self-mapping entry, so without one a hand-written scope file's exact slug silently gets
+    dropped as "not mapped to a known technique", making the tool permanently DENIED. Found by
+    the coordinator independently re-verifying a crew-built scope file before approving it."""
+    d = _draft(_limits(permitted_techniques=[phrase]))
+    assert d.scope.permitted_techniques == (slug,)
+
+
+def test_model_cannot_author_asset_technique_limits() -> None:
+    bad = [{"host": "example.com", "permitted_techniques": ["web-scan"]}]
+    with pytest.raises(ScopeDraftError):
+        _draft(_limits(asset_technique_limits=bad))
+
+
+def test_hand_edited_asset_technique_limits_round_trips_through_load_and_finalize() -> None:
+    d = _draft(_reply())
+    hand_edited = scope_draft.dump_draft(d).replace(
+        "status: DRAFT",
+        "asset_technique_limits:\n"
+        "- host: example.com\n"
+        "  permitted_techniques: [web-scan]\n"
+        "status: DRAFT",
+    )
+    reloaded = load_draft(hand_edited)
+    assert reloaded.scope.asset_technique_limits == (
+        AssetTechniqueLimit(host="example.com", permitted_techniques=("web-scan",)),
+    )
+    finalized = scope_draft.finalize(reloaded)
+    scope = Scope.model_validate(yaml.safe_load(finalized))
+    assert scope.asset_technique_limits == reloaded.scope.asset_technique_limits
 
 
 @pytest.mark.parametrize("sentence", [

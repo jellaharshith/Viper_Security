@@ -24,7 +24,7 @@ import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from viper.policy.engine import normalize_host
-from viper.policy.models import KNOWN_TECHNIQUES, Scope, normalize_technique
+from viper.policy.models import KNOWN_TECHNIQUES, AssetTechniqueLimit, Scope, normalize_technique
 
 MAX_PROGRAM_CHARS = 20_000
 MAX_REPLY_CHARS = 65_536
@@ -200,6 +200,20 @@ _TECHNIQUE_ALIASES: dict[str, str] = {
     "denial-of-service": "dos", "stress-testing": "dos", "load-testing": "dos",
     "flooding": "dos",
     "exploit": "exploit", "exploits": "exploit", "exploitation": "exploit",
+    "otp-bypass": "otp-bypass", "2fa-bypass": "otp-bypass", "otp-rate-limit-bypass": "otp-bypass",
+    "otp-rate-limit": "otp-bypass", "two-factor-bypass": "otp-bypass",
+    "upload-bypass": "upload-bypass", "file-upload-bypass": "upload-bypass",
+    "upload-filter-bypass": "upload-bypass",
+    "xss": "injection-test", "cross-site-scripting": "injection-test",
+    "sqli": "injection-test", "sql-injection": "injection-test",
+    "command-injection": "injection-test", "os-injection": "injection-test",
+    "os-command-injection": "injection-test", "url-injection": "injection-test",
+    "rce": "injection-test", "remote-code-execution": "injection-test",
+    "privilege-escalation": "injection-test", "injection-test": "injection-test",
+    "secret-scan": "secret-scan", "secret-scanning": "secret-scan",
+    "exposed-credentials-scan": "secret-scan",
+    "graphql-introspection": "graphql-introspection",
+    "graphql-schema-introspection": "graphql-introspection",
 }
 
 
@@ -319,6 +333,13 @@ def _build(
             max_rate_rps=_rate(data.get("max_rate_rps")),
             automation_allowed=_flag(data.get("automation_allowed", True)),
             permitted_techniques=permitted,
+            # Hand-edited file path only: the model can never supply this key (draft_scope
+            # rejects it via _MODEL_KEYS before _build is ever called), so re-validating it
+            # unconditionally here is safe and keeps the most safety-critical field human-only.
+            asset_technique_limits=tuple(
+                AssetTechniqueLimit.model_validate(entry)
+                for entry in data.get("asset_technique_limits") or ()
+            ),
         )
     except ValidationError:
         raise ScopeDraftError("draft does not form a valid scope") from None
