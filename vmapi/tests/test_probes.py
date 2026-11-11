@@ -169,6 +169,31 @@ def test_secret_scan_detects_each_fixed_secret_shape_and_redacts_it(capsys) -> N
             assert m["redacted_snippet"].startswith("AKIA")
 
 
+def test_secret_scan_jwt_pattern_ignores_dotted_js_property_chains(capsys) -> None:
+    """Found live against tax.crypto.com: the old JWT regex (three [A-Za-z0-9_-]{10,} segments
+    joined by dots, no further structure check) matched ordinary minified-JS property-access
+    chains as 'high severity exposed JWT' - e.g. a GeeTest captcha library's own
+    `geetest_holder.geetest_wind.geetest_fallback` and the Push API's
+    `swRegistration.pushManager.getSubscription`. A real JWT's first segment is base64url of a
+    JSON object starting '{"...', which always encodes to 'eyJ' - requiring that prefix is the
+    standard JWT-detection heuristic and rejects these false positives without rejecting real
+    JWTs (see the fixture in the test above, which already starts 'eyJ...').
+    """
+    body = (
+        "var cfg = {geetest_holder: 1, geetest_wind: 2, geetest_fallback: 3};"
+        "x = geetest_holder.geetest_wind.geetest_fallback;"
+        "swRegistration.pushManager.getSubscription().then(doStuff);"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=body)
+
+    client = secret_scan.build_client(transport=httpx.MockTransport(handler))
+    secret_scan.run({"target": TARGET, "path": "/static/app.js"}, client=client)
+    record = _lines(capsys)[0]
+    assert all(m["pattern_name"] != "jwt" for m in record["matches"])
+
+
 def test_secret_scan_clean_response_yields_no_matches(capsys) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text="console.log('nothing to see here');")

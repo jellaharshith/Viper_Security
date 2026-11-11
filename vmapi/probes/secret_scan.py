@@ -30,7 +30,11 @@ _INTERNAL_HOST_ALTERNATION = "|".join(re.escape(suffix) for suffix in INTERNAL_D
 PATTERNS: dict[str, re.Pattern[str]] = {
     "aws_access_key": re.compile(r"AKIA[0-9A-Z]{16}"),
     "bearer_token": re.compile(r"Bearer [A-Za-z0-9\-_.]{20,}"),
-    "jwt": re.compile(r"\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
+    # A real JWT's header segment is base64url of JSON starting '{"...', which always encodes
+    # to "eyJ" - requiring that prefix is the standard JWT-detection heuristic. Without it this
+    # matched ordinary minified-JS dotted property chains (e.g. a captcha library's
+    # "geetest_holder.geetest_wind.geetest_fallback") as a "high severity exposed JWT".
+    "jwt": re.compile(r"\beyJ[A-Za-z0-9_-]{7,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
     "internal_hostname": re.compile(rf"[a-z0-9-]+(?:{_INTERNAL_HOST_ALTERNATION})"),
 }
 
