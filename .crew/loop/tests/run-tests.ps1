@@ -63,6 +63,11 @@ Assert-Eq 'APPROVED' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'T1' -Boar
 'codex: T2 REJECTED: nope' | Out-File -Encoding utf8 $fake
 Assert-Eq 'REJECTED' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'T2' -Board $fake) 'checker REJECTED parsed'
 Assert-Eq 'PENDING' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'T9' -Board $fake) 'absent verdict is PENDING'
+# Verdict token may come BEFORE the task id (a live agent wrote "REJECTED AUTO1") -- order-independent.
+'codex: REJECTED AUTO1: could not run gate' | Out-File -Encoding utf8 $fake
+Assert-Eq 'REJECTED' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'AUTO1' -Board $fake) 'verdict-before-id REJECTED parsed'
+'codex: APPROVED AUTO2' | Out-File -Encoding utf8 $fake
+Assert-Eq 'APPROVED' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'AUTO2' -Board $fake) 'verdict-before-id APPROVED parsed'
 # Safety invariant: for a still-unimplemented mode, gates skipped + checker APPROVED still PARKs.
 'codex: T1 APPROVED' | Out-File -Encoding utf8 $fake
 # Safety invariant: gates skipped + checker APPROVED is NOT enough -- the condition still gates.
