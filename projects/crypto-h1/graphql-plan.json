@@ -1,0 +1,3 @@
+[
+  {"action_id": "crypto-graphql-pay", "tool_name": "graphql_introspect", "args": {"target": "pay.crypto.com", "path": "/graphql"}}
+]

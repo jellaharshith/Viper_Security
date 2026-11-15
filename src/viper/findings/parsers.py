@@ -13,6 +13,7 @@ import hashlib
 import json
 import re
 import shlex
+from typing import Any
 from urllib.parse import urlsplit
 
 from viper.findings.models import Finding, Severity
@@ -521,3 +522,317 @@ def parse_nuclei_metrics(output: str) -> dict[str, int | None]:
     )
     final_requests = stat_requests
     return {"template_count": final_templates, "request_count": final_requests}
+
+
+# --- v1.2 web-app probes (otp_2fa_probe, upload_bypass_probe, injection_probe) -------------
+# One JSON object per line (the probes' own JSONL contract, mirroring nuclei's -jsonl). Every
+# record is independently re-validated here: malformed/garbled lines are skipped, never trusted,
+# so a hostile or buggy probe line can never fabricate a "confirmed" finding.
+
+def _probe_records(output: str) -> tuple[list[dict[str, Any]], int]:
+    lines, skipped = _lines(output)
+    records: list[dict[str, Any]] = []
+    for line in lines[:MAX_LINES]:
+        if not line.startswith("{") or not _json_depth_ok(line):
+            skipped += 1
+            continue
+        try:
+            d = json.loads(line)
+        except Exception:  # noqa: BLE001, S112
+            skipped += 1
+            continue
+        if isinstance(d, dict):
+            records.append(d)
+        else:
+            skipped += 1
+    return records, skipped
+
+
+def parse_otp_probe(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> list[Finding]:
+    findings, _ = parse_otp_probe_ex(output, action_id=action_id, target=target, audit_refs=audit_refs)
+    return findings
+
+
+def parse_otp_probe_ex(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> tuple[list[Finding], int]:
+    """One finding per run at most: the probe's own records decide whether the OTP endpoint's
+    rate limit/lockout held (no finding) or did not (confirmed), or whether an enumerate_codes
+    run ever got a 2xx (confirmed, critical: the code was accepted).
+    """
+    all_records, skipped = _probe_records(output)
+    mine = [r for r in all_records if r.get("tool") == "otp_2fa_probe"]
+    records = [r for r in mine if isinstance(r.get("mode"), str) and isinstance(r.get("status_code"), int)]
+    skipped += len(mine) - len(records)
+    if not records:
+        return [], skipped
+    mode = records[0].get("mode")
+    endpoint = _field(records[0].get("endpoint_path", ""), MAX_LOCATION)
+    evidence = _field(output, MAX_TEXT_FIELD * 4)
+    if mode == "enumerate_codes":
+        hit = next((r for r in records if isinstance(r.get("status_code"), int)
+                   and 200 <= r["status_code"] < 300), None)
+        if hit is None:
+            return [], skipped
+        return [Finding(
+            id=_fid("otp_2fa_probe", action_id, "enumerate_codes-accepted"),
+            title=f"OTP code accepted during bounded enumeration on {endpoint}",
+            affected_asset=target, source_tool="otp_2fa_probe", source_action_id=action_id,
+            evidence=evidence, severity="critical",
+            severity_rationale="A bounded OTP-code guess was accepted (2xx) during a scope-"
+                               "permitted enumeration probe.",
+            confidence="confirmed", reproducibility="Replay the same bounded guesses against "
+                                                     f"{endpoint} with the probe's recorded attempts.",
+            remediation="Enforce per-account OTP attempt limits and lockout independent of source IP.",
+            references=[], audit_refs=list(audit_refs),
+        )], skipped
+    if mode == "rate_limit_probe":
+        if any(r.get("lockout_observed") is True for r in records):
+            return [], skipped  # the limit held: not a finding
+        return [Finding(
+            id=_fid("otp_2fa_probe", action_id, "rate-limit-probe-no-lockout"),
+            title=f"No OTP rate limit/lockout observed on {endpoint}",
+            affected_asset=target, source_tool="otp_2fa_probe", source_action_id=action_id,
+            evidence=evidence, severity="high",
+            severity_rationale=f"{len(records)} bounded wrong-code attempts produced no lockout "
+                               "or throttling signal (429/423/explicit 403 lockout message).",
+            confidence="confirmed",
+            reproducibility=f"Repeat {len(records)} wrong-code attempts against {endpoint}.",
+            remediation="Add a per-account/IP OTP attempt counter with lockout or backoff.",
+            references=[], audit_refs=list(audit_refs),
+        )], skipped
+    return [], skipped
+
+
+def parse_upload_probe(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> list[Finding]:
+    findings, _ = parse_upload_probe_ex(output, action_id=action_id, target=target, audit_refs=audit_refs)
+    return findings
+
+
+def parse_upload_probe_ex(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> tuple[list[Finding], int]:
+    """Confirmed when the probe's own fixed, benign file was accepted (2xx) — an unambiguous
+    accept/reject signal from the server, never inferred from prose.
+    """
+    all_records, skipped = _probe_records(output)
+    records = [r for r in all_records if r.get("tool") == "upload_bypass_probe"]
+    findings: list[Finding] = []
+    seen: set[str] = set()
+    for r in records:
+        status = r.get("status_code")
+        variant = r.get("variant")
+        if not isinstance(status, int) or not isinstance(variant, str):
+            skipped += 1
+            continue
+        if not (200 <= status < 300):
+            continue  # a clean reject (not 2xx) is a normal outcome, not a malformed record
+        endpoint = _field(r.get("endpoint_path", ""), MAX_LOCATION)
+        key = f"{variant}|{endpoint}"
+        if key in seen or len(findings) >= MAX_FINDINGS:
+            continue
+        seen.add(key)
+        label = {"content_detector_marker": "content-detector bypass",
+                 "disallowed_extension_render": "extension allow-list bypass"}.get(variant, variant)
+        findings.append(Finding(
+            id=_fid("upload_bypass_probe", action_id, key),
+            title=f"Upload {label} accepted on {endpoint}",
+            affected_asset=target, source_tool="upload_bypass_probe", source_action_id=action_id,
+            evidence=_field(json.dumps(r), MAX_TEXT_FIELD * 2),
+            severity="critical",
+            severity_rationale=f"Server returned {status} for a fixed, reviewed {variant} probe "
+                               "file that should have been rejected by the upload filter.",
+            confidence="confirmed",
+            reproducibility=f"Re-upload the same fixed {variant} probe file to {endpoint}.",
+            remediation="Validate uploaded content server-side (magic bytes, re-encode images, "
+                        "reject by allow-listed MIME+extension pair), not by extension alone.",
+            references=[], audit_refs=list(audit_refs),
+        ))
+    return findings, skipped
+
+
+_INJECTION_SEVERITY: dict[str, Severity] = {
+    "xss_reflected_marker": "high",
+    "command_injection_marker": "critical",
+    "url_injection_redirect": "medium",
+}
+_INJECTION_SIGNAL_FIELD = {
+    "xss_reflected_marker": "marker_reflected_unescaped",
+    "command_injection_marker": "marker_echoed",
+    "url_injection_redirect": "redirected_to_payload",
+}
+
+
+def parse_injection_probe(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> list[Finding]:
+    findings, _ = parse_injection_probe_ex(output, action_id=action_id, target=target, audit_refs=audit_refs)
+    return findings
+
+
+def parse_injection_probe_ex(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> tuple[list[Finding], int]:
+    """XSS/command-injection/redirect: confirmed only when the probe's own explicit boolean
+    signal is True. SQLi (boolean-diff/timing) needs a baseline comparison this single-shot
+    probe does not take, so it is always reported as an unconfirmed hypothesis for a human to
+    verify with a second request, never silently promoted to confirmed.
+    """
+    all_records, skipped = _probe_records(output)
+    records = [r for r in all_records if r.get("tool") == "injection_probe"]
+    findings: list[Finding] = []
+    seen: set[str] = set()
+    for r in records:
+        technique = r.get("technique")
+        endpoint = r.get("endpoint_path")
+        param = r.get("param_name")
+        if not isinstance(technique, str) or not isinstance(endpoint, str) or not isinstance(param, str):
+            skipped += 1
+            continue
+        endpoint = _field(endpoint, MAX_LOCATION)
+        param = _field(param, 64)
+        key = f"{technique}|{endpoint}|{param}"
+        if key in seen or len(findings) >= MAX_FINDINGS:
+            continue
+        evidence = _field(json.dumps(r), MAX_TEXT_FIELD * 2)
+        if technique in _INJECTION_SIGNAL_FIELD:
+            if r.get(_INJECTION_SIGNAL_FIELD[technique]) is not True:
+                continue
+            seen.add(key)
+            findings.append(Finding(
+                id=_fid("injection_probe", action_id, key),
+                title=f"{technique.replace('_', ' ')} confirmed on {endpoint} ({param})",
+                affected_asset=target, source_tool="injection_probe", source_action_id=action_id,
+                evidence=evidence, severity=_INJECTION_SEVERITY.get(technique, "medium"),
+                severity_rationale=f"Probe's own {_INJECTION_SIGNAL_FIELD[technique]} signal "
+                                   "was True: the fixed, reviewed marker was observed unescaped "
+                                   "in the response.",
+                confidence="confirmed",
+                reproducibility=f"Resend the same fixed {technique} probe payload to {param} on "
+                                f"{endpoint}.",
+                remediation="Encode/escape output and validate input server-side for this "
+                            "parameter; parameterize any underlying query.",
+                references=[], audit_refs=list(audit_refs),
+            ))
+        elif technique in ("sqli_boolean", "sqli_time"):
+            seen.add(key)
+            findings.append(Finding(
+                id=_fid("injection_probe", action_id, key),
+                title=f"Possible {technique.replace('_', ' ')} on {endpoint} ({param})",
+                affected_asset=target, source_tool="injection_probe", source_action_id=action_id,
+                evidence=evidence, severity="info",
+                severity_rationale="Single-shot probe has no baseline response/timing to diff "
+                                   "against; this is an unconfirmed hypothesis only.",
+                confidence="hypothesis",
+                reproducibility=f"Manually compare this response/timing against a baseline "
+                                f"request to {endpoint} without the {technique} payload.",
+                remediation="Use parameterized queries; verify manually with a baseline "
+                            "comparison before treating this as a confirmed finding.",
+                references=[], audit_refs=list(audit_refs),
+            ))
+    return findings, skipped
+
+
+_SECRET_SEVERITY: dict[str, Severity] = {
+    "aws_access_key": "high", "bearer_token": "high", "jwt": "high",
+    "internal_hostname": "medium",
+}
+
+
+def parse_secret_scan(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> list[Finding]:
+    return parse_secret_scan_ex(output, action_id=action_id, target=target, audit_refs=audit_refs)[0]
+
+
+def parse_secret_scan_ex(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> tuple[list[Finding], int]:
+    """One confirmed finding per fixed pattern/path; retain only the probe's redacted snippet."""
+    records, skipped = _probe_records(output)
+    findings: list[Finding] = []
+    seen: set[str] = set()
+    for record in records:
+        if record.get("tool") != "secret_scan":
+            continue
+        path, matches = record.get("path"), record.get("matches")
+        if not isinstance(path, str) or not isinstance(matches, list):
+            skipped += 1
+            continue
+        for match in matches:
+            if not isinstance(match, dict):
+                skipped += 1
+                continue
+            pattern, snippet = match.get("pattern_name"), match.get("redacted_snippet")
+            if (not isinstance(pattern, str) or pattern not in _SECRET_SEVERITY
+                    or not isinstance(snippet, str)):
+                skipped += 1
+                continue
+            key = f"{pattern}|{path}"
+            if key in seen:
+                continue
+            if len(findings) >= MAX_FINDINGS:
+                skipped += 1
+                continue
+            seen.add(key)
+            endpoint = _field(path, MAX_LOCATION)
+            findings.append(Finding(
+                id=_fid("secret_scan", action_id, key),
+                title=f"Exposed {pattern.replace('_', ' ')} in {endpoint}",
+                affected_asset=target, source_tool="secret_scan", source_action_id=action_id,
+                evidence=_field(snippet), severity=_SECRET_SEVERITY[pattern],
+                severity_rationale="The public response matched the probe's fixed "
+                                   f"{pattern} pattern.",
+                confidence="confirmed",
+                reproducibility=f"Fetch {endpoint} and run the same fixed secret scan.",
+                remediation="Remove exposed secrets or internal hostnames from public assets; "
+                            "revoke and rotate exposed credentials.",
+                references=[], audit_refs=list(audit_refs),
+            ))
+    return findings, skipped
+
+
+def parse_graphql_introspect(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> list[Finding]:
+    return parse_graphql_introspect_ex(
+        output, action_id=action_id, target=target, audit_refs=audit_refs)[0]
+
+
+def parse_graphql_introspect_ex(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> tuple[list[Finding], int]:
+    """Schema disclosure is confirmed only by the probe's explicit true boolean signal."""
+    records, skipped = _probe_records(output)
+    findings: list[Finding] = []
+    seen: set[str] = set()
+    for record in records:
+        if record.get("tool") != "graphql_introspect":
+            continue
+        path, enabled = record.get("path"), record.get("introspection_enabled")
+        if not isinstance(path, str) or type(enabled) is not bool:
+            skipped += 1
+            continue
+        if enabled is not True or path in seen:
+            continue
+        if len(findings) >= MAX_FINDINGS:
+            skipped += 1
+            continue
+        seen.add(path)
+        endpoint = _field(path, MAX_LOCATION)
+        findings.append(Finding(
+            id=_fid("graphql_introspect", action_id, path),
+            title=f"GraphQL schema disclosed through introspection on {endpoint}",
+            affected_asset=target, source_tool="graphql_introspect", source_action_id=action_id,
+            evidence=_field(json.dumps(record), MAX_TEXT_FIELD * 2), severity="medium",
+            severity_rationale="The fixed introspection query returned schema information.",
+            confidence="confirmed",
+            reproducibility=f"Send the same fixed introspection query to {endpoint}.",
+            remediation="Disable public introspection or restrict it to authorized users.",
+            references=[], audit_refs=list(audit_refs),
+        ))
+    return findings, skipped

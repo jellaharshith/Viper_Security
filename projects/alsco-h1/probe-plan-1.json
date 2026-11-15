@@ -1,0 +1,37 @@
+[
+  {
+    "action_id": "alsco-royal-inj-sqli-1",
+    "tool_name": "injection_probe",
+    "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/index.php", "param_name": "id", "technique": "sqli_boolean"}
+  },
+  {
+    "action_id": "alsco-royal-inj-sqlitime-1",
+    "tool_name": "injection_probe",
+    "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/search.php", "param_name": "q", "technique": "sqli_time"}
+  },
+  {
+    "action_id": "alsco-royal-inj-xss-1",
+    "tool_name": "injection_probe",
+    "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/search.php", "param_name": "q", "technique": "xss_reflected_marker"}
+  },
+  {
+    "action_id": "alsco-royal-inj-cmd-1",
+    "tool_name": "injection_probe",
+    "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/index.php", "param_name": "page", "technique": "command_injection_marker"}
+  },
+  {
+    "action_id": "alsco-royal-inj-redirect-1",
+    "tool_name": "injection_probe",
+    "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/login.php", "param_name": "redirect", "technique": "url_injection_redirect"}
+  },
+  {
+    "action_id": "alsco-royal-upload-ext-1",
+    "tool_name": "upload_bypass_probe",
+    "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/upload.php", "variant": "disallowed_extension_render"}
+  },
+  {
+    "action_id": "alsco-royal-upload-marker-1",
+    "tool_name": "upload_bypass_probe",
+    "args": {"target": "sandbox-royal.securegateway.com", "endpoint_path": "/upload.php", "variant": "content_detector_marker"}
+  }
+]

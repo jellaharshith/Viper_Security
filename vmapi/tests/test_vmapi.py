@@ -12,7 +12,7 @@ from unittest.mock import Mock
 from fastapi.testclient import TestClient
 from vmapi.app import create_app
 from vmapi.jobs import Job, JobRegistry
-from vmapi.toolrunner import build_command
+from vmapi.toolrunner import TOOLS, build_command
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 POSIX = pytest.mark.skipif(os.name != "posix", reason="Linux VM process groups required")
@@ -50,7 +50,7 @@ def test_every_route_requires_auth(client, method, path):
 
 
 def test_health(client, monkeypatch):
-    assert client.get("/health", headers=AUTH).json() == {"status": "ok", "tools": ["nmap", "nuclei"]}
+    assert client.get("/health", headers=AUTH).json() == {"status": "ok", "tools": list(TOOLS)}
     monkeypatch.delenv("VIPER_EXEC_API_TOKEN")
     assert client.get("/health", headers=AUTH).status_code == 401
 

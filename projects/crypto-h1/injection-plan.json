@@ -1,0 +1,6 @@
+[
+  {"action_id": "crypto-inj-tickets-id-sqli", "tool_name": "injection_probe", "args": {"target": "tickets.crypto.com", "endpoint_path": "/browse/concerts", "param_name": "id", "technique": "sqli_boolean"}},
+  {"action_id": "crypto-inj-tickets-id-xss", "tool_name": "injection_probe", "args": {"target": "tickets.crypto.com", "endpoint_path": "/browse/concerts", "param_name": "id", "technique": "xss_reflected_marker"}},
+  {"action_id": "crypto-inj-tickets-name-xss", "tool_name": "injection_probe", "args": {"target": "tickets.crypto.com", "endpoint_path": "/browse/concerts", "param_name": "name", "technique": "xss_reflected_marker"}},
+  {"action_id": "crypto-inj-tickets-name-sqli", "tool_name": "injection_probe", "args": {"target": "tickets.crypto.com", "endpoint_path": "/browse/concerts", "param_name": "name", "technique": "sqli_boolean"}}
+]

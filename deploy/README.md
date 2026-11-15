@@ -10,8 +10,12 @@ It does not perform a scan or provision cloud infrastructure/firewalls.
 Copy the trusted repository's `vmapi/` directory to `/tmp/vmapi-upload` and this
 script to `/tmp/vm-bootstrap.sh` using the runbook's IAP SCP transport. Keep those
 uploads under the trusted operator's control until installation finishes. The
-script installs the four runtime Python modules and `requirements.txt`; uploaded
-virtualenvs, tests and credentials are not copied into the service directory.
+script installs the four runtime Python modules, `requirements.txt`, and the
+`probes/` package (`__init__.py`, `_common.py`, `otp_2fa_probe.py`,
+`upload_bypass_probe.py`, `injection_probe.py`, `secret_scan.py`,
+`graphql_introspect.py`) that `toolrunner.py` dispatches
+from `/opt/viper/probes`; uploaded virtualenvs, tests and credentials are not
+copied into the service directory.
 
 ```bash
 # On the VM; default exact target is scanme.nmap.org.

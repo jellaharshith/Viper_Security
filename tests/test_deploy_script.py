@@ -107,9 +107,32 @@ def test_bootstrap_keeps_safe_exact_hosts_and_unscoped_ips(value, monkeypatch):
     validate_allowlist(value, monkeypatch)
 
 
+def test_webapp_probes_are_installed_to_opt_viper_probes():
+    """vmapi/toolrunner.py dispatches webapp probes from /opt/viper/probes; the v1.2
+    probe modules were added to vmapi/probes/ but the bootstrap script's upload
+    allowlist and install step never learned about them (found while prepping the
+    ALSCO VM: toolrunner would 500 on every otp/upload/injection probe call)."""
+    text = script_text()
+    for module in ("__init__.py", "_common.py", "otp_2fa_probe.py",
+                    "upload_bypass_probe.py", "injection_probe.py"):
+        assert f"probes/{module}" in text, f"bootstrap never checks or installs probes/{module}"
+    assert "/opt/viper/probes" in text
+    assert text.index("probes/__init__.py") < text.index("/opt/viper/vmapi/.venv/bin/python -m pip install")
+
+
 def test_bootstrap_script_has_unix_line_endings():
     """A CRLF copy breaks bash on the VM ("set: pipefail\r: invalid option name"): caught on a live run."""
     from pathlib import Path
 
     data = (Path(__file__).resolve().parents[1] / "deploy" / "vm-bootstrap.sh").read_bytes()
     assert b"\r" not in data
+
+
+def test_crypto_probes_are_checked_and_installed():
+    text = script_text()
+    presence = text.split("for module in ", 1)[1].split("; do", 1)[0]
+    install = text.split("for module in ")[-1].split("; do", 1)[0]
+    for module in ("secret_scan.py", "graphql_introspect.py"):
+        assert f"probes/{module}" in presence
+        assert module in install
+    assert "/opt/viper/probes/$module" in text

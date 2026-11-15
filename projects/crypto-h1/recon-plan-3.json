@@ -1,0 +1,8 @@
+[
+  {"action_id": "crypto-nmap-og", "tool_name": "nmap", "args": {"target": "og.com", "ports": "80,443", "service_detection": true}},
+  {"action_id": "crypto-nuclei-og", "tool_name": "nuclei", "args": {"target": "og.com", "rate_limit": 4}},
+  {"action_id": "crypto-nmap-nadex", "tool_name": "nmap", "args": {"target": "nadex.com", "ports": "80,443", "service_detection": true}},
+  {"action_id": "crypto-nuclei-nadex", "tool_name": "nuclei", "args": {"target": "nadex.com", "rate_limit": 4}},
+  {"action_id": "crypto-nmap-merchant", "tool_name": "nmap", "args": {"target": "merchant.crypto.com", "ports": "80,443", "service_detection": true}},
+  {"action_id": "crypto-nuclei-merchant", "tool_name": "nuclei", "args": {"target": "merchant.crypto.com", "rate_limit": 4}}
+]
