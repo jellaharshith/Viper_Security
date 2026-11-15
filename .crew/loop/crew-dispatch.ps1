@@ -60,11 +60,16 @@ function Get-CrewAgents {
 }
 
 function Resolve-CrewTarget {
-  # Pick a live agent by role/lane prefix (e.g. 'codex' matches 'codex-crypto'). $null if none live.
+  # Pick a live agent by role prefix. Match on the UNIQUE assigned name (e.g. a coordinator and a
+  # maker can both be agent-kind 'claude' but have distinct names) -- fall back to the detected
+  # kind only when an agent has no name. $null if none live.
   param([string]$Role, [object[]]$Agents = $null)
   if ($null -eq $Agents) { $Agents = Get-CrewAgents }
   if (-not $Agents -or $Agents.Count -eq 0) { return $null }
-  $match = $Agents | Where-Object { $_.agent -like "$Role*" } | Select-Object -First 1
+  $match = $Agents | Where-Object {
+    $id = if ($_.name) { $_.name } else { $_.agent }
+    $id -like "$Role*"
+  } | Select-Object -First 1
   if ($match) { return $match.pane_id }
   return $null
 }
