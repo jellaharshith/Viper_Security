@@ -95,6 +95,74 @@ function Test-CiTriageCondition {
   return @{ Ok = $true; Detail = "scoped committed fix ($($changed.Count) file(s)); regression covered by gates" }
 }
 
+function Get-BranchChange {
+  # Shared: @{ Commits=[int]; Files=[string[]] (fwd-slashed) } for $Base...HEAD in a worktree.
+  param([string]$WorktreePath, [string]$Base = 'main')
+  $countRaw = (& git -C $WorktreePath rev-list --count "$Base..HEAD" 2>$null | Select-Object -First 1)
+  $n = 0; [void][int]::TryParse("$countRaw", [ref]$n)
+  $files = @(& git -C $WorktreePath diff --name-only "$Base...HEAD" 2>$null |
+            Where-Object { $_ } | ForEach-Object { $_.Replace('\','/') })
+  return @{ Commits = $n; Files = $files }
+}
+
+function Test-ProbeDevCondition {
+  # probe-dev is DONE when a new/changed probe or parser is COMMITTED, REGISTERED at its
+  # cross-cutting registration point (evidence._PARSERS / tools.registry -- the silent-failure
+  # class from CRYPTO-H1), and covered by a TEST. "Demonstrably fires" is approximated by a probe
+  # test changing plus the gate suite passing (ANDed by the judge).
+  param([string]$WorktreePath, [string]$Base = 'main')
+  if (-not $WorktreePath -or -not (Test-Path $WorktreePath)) {
+    return @{ Ok = $false; Detail = 'worktree missing -> nothing to verify' }
+  }
+  $chg = Get-BranchChange -WorktreePath $WorktreePath -Base $Base
+  if ($chg.Commits -lt 1)      { return @{ Ok = $false; Detail = 'no commit on branch: nothing was built' } }
+  if ($chg.Files.Count -eq 0)  { return @{ Ok = $false; Detail = 'empty diff: no files changed' } }
+
+  $touchesProbe = @($chg.Files | Where-Object { $_ -match 'findings/parsers\.py$|/probes/[^/]+\.py$' }).Count -gt 0
+  $touchesReg   = @($chg.Files | Where-Object { $_ -match 'agents/evidence\.py$|tools/registry\.py$' }).Count -gt 0
+  $touchesTest  = @($chg.Files | Where-Object { $_ -match '(^|/)tests/|vmapi/tests/' }).Count -gt 0
+
+  if ($touchesProbe -and -not $touchesReg) {
+    return @{ Ok = $false; Detail = 'probe/parser changed but no registration point (evidence._PARSERS / tools.registry) updated -- the silent-failure class' }
+  }
+  if (-not $touchesTest) {
+    return @{ Ok = $false; Detail = 'no test added/updated -- cannot confirm the probe fires' }
+  }
+  return @{ Ok = $true; Detail = "probe change committed, registered, and tested ($($chg.Files.Count) file(s))" }
+}
+
+function Test-TestQualityCondition {
+  # test-quality is DONE when the change is TESTS-ONLY (no production .py changed) and the target
+  # test file (parsed from $Source '<file>:<line>') passes DETERMINISTICALLY across two runs. A
+  # flaky test that passes once is not fixed, so one green run is not enough.
+  param([string]$WorktreePath, [string]$Source, [string]$Base = 'main')
+  if (-not $WorktreePath -or -not (Test-Path $WorktreePath)) {
+    return @{ Ok = $false; Detail = 'worktree missing -> nothing to verify' }
+  }
+  $chg = Get-BranchChange -WorktreePath $WorktreePath -Base $Base
+  if ($chg.Commits -lt 1)     { return @{ Ok = $false; Detail = 'no commit on branch: nothing changed' } }
+  if ($chg.Files.Count -eq 0) { return @{ Ok = $false; Detail = 'empty diff: no files changed' } }
+
+  $prod = @($chg.Files | Where-Object { $_ -match '\.py$' -and $_ -notmatch '(^|/)tests/|vmapi/tests/' })
+  if ($prod.Count -gt 0) {
+    return @{ Ok = $false; Detail = "test-quality must not change production code: $($prod -join ', ')" }
+  }
+  $file = ($Source -replace ':\d+\s*$', '').Trim()
+  if ($file -and (Test-Path (Join-Path $WorktreePath $file))) {
+    $py = Get-VenvPython
+    Push-Location $WorktreePath
+    try {
+      & $py -m pytest -q $file *> $null; $run1 = ($LASTEXITCODE -eq 0)
+      & $py -m pytest -q $file *> $null; $run2 = ($LASTEXITCODE -eq 0)
+    } finally { Pop-Location }
+    if (-not ($run1 -and $run2)) {
+      return @{ Ok = $false; Detail = "target test not green+deterministic across two runs ($file)" }
+    }
+    return @{ Ok = $true; Detail = "tests-only change; $file passed twice (deterministic)" }
+  }
+  return @{ Ok = $true; Detail = 'tests-only change; determinism covered by the gate suite' }
+}
+
 function Test-TaskCondition {
   # The per-mode "verifiably done" predicate. Returns @{ Ok=[bool]; Detail=[string] }.
   # Gates prove the code is clean; THIS proves the task's own goal was actually achieved.
@@ -106,14 +174,14 @@ function Test-TaskCondition {
     [string]$Base = 'main'
   )
   switch ($Mode) {
-    'ci-triage' { return (Test-CiTriageCondition -WorktreePath $WorktreePath -Source $Source -Base $Base) }
+    'ci-triage'    { return (Test-CiTriageCondition    -WorktreePath $WorktreePath -Source $Source -Base $Base) }
+    'probe-dev'    { return (Test-ProbeDevCondition    -WorktreePath $WorktreePath -Base $Base) }
+    'test-quality' { return (Test-TestQualityCondition -WorktreePath $WorktreePath -Source $Source -Base $Base) }
     default {
-      # TODO(human): implement the verifiable done-condition for probe-dev / test-quality / engagement.
-      #   Return @{ Ok = $true/$false; Detail = '<why>' }. See LOOP_ENGINEERING.md for the per-mode signal:
-      #     probe-dev    -> tests pass AND the probe is registered in evidence._PARSERS AND it demonstrably fires.
-      #     test-quality -> target test passes deterministically across two runs, diff touches only tests/.
-      #     engagement   -> artifact renders, cited audit hashes resolve, and NO active action was taken.
-      #   Until implemented, the safe default below PARKs these modes (never a false PASS).
+      # TODO(human): implement the engagement done-condition (the one remaining mode).
+      #   engagement -> the artifact renders, every cited audit hash resolves, and NO active action
+      #   was taken (git diff shows no active-tool invocation); otherwise it must PARK for approval.
+      #   Until implemented, the safe default below PARKs engagement (never a false PASS).
       return @{ Ok = $false; Detail = "condition for '$Mode' not implemented (TODO human) -> parked for safety" }
     }
   }

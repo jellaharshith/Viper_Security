@@ -25,6 +25,10 @@ function Assert-Eq { param($Expected, $Actual, [string]$Name)
 . (Join-Path $LoopDir 'discover\_common.ps1')
 . (Join-Path $LoopDir 'crew-loop.ps1')
 $ErrorActionPreference = 'Continue'   # crew-loop sets Stop; tests want to continue + report
+# Pin condition tests to the actual branch point (New-CrewWorktree branches from repo HEAD), so they
+# are location-independent -- running from a worktree whose 'main' has diverged won't skew the diff.
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $LoopDir)
+$TESTBASE = (& git -C $RepoRoot rev-parse HEAD 2>$null | Select-Object -First 1)
 
 Write-Host "`n[dispatch]"
 Assert-Eq 'herdr' (Resolve-CrewBackend 'auto') 'backend auto-resolves to herdr on this machine'
@@ -49,8 +53,8 @@ Assert-Eq 'REJECTED' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'T2' -Boar
 Assert-Eq 'PENDING' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'T9' -Board $fake) 'absent verdict is PENDING'
 # Safety invariant: for a still-unimplemented mode, gates skipped + checker APPROVED still PARKs.
 'codex: T1 APPROVED' | Out-File -Encoding utf8 $fake
-$j = Invoke-CrewJudge -Mode 'probe-dev' -Lane 'claude' -TaskId 'T1' -WorktreePath 'none' -Board $fake -SkipGates
-Assert-Eq 'PARK' $j.Verdict 'unimplemented mode (probe-dev) PARKs by safe default'
+$j = Invoke-CrewJudge -Mode 'engagement' -Lane 'claude' -TaskId 'T1' -WorktreePath 'none' -Board $fake -SkipGates
+Assert-Eq 'PARK' $j.Verdict 'unimplemented mode (engagement) PARKs by safe default'
 Assert-True ($j.Gates -and $j.Checker -eq 'APPROVED' -and -not $j.Condition) 'park is due to the condition, not gates/checker'
 Assert-True ($j.Reasons -join ' ' -match 'TODO human') 'unimplemented-mode detail still flags TODO human'
 Remove-Item $fake -ErrorAction SilentlyContinue
@@ -67,18 +71,67 @@ Assert-True (-not (Test-CiTriageCondition -WorktreePath 'does-not-exist').Ok) 'm
 $tid = 'CONDTEST01'; $lane = 'probe'
 try {
   $wt = New-CrewWorktree -Lane $lane -TaskId $tid
-  $r0 = Test-CiTriageCondition -WorktreePath $wt.Path -Base 'main'
+  $r0 = Test-CiTriageCondition -WorktreePath $wt.Path -Base $TESTBASE
   Assert-True (-not $r0.Ok) 'fresh worktree, no commit -> not done'
   # make one scoped commit in the worktree
   Set-Content -Encoding utf8 -Path (Join-Path $wt.Path '_cond_probe.txt') -Value 'loop condition test'
   & git -C $wt.Path add _cond_probe.txt 2>&1 | Out-Null
   & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'test: scoped change' 2>&1 | Out-Null
-  $r1 = Test-CiTriageCondition -WorktreePath $wt.Path -Base 'main'
+  $r1 = Test-CiTriageCondition -WorktreePath $wt.Path -Base $TESTBASE
   Assert-True $r1.Ok 'worktree with one scoped commit -> done'
   Assert-True ($r1.Detail -match '1 file') 'detail reports the scoped file count'
 } finally {
   Remove-CrewWorktree -Lane $lane -TaskId $tid -DeleteBranch
 }
+
+Write-Host "`n[judge: probe-dev condition]"
+$pdid = 'PDCOND01'; $pdlane = 'pd'
+try {
+  $wt = New-CrewWorktree -Lane $pdlane -TaskId $pdid
+  New-Item -ItemType Directory -Force (Join-Path $wt.Path 'vmapi/probes') | Out-Null
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'vmapi/probes/_cond_probe.py') "# probe`n"
+  & git -C $wt.Path add vmapi/probes/_cond_probe.py 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'feat: probe only' 2>&1 | Out-Null
+  $r0 = Test-ProbeDevCondition -WorktreePath $wt.Path -Base $TESTBASE
+  Assert-True (-not $r0.Ok) 'probe without registration -> not done (silent-failure class)'
+  Assert-True ($r0.Detail -match 'registration') 'detail names the missing registration point'
+  # add registration touch + a test -> now done
+  Add-Content -Encoding utf8 (Join-Path $wt.Path 'src/viper/agents/evidence.py') "# loop cond test touch`n"
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'tests/test_cond_probe.py') "def test_probe():`n    assert True`n"
+  & git -C $wt.Path add src/viper/agents/evidence.py tests/test_cond_probe.py 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'feat: register + test' 2>&1 | Out-Null
+  $r1 = Test-ProbeDevCondition -WorktreePath $wt.Path -Base $TESTBASE
+  Assert-True $r1.Ok 'probe + registration + test -> done'
+} finally { Remove-CrewWorktree -Lane $pdlane -TaskId $pdid -DeleteBranch }
+
+Write-Host "`n[judge: test-quality condition]"
+$tqid = 'TQCOND01'; $tqlane = 'tq'
+try {
+  $wt = New-CrewWorktree -Lane $tqlane -TaskId $tqid
+  # production-code change -> not done
+  Add-Content -Encoding utf8 (Join-Path $wt.Path 'src/viper/policy/engine.py') "# loop cond test touch`n"
+  & git -C $wt.Path add src/viper/policy/engine.py 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'chore: touch prod' 2>&1 | Out-Null
+  $r0 = Test-TestQualityCondition -WorktreePath $wt.Path -Source '' -Base $TESTBASE
+  Assert-True (-not $r0.Ok) 'production-code change -> not done'
+  Assert-True ($r0.Detail -match 'production code') 'detail flags the production file'
+} finally { Remove-CrewWorktree -Lane $tqlane -TaskId $tqid -DeleteBranch }
+# tests-only + deterministic target passes twice -> done (needs the venv; else assert fallback)
+$tqid2 = 'TQCOND02'
+try {
+  $wt = New-CrewWorktree -Lane $tqlane -TaskId $tqid2
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'tests/test_cond_quality.py') "def test_ok():`n    assert True`n"
+  & git -C $wt.Path add tests/test_cond_quality.py 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'test: add passing test' 2>&1 | Out-Null
+  if (Test-Path (Join-Path $LoopDir '..\..\.venv\Scripts\python.exe')) {
+    $r1 = Test-TestQualityCondition -WorktreePath $wt.Path -Source 'tests/test_cond_quality.py:1' -Base $TESTBASE
+    Assert-True $r1.Ok 'tests-only + target passes twice -> done (deterministic)'
+    Assert-True ($r1.Detail -match 'twice') 'detail reports the twice-run determinism check'
+  } else {
+    $r1 = Test-TestQualityCondition -WorktreePath $wt.Path -Source '' -Base $TESTBASE
+    Assert-True $r1.Ok 'tests-only change -> done (fallback; no venv for twice-run)'
+  }
+} finally { Remove-CrewWorktree -Lane $tqlane -TaskId $tqid2 -DeleteBranch }
 
 Write-Host "`n[loop: queue merge]"
 $q = [pscustomobject]@{ updated=''; tasks=@($a) }
