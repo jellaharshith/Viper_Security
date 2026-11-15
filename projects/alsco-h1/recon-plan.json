@@ -1,0 +1,12 @@
+[
+  {
+    "action_id": "alsco-royal-nmap-1",
+    "tool_name": "nmap",
+    "args": {"target": "sandbox-royal.securegateway.com", "ports": "80,443", "service_detection": true}
+  },
+  {
+    "action_id": "alsco-royal-nuclei-1",
+    "tool_name": "nuclei",
+    "args": {"target": "sandbox-royal.securegateway.com", "rate_limit": 4}
+  }
+]

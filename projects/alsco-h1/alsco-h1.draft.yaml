@@ -1,0 +1,49 @@
+project_id: alsco-h1
+program_url: https://hackerone.com/alsco
+evidence_ref: >-
+  HackerOne alsco program scope page (hackerone.com/alsco/policy_scopes), asset
+  "sandbox-royal.securegateway.com" (Domain, In scope, Critical, Bounty eligible),
+  checked 2026-11-10: "Check [Royal CMS] Against Common Injection include [XSS
+  Injection, SQL Injection, SQLi Injection, OS Injection, Command Injection, URL
+  Injection, Remote Code Execution, and privilege escalation] that could cause hack
+  CMS and change major files." Only a full hack scenario (e.g. edit the index page,
+  download the database) is bounty-eligible; a recorded video is required with every
+  report. Program rules (hackerone.com/alsco) forbid: credential brute-forcing, DoS,
+  uploading shells/backdoors, social engineering, touching non-own accounts, exfiltrating
+  data beyond the researcher's own test data, and anything outside this exact asset.
+in_scope:
+  - sandbox-royal.securegateway.com
+exclusions: []
+forbidden_techniques:
+  - brute-force
+  - dos
+  - exploit
+max_rate_rps: 4
+automation_allowed: true
+permitted_techniques:
+  - port-scan
+  - service-detection
+  - web-scan
+  - template-scan
+  - injection-test
+asset_technique_limits:
+  - host: sandbox-royal.securegateway.com
+    permitted_techniques:
+      - port-scan
+      - service-detection
+      - web-scan
+      - template-scan
+      - injection-test
+status: DRAFT
+ambiguities:
+  - >-
+    sandbox.securegateway.com (the Secure Gateway 2FA/upload asset) is deliberately
+    excluded from this scope for now: it requires a test account from ALSCO that has
+    not yet been requested (the only request path burns a limited HackerOne trial
+    report, which the operator chose to defer). Add it in a follow-up scope revision,
+    with its own asset_technique_limits entry for otp-bypass/upload-bypass, once that
+    account is obtained.
+  - >-
+    The program also forbids business-logic/misconfiguration findings from bounty
+    eligibility (still reportable, just not paid); not separately encoded as a technique
+    restriction here since the policy engine has no such slug.
