@@ -33,3 +33,9 @@ Thumbs.db
 
 # public trust anchors used as test fixtures (not secrets)
 !tests/fixtures/anchor/*.pem
+
+# herdr crew loop runtime artifacts
+viper-wt/
+.crew/loop/dispatch-noop.log
+.crew/loop/briefs/*.md
+!.crew/loop/briefs/.gitkeep
