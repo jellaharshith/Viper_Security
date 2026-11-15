@@ -61,9 +61,11 @@ function Get-CheckerVerdict {
   param([string]$CheckerLane, [string]$TaskId, [string]$Board)
   if (-not (Test-Path $Board)) { return 'PENDING' }
   $text = Get-Content -Raw -Path $Board
-  # Look for a line mentioning the task id and an explicit verdict token from the checker.
-  $approved = [regex]::IsMatch($text, "(?im)^.*$([regex]::Escape($TaskId)).*\bAPPROVED\b.*$")
-  $rejected = [regex]::IsMatch($text, "(?im)^.*$([regex]::Escape($TaskId)).*\bREJECTED\b.*$")
+  # Match a line containing BOTH the task id and the verdict token, in EITHER order (an agent may
+  # write "REJECTED AUTO1" or "AUTO1 APPROVED"). Lookaheads keep it order-independent.
+  $id = [regex]::Escape($TaskId)
+  $approved = [regex]::IsMatch($text, "(?im)^(?=.*\b$id\b)(?=.*\bAPPROVED\b).*$")
+  $rejected = [regex]::IsMatch($text, "(?im)^(?=.*\b$id\b)(?=.*\bREJECTED\b).*$")
   if ($rejected) { return 'REJECTED' }
   if ($approved) { return 'APPROVED' }
   return 'PENDING'
