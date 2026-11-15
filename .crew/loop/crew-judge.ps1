@@ -163,6 +163,54 @@ function Test-TestQualityCondition {
   return @{ Ok = $true; Detail = 'tests-only change; determinism covered by the gate suite' }
 }
 
+function Test-EngagementCondition {
+  # engagement is PASSIVE-only. DONE when: a non-empty passive artifact (a write-up/plan/report
+  # under projects/ or docs/, or a report file) is committed; the diff touches NO active-execution
+  # code (defense in depth -- any active work must PARK for human approval per viper.policy); and
+  # every audit hash the artifact cites resolves to another committed file (traceability).
+  param([string]$WorktreePath, [string]$Base = 'main')
+  if (-not $WorktreePath -or -not (Test-Path $WorktreePath)) {
+    return @{ Ok = $false; Detail = 'worktree missing -> nothing to verify' }
+  }
+  $chg = Get-BranchChange -WorktreePath $WorktreePath -Base $Base
+  if ($chg.Commits -lt 1)     { return @{ Ok = $false; Detail = 'no commit on branch: no artifact produced' } }
+  if ($chg.Files.Count -eq 0) { return @{ Ok = $false; Detail = 'empty diff: nothing produced' } }
+
+  # SAFETY (defense in depth): active-execution code in the diff => possible active action => PARK.
+  $active = @($chg.Files | Where-Object { $_ -match 'viper/execution/|viper/tools/registry\.py$|^vmapi/' })
+  if ($active.Count -gt 0) {
+    return @{ Ok = $false; Detail = "diff touches active-execution code ($($active -join ', ')) -> requires human approval" }
+  }
+
+  # A passive artifact must be present and non-empty (the 'renders' check, lightweight).
+  $artifacts = @($chg.Files | Where-Object { $_ -match '^projects/|^docs/|\.md$|report.*\.(json|sarif)$' })
+  if ($artifacts.Count -eq 0) {
+    return @{ Ok = $false; Detail = 'no passive artifact (projects/ write-up, docs/, or report) in the diff' }
+  }
+  $nonEmpty = $false
+  foreach ($a in $artifacts) {
+    $p = Join-Path $WorktreePath $a
+    if ((Test-Path $p) -and ((Get-Item $p).Length -gt 0)) { $nonEmpty = $true; break }
+  }
+  if (-not $nonEmpty) { return @{ Ok = $false; Detail = 'artifact is empty -> does not render' } }
+
+  # Every cited audit hash (64-hex sha256) must resolve to ANOTHER committed file (not just itself).
+  foreach ($a in $artifacts) {
+    $p = Join-Path $WorktreePath $a
+    if (-not (Test-Path $p)) { continue }
+    $hashes = @([regex]::Matches((Get-Content -Raw $p), '\b[0-9a-f]{64}\b') |
+              ForEach-Object { $_.Value } | Select-Object -Unique)
+    foreach ($h in $hashes) {
+      $hits  = @(& git -C $WorktreePath grep -F -l -- $h 2>$null | ForEach-Object { $_.Replace('\','/') })
+      $other = @($hits | Where-Object { $_ -ne $a })
+      if ($other.Count -eq 0) {
+        return @{ Ok = $false; Detail = "cited audit hash does not resolve to committed evidence: $($h.Substring(0,12))..." }
+      }
+    }
+  }
+  return @{ Ok = $true; Detail = "passive artifact produced ($($artifacts.Count) file(s)); no active action; citations resolve" }
+}
+
 function Test-TaskCondition {
   # The per-mode "verifiably done" predicate. Returns @{ Ok=[bool]; Detail=[string] }.
   # Gates prove the code is clean; THIS proves the task's own goal was actually achieved.
@@ -177,12 +225,10 @@ function Test-TaskCondition {
     'ci-triage'    { return (Test-CiTriageCondition    -WorktreePath $WorktreePath -Source $Source -Base $Base) }
     'probe-dev'    { return (Test-ProbeDevCondition    -WorktreePath $WorktreePath -Base $Base) }
     'test-quality' { return (Test-TestQualityCondition -WorktreePath $WorktreePath -Source $Source -Base $Base) }
+    'engagement'   { return (Test-EngagementCondition  -WorktreePath $WorktreePath -Base $Base) }
     default {
-      # TODO(human): implement the engagement done-condition (the one remaining mode).
-      #   engagement -> the artifact renders, every cited audit hash resolves, and NO active action
-      #   was taken (git diff shows no active-tool invocation); otherwise it must PARK for approval.
-      #   Until implemented, the safe default below PARKs engagement (never a false PASS).
-      return @{ Ok = $false; Detail = "condition for '$Mode' not implemented (TODO human) -> parked for safety" }
+      # ValidateSet on $Mode makes this unreachable; park safely if ever hit by a new mode.
+      return @{ Ok = $false; Detail = "unknown mode '$Mode' -> parked for safety" }
     }
   }
 }

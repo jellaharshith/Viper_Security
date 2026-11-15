@@ -53,10 +53,10 @@ Assert-Eq 'REJECTED' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'T2' -Boar
 Assert-Eq 'PENDING' (Get-CheckerVerdict -CheckerLane 'codex' -TaskId 'T9' -Board $fake) 'absent verdict is PENDING'
 # Safety invariant: for a still-unimplemented mode, gates skipped + checker APPROVED still PARKs.
 'codex: T1 APPROVED' | Out-File -Encoding utf8 $fake
+# Safety invariant: gates skipped + checker APPROVED is NOT enough -- the condition still gates.
 $j = Invoke-CrewJudge -Mode 'engagement' -Lane 'claude' -TaskId 'T1' -WorktreePath 'none' -Board $fake -SkipGates
-Assert-Eq 'PARK' $j.Verdict 'unimplemented mode (engagement) PARKs by safe default'
+Assert-Eq 'PARK' $j.Verdict 'engagement with no worktree/artifact PARKs despite gates+checker'
 Assert-True ($j.Gates -and $j.Checker -eq 'APPROVED' -and -not $j.Condition) 'park is due to the condition, not gates/checker'
-Assert-True ($j.Reasons -join ' ' -match 'TODO human') 'unimplemented-mode detail still flags TODO human'
 Remove-Item $fake -ErrorAction SilentlyContinue
 
 Write-Host "`n[pr: no-attribution enforcement]"
@@ -132,6 +132,56 @@ try {
     Assert-True $r1.Ok 'tests-only change -> done (fallback; no venv for twice-run)'
   }
 } finally { Remove-CrewWorktree -Lane $tqlane -TaskId $tqid2 -DeleteBranch }
+
+Write-Host "`n[judge: engagement condition]"
+# E1: active-execution code in the diff -> PARK (defense in depth over the pre-dispatch gate)
+$e = 'EN1'
+try {
+  $wt = New-CrewWorktree -Lane en -TaskId $e
+  New-Item -ItemType Directory -Force (Join-Path $wt.Path 'src/viper/execution') | Out-Null
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'src/viper/execution/_cond_x.py') "# x`n"
+  & git -C $wt.Path add src/viper/execution/_cond_x.py 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'active' 2>&1 | Out-Null
+  $r = Test-EngagementCondition -WorktreePath $wt.Path -Base $TESTBASE
+  Assert-True (-not $r.Ok) 'active-execution code -> PARK (requires approval)'
+  Assert-True ($r.Detail -match 'active-execution') 'detail flags active code'
+} finally { Remove-CrewWorktree -Lane en -TaskId $e -DeleteBranch }
+# E2: passive artifact (projects/ write-up), non-empty, no citations -> done
+$e = 'EN2'
+try {
+  $wt = New-CrewWorktree -Lane en -TaskId $e
+  New-Item -ItemType Directory -Force (Join-Path $wt.Path 'projects/_cond-h1') | Out-Null
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'projects/_cond-h1/writeup.md') "# Passive write-up`nFindings summary.`n"
+  & git -C $wt.Path add projects/_cond-h1/writeup.md 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'writeup' 2>&1 | Out-Null
+  $r = Test-EngagementCondition -WorktreePath $wt.Path -Base $TESTBASE
+  Assert-True $r.Ok 'passive artifact, no citations -> done'
+} finally { Remove-CrewWorktree -Lane en -TaskId $e -DeleteBranch }
+# E3: artifact cites an audit hash that resolves to another committed file -> done
+$H = 'a1b2c3d4' * 8
+$e = 'EN3'
+try {
+  $wt = New-CrewWorktree -Lane en -TaskId $e
+  New-Item -ItemType Directory -Force (Join-Path $wt.Path 'projects/_cond2-h1') | Out-Null
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'projects/_cond2-h1/writeup.md') "Cites audit $H in evidence.`n"
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'projects/_cond2-h1/evidence.txt') "$H`n"
+  & git -C $wt.Path add projects/_cond2-h1/writeup.md projects/_cond2-h1/evidence.txt 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'cited' 2>&1 | Out-Null
+  $r = Test-EngagementCondition -WorktreePath $wt.Path -Base $TESTBASE
+  Assert-True $r.Ok 'artifact citing a resolvable audit hash -> done'
+} finally { Remove-CrewWorktree -Lane en -TaskId $e -DeleteBranch }
+# E4: artifact cites an audit hash that resolves nowhere -> PARK
+$e = 'EN4'
+try {
+  $wt = New-CrewWorktree -Lane en -TaskId $e
+  New-Item -ItemType Directory -Force (Join-Path $wt.Path 'projects/_cond3-h1') | Out-Null
+  Set-Content -Encoding utf8 (Join-Path $wt.Path 'projects/_cond3-h1/writeup.md') "Cites audit $H but nothing backs it.`n"
+  & git -C $wt.Path add projects/_cond3-h1/writeup.md 2>&1 | Out-Null
+  & git -C $wt.Path -c user.email=t@t -c user.name=t commit -m 'bad cite' 2>&1 | Out-Null
+  $r = Test-EngagementCondition -WorktreePath $wt.Path -Base $TESTBASE
+  Assert-True (-not $r.Ok) 'artifact citing an unresolvable audit hash -> PARK'
+  Assert-True ($r.Detail -match 'does not resolve') 'detail flags the dangling citation'
+} finally { Remove-CrewWorktree -Lane en -TaskId $e -DeleteBranch }
 
 Write-Host "`n[loop: queue merge]"
 $q = [pscustomobject]@{ updated=''; tasks=@($a) }
