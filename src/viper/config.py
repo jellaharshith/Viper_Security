@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     embed_doc_prefix: str = "search_document: "
     kb_version: str = "v2p"  # index version = collection suffix (v2p: nomic task prefixes)
     kb_registry_path: Path = Path("data/kb_registry.json")
+    # Optional NVD API key for the bounded NVD source (user's own env name, no VIPER_ prefix).
+    nvd_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="NVD_API_KEY")
     kb_min_recall_at_4: float = 0.95  # promotion gate: absolute floor on the frozen retrieval set
     kb_max_shrink: float = 0.10  # reject an update that drops more than this fraction of records
     retrieval_top_k: int = 4

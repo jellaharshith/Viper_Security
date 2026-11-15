@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Weakness_Catalog xmlns="http://cwe.mitre.org/cwe-7" Name="CWE" Version="4.17" Date="2026-01-01">
+  <Weaknesses>
+    <Weakness ID="79" Name="Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')" Abstraction="Base" Structure="Simple" Status="Stable">
+      <Description>The product does not neutralize or incorrectly neutralizes user-controllable input before it is placed in output that is used as a web page that is served to other users.</Description>
+      <Extended_Description>Cross-site scripting (XSS) vulnerabilities occur when untrusted data is included in a web page without proper validation or escaping.</Extended_Description>
+      <Common_Consequences>
+        <Consequence><Scope>Confidentiality</Scope><Impact>Read Application Data</Impact></Consequence>
+        <Consequence><Scope>Access Control</Scope><Impact>Bypass Protection Mechanism</Impact></Consequence>
+      </Common_Consequences>
+    </Weakness>
+    <Weakness ID="89" Name="Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')" Abstraction="Base" Structure="Simple" Status="Stable">
+      <Description>The product constructs all or part of an SQL command using externally-influenced input, but it does not neutralize special elements that could modify the intended SQL command.</Description>
+      <Extended_Description>SQL injection has become a common issue with database-driven web sites.</Extended_Description>
+      <Common_Consequences>
+        <Consequence><Scope>Confidentiality</Scope><Impact>Read Application Data</Impact></Consequence>
+      </Common_Consequences>
+    </Weakness>
+    <Weakness ID="9999" Name="Deprecated Example Weakness" Abstraction="Base" Structure="Simple" Status="Deprecated">
+      <Description>This entry has been deprecated and should be skipped.</Description>
+    </Weakness>
+  </Weaknesses>
+</Weakness_Catalog>

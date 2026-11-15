@@ -17,4 +17,4 @@ Rules: one milestone at a time; tests green before moving on; explicit approval 
 M2 needs M1. M4 needs M2 (baseline) and a verified model license. M5 needs M1. M6 needs M5's policy engine. M7 needs M5 + M6.
 
 ## Next step
-v1.1 is released (RFC-3161 TSA anchoring, enforced scope limits). Next priorities: the v1.2 backlog (see CHANGELOG "Deferred to v1.2" and docs/v1-scope.md §3), including the SSH shell, OWASP ZAP and noVNC desktop takeover.
+v1.1 is released (RFC-3161 TSA anchoring, enforced scope limits). **v1.2 in progress** (see CHANGELOG `[Unreleased]` and docs/development-progress.md): KB grown with CWE/NVD/EPSS public sources, OWASP ZAP baseline scanner added (code + deploy), fine-tune harness being staged. Remaining v1.2 backlog: audited SSH takeover shell (§3.3), noVNC desktop (§3.2), Postgres operational tables (§3.6), Sigstore Rekor (§3.9). Live/paid/Colab steps (ZAP daemon + live scan, NVD live fetch, full eval, any QLoRA run) are owner-gated.

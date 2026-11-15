@@ -16,7 +16,10 @@ PROBES_DIR = Path(__file__).resolve().parents[1] / "probes"
 MINIMAL_ENV = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "HOME": "/root"}
 
 
-@pytest.mark.parametrize("script", ["otp_2fa_probe.py", "upload_bypass_probe.py", "injection_probe.py"])
+@pytest.mark.parametrize(
+    "script",
+    ["otp_2fa_probe.py", "upload_bypass_probe.py", "injection_probe.py", "zap_baseline.py"],
+)
 def test_probe_script_imports_without_the_vmapi_package_on_path(script: str) -> None:
     result = subprocess.run(  # noqa: S603 -- fixed interpreter + local script, no shell
         [sys.executable, str(PROBES_DIR / script), "--args-json", "{}"],

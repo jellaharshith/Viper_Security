@@ -836,3 +836,75 @@ def parse_graphql_introspect_ex(
             references=[], audit_refs=list(audit_refs),
         ))
     return findings, skipped
+
+
+# ---------------------------------------------------------------------------- zap_baseline
+_ZAP_RISK_TO_SEVERITY: dict[str, str] = {
+    "informational": "info", "info": "info", "low": "low",
+    "medium": "medium", "high": "high", "critical": "critical",
+}
+# ZAP's own confidence: only its strongest levels earn a "confirmed" finding; the rest stay
+# hypotheses, consistent with the project rule that confirmed needs deterministic evidence.
+_ZAP_CONFIRMED = frozenset({"high", "confirmed"})
+
+
+def parse_zap_probe(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> list[Finding]:
+    return parse_zap_probe_ex(output, action_id=action_id, target=target, audit_refs=audit_refs)[0]
+
+
+def parse_zap_probe_ex(
+    output: str, *, action_id: str, target: str, audit_refs: list[str]
+) -> tuple[list[Finding], int]:
+    """Parse OWASP ZAP baseline JSONL alerts (spider + passive rules) into Findings.
+
+    Each record is one ZAP alert; severity comes from ZAP's risk, confidence from ZAP's own
+    confidence rating. Malformed records are skip-counted, never silently dropped.
+    """
+    records, skipped = _probe_records(output)
+    findings: list[Finding] = []
+    seen: set[str] = set()
+    for record in records:
+        if record.get("tool") != "zap_baseline":
+            continue
+        alert = record.get("alert")
+        url = record.get("url")
+        risk = str(record.get("risk", "")).strip().lower()
+        if not isinstance(alert, str) or not alert or not isinstance(url, str) or not url:
+            skipped += 1
+            continue
+        severity = _ZAP_RISK_TO_SEVERITY.get(risk)
+        if severity is None:
+            skipped += 1
+            continue
+        key = f"{alert}|{url}"
+        if key in seen:
+            continue
+        if len(findings) >= MAX_FINDINGS:
+            skipped += 1
+            continue
+        seen.add(key)
+        conf = str(record.get("confidence", "")).strip().lower()
+        confidence = "confirmed" if conf in _ZAP_CONFIRMED else "hypothesis"
+        cwe: list[str] = []
+        raw_cwe = str(record.get("cweid", "")).strip()
+        if raw_cwe.isdigit() and int(raw_cwe) > 0:
+            cwe = [f"CWE-{int(raw_cwe)}"]
+        location = _field(url, MAX_LOCATION)
+        refs = [r for r in [_field(str(record.get("reference", "")), MAX_REFERENCE_CHARS)] if r]
+        findings.append(Finding(
+            id=_fid("zap_baseline", action_id, key),
+            title=_field(f"{alert} at {location}", MAX_TEXT_FIELD),
+            affected_asset=target, source_tool="zap_baseline", source_action_id=action_id,
+            evidence=_field(json.dumps(record), MAX_TEXT_FIELD * 2),
+            severity=severity,  # type: ignore[arg-type]
+            severity_rationale=f"ZAP reported this alert at {risk or 'unknown'} risk.",
+            confidence=confidence,  # type: ignore[arg-type]
+            reproducibility=f"Re-run a ZAP baseline (spider + passive) scan against {location}.",
+            remediation=_field(str(record.get("solution", "")) or "See the ZAP alert reference.",
+                               MAX_TEXT_FIELD),
+            description=_field(str(record.get("description", "")), MAX_TEXT_FIELD),
+            references=refs, audit_refs=list(audit_refs), cwe=cwe,
+        ))
+    return findings, skipped

@@ -10,7 +10,7 @@ import sys
 import unicodedata
 
 TOOLS = ("nmap", "nuclei", "otp_2fa_probe", "upload_bypass_probe", "injection_probe",
-         "secret_scan", "graphql_introspect")
+         "secret_scan", "graphql_introspect", "zap_baseline")
 ARGUMENT_ALLOWLIST = {
     "nmap": frozenset({"target", "ports", "service_detection", "skip_discovery"}),
     "nuclei": frozenset({"target", "rate_limit"}),
@@ -19,6 +19,7 @@ ARGUMENT_ALLOWLIST = {
     "injection_probe": frozenset({"target", "endpoint_path", "param_name", "technique"}),
     "secret_scan": frozenset({"target", "path"}),
     "graphql_introspect": frozenset({"target", "path"}),
+    "zap_baseline": frozenset({"target", "max_duration_minutes"}),
 }
 
 # v1.2 web-app probes: each selects ONE of a small, fixed, pre-reviewed probe via an enum field.
@@ -55,7 +56,7 @@ def build_command(tool: str, args: dict, target: str, allowed_targets: frozenset
     if not valid_target(target) or target not in allowed_targets or args.get("target") != target:
         raise ValueError("target not allowlisted or mismatched")
     if tool in ("otp_2fa_probe", "upload_bypass_probe", "injection_probe",
-                "secret_scan", "graphql_introspect"):
+                "secret_scan", "graphql_introspect", "zap_baseline"):
         return _build_probe_command(tool, args, target)
     if tool == "nmap":
         command = ["/usr/bin/nmap", "-sT"]
@@ -133,6 +134,11 @@ def _build_probe_command(tool: str, args: dict, target: str) -> list[str]:
         if not isinstance(path, str) or not _GRAPHQL_PATH.fullmatch(path):
             raise ValueError("path must match the bounded GraphQL path schema")
         args = {**args, "path": path}
+    elif tool == "zap_baseline":
+        minutes = args.get("max_duration_minutes", 5)
+        if type(minutes) is not int or not 1 <= minutes <= 15:
+            raise ValueError("max_duration_minutes must be a bounded integer from 1 to 15")
+        args = {**args, "max_duration_minutes": minutes}
     else:
         raise ValueError("probe tool not allowlisted")
     payload = json.dumps({**args, "target": target}, sort_keys=True)

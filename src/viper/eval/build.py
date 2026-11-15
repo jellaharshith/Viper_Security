@@ -497,6 +497,49 @@ def build_answers_v2(out_dir: Path = DATASET_DIR, seed: int = SEED) -> dict[str,
     return {"answers_v2": len(answers)}
 
 
+# =========================================================================
+# Dataset v3 generators (CWE)
+# =========================================================================
+
+_CWE_ALIAS = re.compile(r"'([^']+)'")
+
+
+def _cwe_query(doc: Document) -> str:
+    """A short definition-style query for a CWE: prefer its quoted alias, else the full name."""
+    name = doc.title.split(": ", 1)[-1] if ": " in doc.title else doc.title
+    m = _CWE_ALIAS.search(name)
+    return f"What is {m.group(1)}?" if m else f"What is {name}?"
+
+
+def build_cwe(
+    store: Store | None = None,
+    docs: list[Document] | None = None,
+    out_dir: Path = DATASET_DIR,
+    seed: int = SEED,
+) -> dict[str, int]:
+    """Build retrieval_cwe.jsonl: one definition-style query per CWE weakness (gold = cwe: id)."""
+    _ = random.Random(seed)  # noqa: S311
+    if docs is None:
+        docs = docs_from_store(store) if store is not None else []
+    cwe_docs = sorted((d for d in (docs or []) if d.id.startswith("cwe:")), key=lambda d: d.id)
+    retrieval: list[dict[str, Any]] = []
+    for d in cwe_docs:
+        retrieval.append({"id": f"ret-cwe-{len(retrieval):03d}", "query": _cwe_query(d),
+                          "style": "definition", "gold_id": d.id})
+    negatives = [
+        "What is a good recipe for lemon cake?",
+        "Who painted the Mona Lisa?",
+        "What is CWE-999999 that does not exist?",
+    ]
+    for j, q in enumerate(negatives):
+        retrieval.append({"id": f"neg-cwe-{j:03d}", "query": q, "style": "negative", "gold_id": None})
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "retrieval_cwe.jsonl").write_text(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in retrieval) + "\n",
+        encoding="utf-8", newline="\n")
+    return {"retrieval_cwe": len(retrieval), "cwe_records": len(cwe_docs)}
+
+
 def build_v2(
     store: Store | None = None,
     docs: list[Document] | None = None,
@@ -506,4 +549,5 @@ def build_v2(
     """Regenerate both v2 datasets (retrieval_attack_owasp and answers_v2)."""
     res1 = build_attack_owasp(store=store, docs=docs, out_dir=out_dir, seed=seed)
     res2 = build_answers_v2(out_dir=out_dir, seed=seed)
-    return {**res1, **res2}
+    res3 = build_cwe(store=store, docs=docs, out_dir=out_dir, seed=seed)
+    return {**res1, **res2, **res3}

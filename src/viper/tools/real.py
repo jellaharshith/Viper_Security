@@ -67,6 +67,22 @@ class NucleiArgs(BaseModel):
     rate_limit: int = Field(default=5, ge=1, le=10, strict=True, description="Requests per second, 1-10.")
 
 
+class ZapBaselineArgs(BaseModel):
+    """OWASP ZAP baseline scan arguments - mirrors vmapi's zap_baseline allowlist.
+
+    The baseline scan is benign by design: a spider plus ZAP's PASSIVE rules only, never an active
+    attack. There is deliberately no field to turn on active scanning; the VM wrapper hard-codes
+    passive-only. ``max_duration_minutes`` bounds the spider so a run cannot hang the job slot.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    target: str = Field(description="Exact hostname or IP address; must be one of allowed_hosts.")
+    max_duration_minutes: int = Field(
+        default=5, ge=1, le=15, strict=True,
+        description="Upper bound on spider/passive-scan time in minutes (1-15).")
+
+
 def _nmap_dry_run(args: dict[str, Any]) -> DryRunResult:
     return DryRunResult(
         tool="nmap", args=args,
@@ -99,7 +115,25 @@ nuclei = Tool(
     description="Bounded nuclei scan (technology detection and misconfiguration) of an in-scope target.",
 )
 
-ALL_REAL_TOOLS: tuple[Tool, ...] = (nmap, nuclei)
+def _zap_dry_run(args: dict[str, Any]) -> DryRunResult:
+    return DryRunResult(
+        tool="zap_baseline", args=args,
+        summary=f"[not executed] zap_baseline would passively scan {args.get('target')!r}",
+        simulated=True,
+    )
+
+
+zap_baseline = Tool(
+    name="zap_baseline",
+    risk=RiskLevel.ACTIVE,
+    params_schema=ZapBaselineArgs,
+    dry_run_fn=_zap_dry_run,
+    dry_run_only=False,
+    description="OWASP ZAP baseline scan (spider + passive rules only) of an in-scope web target.",
+    techniques=frozenset({"web-scan", "passive-scan", "spider"}),
+)
+
+ALL_REAL_TOOLS: tuple[Tool, ...] = (nmap, nuclei, zap_baseline)
 
 for _tool in ALL_REAL_TOOLS:
     if _tool.name not in default_registry._tools:

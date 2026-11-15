@@ -67,7 +67,7 @@ def load_retrieval_attack_owasp(path: Path | None = None) -> list[RetrievalCase]
 def load_retrieval_all(dataset_dir: Path = DATASET_DIR) -> list[RetrievalCase]:
     """Load both v1 retrieval.jsonl and retrieval_attack_owasp.jsonl into a unified collection."""
     cases: list[RetrievalCase] = []
-    for name in ("retrieval.jsonl", "retrieval_attack_owasp.jsonl"):
+    for name in ("retrieval.jsonl", "retrieval_attack_owasp.jsonl", "retrieval_cwe.jsonl"):
         p = dataset_dir / name
         if p.exists():
             cases.extend([RetrievalCase(**r) for r in _read(p)])

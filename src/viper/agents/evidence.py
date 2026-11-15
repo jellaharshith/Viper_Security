@@ -24,6 +24,7 @@ from viper.findings.parsers import (
     parse_otp_probe_ex,
     parse_secret_scan_ex,
     parse_upload_probe_ex,
+    parse_zap_probe_ex,
 )
 
 _PARSERS = {
@@ -32,6 +33,7 @@ _PARSERS = {
     "injection_probe": parse_injection_probe_ex,
     "secret_scan": parse_secret_scan_ex,
     "graphql_introspect": parse_graphql_introspect_ex,
+    "zap_baseline": parse_zap_probe_ex,
 }
 
 
