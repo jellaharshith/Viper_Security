@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from viper.policy.models import (
     KNOWN_TECHNIQUES,
     Action,
+    AssetTechniqueLimit,
     Decision,
     DecisionType,
     RiskLevel,
@@ -71,6 +72,16 @@ def evaluate(action: Action, tool: ToolInfo | None, scope: Scope | None, setting
         return _deny(action, "policy evaluation error")
 
 
+def _asset_limit_for(target: str, scope: Scope) -> AssetTechniqueLimit | None:
+    host = normalize_host(target)
+    if host is None:
+        return None
+    for limit in scope.asset_technique_limits:
+        if normalize_host(limit.host) == host:
+            return limit
+    return None
+
+
 def _scope_limit_reason(action: Action, tool: ToolInfo, scope: Scope) -> str | None:
     """First scope limit the action breaks (automation, rate, techniques), or None. Fail-closed.
 
@@ -97,6 +108,19 @@ def _scope_limit_reason(action: Action, tool: ToolInfo, scope: Scope) -> str | N
         for technique in sorted(tool.techniques):
             if technique not in permitted:
                 return f"technique '{technique}' is not in the scope's permitted techniques"
+    target = action.args.get("target")
+    if isinstance(target, str):
+        limit = _asset_limit_for(target, scope)
+        if limit is not None:
+            asset_forbidden = {normalize_technique(t) for t in limit.forbidden_techniques} & KNOWN_TECHNIQUES
+            for technique in sorted(tool.techniques):
+                if technique in asset_forbidden:
+                    return f"technique '{technique}' is forbidden by scope for this asset"
+            if limit.permitted_techniques:
+                asset_permitted = {normalize_technique(t) for t in limit.permitted_techniques}
+                for technique in sorted(tool.techniques):
+                    if technique not in asset_permitted:
+                        return f"technique '{technique}' is not permitted by scope for this asset"
     return None
 
 

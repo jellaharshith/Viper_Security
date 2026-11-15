@@ -160,6 +160,7 @@ class ToolRegistry:
             self._defaults_loaded = True
             import viper.tools.real  # noqa: F401  # M6 nmap/nuclei (ACTIVE, real-exec)
             import viper.tools.stubs  # noqa: F401
+            import viper.tools.webapp  # noqa: F401  # v1.2 OTP/upload/injection probes (ACTIVE, real-exec)
 
     def register(self, tool: Tool, *, overwrite: bool = False) -> Tool:
         """Register a tool. Raises ValueError on duplicate unless overwrite=True."""

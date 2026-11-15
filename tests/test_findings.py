@@ -37,6 +37,16 @@ def test_finding_schema_forbids_extra_and_bad_literals() -> None:
         Finding(**{**ok, "severity": "urgent"})  # type: ignore[arg-type]
     with pytest.raises(ValidationError):
         Finding(**{**ok, "source_tool": "sqlmap"})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("tool", ["otp_2fa_probe", "upload_bypass_probe", "injection_probe"])
+def test_finding_accepts_v1_2_webapp_probe_source_tools(tool: str) -> None:
+    ok = dict(
+        id="f1", title="t", affected_asset=T, source_tool=tool, source_action_id="a",
+        evidence="e", severity="info", severity_rationale="r", confidence="confirmed",
+        reproducibility="r", remediation="m", references=[], audit_refs=[],
+    )
+    Finding(**ok)  # type: ignore[arg-type]
     with pytest.raises(ValidationError):
         Finding(**{**ok, "confidence": "likely"})  # type: ignore[arg-type]
 
