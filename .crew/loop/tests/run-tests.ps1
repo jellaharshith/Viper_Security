@@ -35,6 +35,18 @@ Assert-Eq 'herdr' (Resolve-CrewBackend 'auto') 'backend auto-resolves to herdr o
 Assert-Eq 'noop'  (Resolve-CrewBackend 'noop') 'explicit backend passes through'
 $msg = New-KickMessage -Lane 'codex-ci' -BriefPath '.crew\loop\briefs\x.md'
 Assert-True ($msg -match 'codex-ci' -and $msg -match '/x.md' -and $msg -match 'STOP') 'kick message names lane, brief (fwd-slashed), STOP'
+# Resolve-CrewTarget must match on the UNIQUE name, not the detected kind: a coordinator and a
+# maker can both be kind 'claude' (two Claude Code instances) but have distinct names.
+$mock = @(
+  [pscustomobject]@{ name = 'coordinator'; agent = 'claude'; pane_id = 'w5:p1' },
+  [pscustomobject]@{ name = 'claude';      agent = 'claude'; pane_id = 'w5:p7' },
+  [pscustomobject]@{ name = 'codex';       agent = 'codex';  pane_id = 'w5:p8' },
+  [pscustomobject]@{ name = $null;         agent = 'agy';    pane_id = 'w5:p9' }  # no name -> fall back to kind
+)
+Assert-Eq 'w5:p7' (Resolve-CrewTarget -Role 'claude' -Agents $mock) 'maker role resolves to worker name, not the coordinator (same kind)'
+Assert-Eq 'w5:p8' (Resolve-CrewTarget -Role 'codex'  -Agents $mock) 'checker role resolves by name'
+Assert-Eq 'w5:p9' (Resolve-CrewTarget -Role 'agy'    -Agents $mock) 'nameless agent falls back to kind match'
+Assert-True ($null -eq (Resolve-CrewTarget -Role 'nobody' -Agents $mock)) 'no match returns null (caller parks)'
 
 Write-Host "`n[discover/_common]"
 $a = New-LoopTask -Mode 'probe-dev' -Title 'Same Title'
