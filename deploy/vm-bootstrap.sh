@@ -15,7 +15,7 @@ UPLOAD_DIR=/tmp/vmapi-upload
 for module in app.py auth.py jobs.py toolrunner.py requirements.txt \
   probes/__init__.py probes/_common.py probes/otp_2fa_probe.py \
   probes/upload_bypass_probe.py probes/injection_probe.py \
-  probes/secret_scan.py probes/graphql_introspect.py; do
+  probes/secret_scan.py probes/graphql_introspect.py probes/zap_baseline.py; do
   [[ -f "$UPLOAD_DIR/$module" && ! -L "$UPLOAD_DIR/$module" ]] || die "missing trusted upload: $module"
 done
 [[ ! -L "$UPLOAD_DIR" && ! -L /opt/viper && ! -L /opt/viper/vmapi && ! -L /opt/viper/probes ]] \
@@ -70,7 +70,7 @@ for module in app.py auth.py jobs.py toolrunner.py requirements.txt; do
   install -o root -g viper-vmapi -m 0640 "$UPLOAD_DIR/$module" "/opt/viper/vmapi/$module"
 done
 for module in __init__.py _common.py otp_2fa_probe.py upload_bypass_probe.py injection_probe.py \
-  secret_scan.py graphql_introspect.py; do
+  secret_scan.py graphql_introspect.py zap_baseline.py; do
   install -o root -g viper-vmapi -m 0640 "$UPLOAD_DIR/probes/$module" "/opt/viper/probes/$module"
 done
 python3 -m venv /opt/viper/vmapi/.venv

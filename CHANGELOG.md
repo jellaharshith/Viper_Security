@@ -14,9 +14,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 - **Per-run scanner metrics:** executed nuclei template count and request count are parsed into the run result and shown in the Markdown report, the JSON export (`scanner_metrics`) and SARIF run properties. Missing data renders as `unknown`, never `0`.
+- **Knowledge base — new public sources (v1.2):**
+  - **CWE weakness taxonomy** (`viper.rag.cwe`, ids `cwe:CWE-<n>`): the pinned MITRE CWE catalog (~960 active weaknesses), fetched over https from `cwe.mitre.org` and parsed with `defusedxml` (hardened against XML entity attacks). Directly targets the known "definition questions attach unrelated KEV records" failure class.
+  - **NVD CVE detail** (`viper.rag.nvd`, ids `nvd:CVE-<n>`): bounded by design (never the full 250k-record dump — see `docs/v1-scope.md` 3.5) via the NVD CVE API 2.0; optional `NVD_API_KEY` (read under the user's own env name, no `VIPER_` prefix) raises the rate limit. Exploit/PoC availability is derived from NVD's own `Exploit`-tagged references (folds in the ExploitDB signal without indexing a second noisy corpus). Not in the default `all_sources()` — wired in deliberately.
+  - **EPSS enrichment** (`viper.rag.epss`): FIRST.org EPSS exploit-probability scores decorate existing CISA KEV records (no new records, so retrieval stays clean). Best-effort — KEV ingestion never blocks if EPSS is unreachable.
+  - **Dataset v3 (CWE retrieval)** (`eval.build.build_cwe` → `retrieval_cwe.jsonl`), wired into `load_retrieval_all` so the recall gate and per-source metrics cover CWE automatically.
+- **OWASP ZAP baseline scanner (v1.2):** new `zap_baseline` tool (`viper.tools.real`), registry-owned `RiskLevel.ACTIVE` so the policy engine DENYs it with active testing off and REQUIREs human approval when on. The scan is benign by design — spider + ZAP's PASSIVE rules only, never an active attack (there is deliberately no field to enable active scanning). VM-side runner (`vmapi/probes/zap_baseline.py`, lazy `zapv2` import), strict VM allowlist (`zap_baseline`: `target`, bounded `max_duration_minutes`), findings parser (`parse_zap_probe_ex`, mapping ZAP risk→severity and ZAP confidence→finding confidence) wired into `agents.evidence._PARSERS`, and deploy install in `deploy/vm-bootstrap.sh`. Closes the exposure-coverage known limit below (ZAP's spider was named as the alternative).
 
 ### Known limits
-- Exposure checks for `/ftp`, `/metrics` and `/api-docs` are still not in the frozen nuclei profile. The broad `exposure` tag was rejected on purpose (about 6,600 extra requests, roughly 28 minutes at 5 req/s against a 900 s limit); see `docs/v1-scope.md` section 3.4.
+- Exposure checks for `/ftp`, `/metrics` and `/api-docs` are now reachable via the new `zap_baseline` spider rather than the frozen nuclei profile; the broad nuclei `exposure` tag remains deliberately excluded (about 6,600 extra requests, roughly 28 minutes at 5 req/s against a 900 s limit); see `docs/v1-scope.md` section 3.4.
+- The NVD source, the ZAP daemon install/startup on the VM, and any full LLM answer eval are gated/live steps: they require an owner go-ahead (NVD rate limits, a paid VM, Colab) and are not exercised by the offline suite.
 
 ## [1.1.0] - 2026-11-09 - v1.1: Multi-format reports, real RFC-3161 anchoring, scope limits
 

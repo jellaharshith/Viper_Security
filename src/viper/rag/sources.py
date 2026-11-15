@@ -23,12 +23,27 @@ class Source(Protocol):
 
 
 class KevSource:
-    """CISA Known Exploited Vulnerabilities (ids `cisa-kev:CVE-...`)."""
+    """CISA Known Exploited Vulnerabilities (ids `cisa-kev:CVE-...`).
+
+    KEV records are decorated with FIRST.org EPSS exploit-probability scores when reachable. EPSS is
+    best-effort: if its API fails, the KEV records are returned unchanged (never block ingestion).
+    """
 
     name = "cisa-kev"
 
+    enrich_epss: bool = True
+
     def fetch(self) -> list[Document]:
-        return parse_kev(fetch_kev())
+        docs = parse_kev(fetch_kev())
+        if not self.enrich_epss:
+            return docs
+        from viper.rag.epss import enrich_documents, fetch_epss_scores
+        try:
+            cves = [d.id.split(":", 1)[1] for d in docs]
+            scores = fetch_epss_scores(cves)
+            return enrich_documents(docs, scores)
+        except IngestError:
+            return docs  # EPSS unreachable/invalid: KEV stands on its own
 
 
 def safe_get(
@@ -62,6 +77,7 @@ def safe_get(
 def all_sources() -> list[Source]:
     """The sources a full `kb update` covers."""
     from viper.rag.attack import AttackSource
+    from viper.rag.cwe import CweSource
     from viper.rag.owasp import OwaspSource
 
-    return [KevSource(), AttackSource(), OwaspSource()]
+    return [KevSource(), AttackSource(), OwaspSource(), CweSource()]

@@ -136,3 +136,13 @@ def test_crypto_probes_are_checked_and_installed():
         assert f"probes/{module}" in presence
         assert module in install
     assert "/opt/viper/probes/$module" in text
+
+
+def test_zap_baseline_probe_is_checked_and_installed():
+    """The zap_baseline probe must be in both the upload-presence and install loops, or the VM
+    would 500 on every zap_baseline dispatch (same deploy-gap class as the earlier v1.2 probes)."""
+    text = script_text()
+    presence = text.split("for module in ", 1)[1].split("; do", 1)[0]
+    install = text.split("for module in ")[-1].split("; do", 1)[0]
+    assert "probes/zap_baseline.py" in presence
+    assert "zap_baseline.py" in install

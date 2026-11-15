@@ -298,3 +298,33 @@ checkpoint and ended `COMPLETED`:
   scratch files deleted. Only the owner's own `kali-vm` remains in the project.
 - Follow-ups for v1.1: richer remediation text and references for nuclei findings (real nuclei JSON carries little of it for
   many templates), evidence rendering that is easier to read than HTML-escaped JSON, and a reviewed HTTP template subset.
+
+## v1.2 (in progress, 2026-11-15) — KB growth, ZAP, fine-tune harness
+
+Driven directly by the owner ("do everything"), TDD, gates green throughout (`ruff check .`,
+`mypy src`, `pytest -q vmapi\tests tests` = 1356 passed / 3 skipped at this checkpoint).
+
+- **KB public-API sources (Workstream A).** Three new connectors on the existing `Source` protocol
+  (`rag/sources.py:all_sources`), so the gated `run_update`/`collect` pipeline and recall gate cover
+  them with no pipeline change:
+  - `rag/cwe.py` (`cwe:` ids): pinned MITRE CWE catalog, `defusedxml`-hardened XML parse, one record
+    per active weakness; targets the "definition question attaches a KEV record" failure class.
+  - `rag/nvd.py` (`nvd:` ids): **bounded** NVD CVE API 2.0 (never the 250k dump, per v1-scope 3.5);
+    optional `NVD_API_KEY` (own env name); ExploitDB/PoC signal via NVD `Exploit` reference tags.
+    Deliberately not in default `all_sources()`.
+  - `rag/epss.py`: FIRST.org EPSS scores decorate existing KEV records (no new records); best-effort.
+  - `eval/build.py:build_cwe` → `retrieval_cwe.jsonl`, wired into `load_retrieval_all`.
+  - New deps: `defusedxml` (+ `types-defusedxml` dev). Live rebuild from the Supabase index and the
+    full answer eval remain Colab/live-gated (owner go).
+- **OWASP ZAP baseline (Workstream D, code + deploy).** `zap_baseline` tool (ACTIVE, approval-gated),
+  spider + passive rules only (no active attack), VM probe `vmapi/probes/zap_baseline.py` (lazy
+  `zapv2`), strict allowlist in `vmapi/toolrunner.py`, parser `parse_zap_probe_ex` wired into
+  `agents/evidence.py`, deploy install + presence test. Techniques `web-scan/passive-scan/spider`
+  already existed in `KNOWN_TECHNIQUES`, so scope drafting works unchanged. Closes the `/ftp`,
+  `/metrics`, `/api-docs` exposure known-limit. VM daemon install + the live scan are gated.
+- **C1 backlog** (job ids, spot-preemption error, approval-expiry UX, planner targets, per-run
+  metrics) was already shipped in `[Unreleased]`; not re-done.
+
+### Parked (need an explicit owner go / can't run here)
+- Full LLM answer eval and any QLoRA training → Colab. ZAP daemon install + live scan, NVD live
+  fetch, pgvector-against-real-Postgres → a new owned VM / credentials (never `kali-vm`).

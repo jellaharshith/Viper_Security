@@ -14,7 +14,7 @@ Severity = Literal["info", "low", "medium", "high", "critical"]
 Confidence = Literal["confirmed", "hypothesis"]
 SourceTool = Literal[
     "nmap", "nuclei", "otp_2fa_probe", "upload_bypass_probe", "injection_probe",
-    "secret_scan", "graphql_introspect",
+    "secret_scan", "graphql_introspect", "zap_baseline",
 ]
 
 
